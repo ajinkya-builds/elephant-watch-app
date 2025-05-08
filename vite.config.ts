@@ -11,7 +11,7 @@ export function devErrorAndNavigationPlugin(): Plugin {
 
   return {
     name: "dev-error-and-navigation-handler",
-    apply: "serve", 
+    apply: "serve", // This plugin only applies to the dev server
 
     configResolved() {
       const stackTraceLibPath = path.join(
@@ -76,7 +76,7 @@ const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
   injectRegister: false, 
   devOptions: { 
-    enabled: false, 
+    enabled: false, // PWA features disabled for dev server
   },
   manifest: {
     name: "Elephant Watch",
@@ -128,37 +128,34 @@ const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export default defineConfig(({ mode }) => {
-  if (mode === 'development') {
-    // Development mode: only react plugin and force optimizeDeps
-    return {
-      server: {
-        host: "::",
-        port: 8080,
-      },
-      plugins: [react()], // Only the react plugin
-      resolve: {
-        alias: {
-          "@": path.resolve(__dirname, "./src"),
-        },
-      },
-      optimizeDeps: {
-        force: true, // Force Vite to re-bundle dependencies
-      }
-    };
-  }
-  
-  // Production mode: react plugin and VitePWA plugin
-  // The devErrorAndNavigationPlugin is not added here as it's for 'serve' (dev)
-  return {
-    server: { // server config is less relevant for 'build' but harmless
+  // Common configuration for both development and production
+  const commonConfig = {
+    server: {
       host: "::",
       port: 8080,
     },
-    plugins: [react(), VitePWA(pwaOptions)],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+  };
+
+  if (mode === 'development') {
+    return {
+      ...commonConfig,
+      // For development: include devErrorAndNavigationPlugin and react
+      plugins: [devErrorAndNavigationPlugin(), react()], 
+      optimizeDeps: {
+        force: true, // Keep forcing dependency optimization for now
+      }
+    };
+  }
+  
+  // Production mode (implicitly, if not development)
+  return {
+    ...commonConfig,
+    // For production: include react and VitePWA
+    plugins: [react(), VitePWA(pwaOptions)], 
   };
 });
