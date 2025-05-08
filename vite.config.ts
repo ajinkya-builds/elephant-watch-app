@@ -151,7 +151,7 @@ export default defineConfig(({ mode }) => {
     return {
       ...commonConfig,
       plugins: [devErrorAndNavigationPlugin(), react()],
-      // No optimizeDeps: { force: true } for this attempt
+      // No optimizeDeps: { force: true }
     };
   }
   
