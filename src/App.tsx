@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ReportActivityPage from "./pages/ReportActivityPage";
-import PwaReloader from "./components/PwaReloader"; // Re-enable import
+import PwaReloader from "./components/PwaReloader";
 
 const queryClient = new QueryClient();
 
@@ -15,7 +15,8 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <PwaReloader /> {/* Re-enable PwaReloader */}
+      {/* Only include PwaReloader in production builds */}
+      {import.meta.env.PROD && <PwaReloader />}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
