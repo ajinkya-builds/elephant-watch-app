@@ -77,60 +77,8 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
-// Keep your existing pwaOptions definition, though it won't be used for now
 // const pwaOptions: Partial<VitePWAOptions> = { // Commented out
-//   registerType: "autoUpdate",
-//   injectRegister: false, 
-//   devOptions: { 
-//     enabled: false, 
-//   },
-//   manifest: {
-//     name: "Elephant Watch",
-//     short_name: "ElephantWatch",
-//     description: "Report elephant activity to help conservation efforts.",
-//     theme_color: "#4CAF50", 
-//     background_color: "#ffffff",
-//     display: "standalone",
-//     scope: "/",
-//     start_url: "/",
-//     icons: [
-//       {
-//         src: "pwa-192x192.png", 
-//         sizes: "192x192",
-//         type: "image/png",
-//       },
-//       {
-//         src: "pwa-512x512.png", 
-//         sizes: "512x512",
-//         type: "image/png",
-//       },
-//       {
-//         src: "pwa-512x512.png", 
-//         sizes: "512x512",
-//         type: "image/png",
-//         purpose: "maskable",
-//       },
-//     ],
-//   },
-//   workbox: {
-//     globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"], 
-//     runtimeCaching: [
-//       {
-//         urlPattern: /^https:\/\/pauafmgoewfdhwnsexzy\.supabase\.co\/.*/i, 
-//         handler: "NetworkFirst", 
-//         options: {
-//           cacheName: "supabase-api-cache",
-//           expiration: {
-//             maxEntries: 10,
-//             maxAgeSeconds: 60 * 60 * 24 * 1, // 1 day
-//           },
-//           cacheableResponse: {
-//             statuses: [0, 200],
-//           },
-//         },
-//       },
-//     ],
-//   },
+// ...
 // };
 
 export default defineConfig(({ mode }) => {
@@ -146,19 +94,23 @@ export default defineConfig(({ mode }) => {
     },
   };
 
+  // IMPORTANT: Replace <YOUR_REPOSITORY_NAME> with the actual name of your GitHub repository
+  const GITHUB_REPO_NAME = "<YOUR_REPOSITORY_NAME>"; 
+
   if (mode === 'development') {
     console.log("[vite.config.ts] Configuring for development mode.");
     return {
       ...commonConfig,
       plugins: [devErrorAndNavigationPlugin(), react()],
+      base: '/', // Base path for development is root
     };
   }
   
-  // Production mode
+  // Production mode (for GitHub Pages deployment)
   console.log("[vite.config.ts] Configuring for production mode.");
   return {
     ...commonConfig,
-    // plugins: [react(), VitePWA(pwaOptions)], // Commented out PWA plugin
-    plugins: [react()], // Only react plugin for production for now
+    plugins: [react()], // Only react plugin for production for now (PWA commented out)
+    base: `/${GITHUB_REPO_NAME}/`, // Base path for GitHub Pages
   };
 });
