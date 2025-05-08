@@ -1,10 +1,10 @@
 import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import fs from "fs"; // Re-enable fs as it's used by the dev plugin
-// import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Still commented out
+import fs from "fs";
+import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Re-enable import
 
-// Re-enable devErrorAndNavigationPlugin
+// Keep your existing devErrorAndNavigationPlugin
 export function devErrorAndNavigationPlugin(): Plugin {
   let stacktraceJsContent: string | null = null;
   let dyadShimContent: string | null = null;
@@ -34,7 +34,7 @@ export function devErrorAndNavigationPlugin(): Plugin {
         console.error(`[dyad-shim] stacktrace.js not found.`);
       }
 
-      const dyadShimPath = path.join("dyad-shim.js"); // Assuming dyad-shim.js is in the root
+      const dyadShimPath = path.join("dyad-shim.js");
       if (dyadShimPath) {
         try {
           dyadShimContent = fs.readFileSync(dyadShimPath, "utf-8");
@@ -71,17 +71,67 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
-/* // Temporarily commented out PWA options
 const pwaOptions: Partial<VitePWAOptions> = {
-  // ... pwa options ...
+  registerType: "autoUpdate",
+  injectRegister: false, 
+  // devOptions: { // Keep devOptions commented out or set enabled: false
+  //   enabled: false, 
+  //   type: 'module',
+  // },
+  manifest: {
+    name: "Elephant Watch",
+    short_name: "ElephantWatch",
+    description: "Report elephant activity to help conservation efforts.",
+    theme_color: "#4CAF50", 
+    background_color: "#ffffff",
+    display: "standalone",
+    scope: "/",
+    start_url: "/",
+    icons: [
+      {
+        src: "pwa-192x192.png", 
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: "pwa-512x512.png", 
+        sizes: "512x512",
+        type: "image/png",
+      },
+      {
+        src: "pwa-512x512.png", 
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+    ],
+  },
+  workbox: {
+    globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"], 
+    runtimeCaching: [
+      {
+        urlPattern: /^https:\/\/pauafmgoewfdhwnsexzy\.supabase\.co\/.*/i, 
+        handler: "NetworkFirst", 
+        options: {
+          cacheName: "supabase-api-cache",
+          expiration: {
+            maxEntries: 10,
+            maxAgeSeconds: 60 * 60 * 24 * 1, // 1 day
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+    ],
+  },
 };
-*/
 
 export default defineConfig(({ mode }) => {
-  const plugins = [react()]; 
+  const plugins = [react(), VitePWA(pwaOptions)]; // Re-enable VitePWA
   
   if (mode === 'development') {
-    plugins.unshift(devErrorAndNavigationPlugin()); // Re-enable this plugin
+    plugins.unshift(devErrorAndNavigationPlugin()); 
   }
 
   return {
