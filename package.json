@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://<YOUR_GITHUB_USERNAME>.github.io/<YOUR_REPOSITORY_NAME>",
+  "homepage": "https://ajinkya-builds.github.io/elephant-watch-app",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

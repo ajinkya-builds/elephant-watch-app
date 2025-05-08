@@ -94,8 +94,7 @@ export default defineConfig(({ mode }) => {
     },
   };
 
-  // IMPORTANT: Replace <YOUR_REPOSITORY_NAME> with the actual name of your GitHub repository
-  const GITHUB_REPO_NAME = "<YOUR_REPOSITORY_NAME>"; 
+  const GITHUB_REPO_NAME = "elephant-watch-app"; 
 
   if (mode === 'development') {
     console.log("[vite.config.ts] Configuring for development mode.");
