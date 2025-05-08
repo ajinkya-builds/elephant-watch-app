@@ -44,10 +44,10 @@ const reportFormSchema = z.object({
   unknownElephants: z.coerce.number({invalid_type_error: "Must be a number / संख्या होनी चाहिए"}).min(0).int().optional().nullable(),
   activityDate: z.string().min(1, "Date is required / दिनांक आवश्यक है"),
   activityTime: z.string().min(1, "Time is required / समय आवश्यक है"),
-  latitude: z.string() // Stays as string from form, Supabase handles numeric conversion if column type is numeric
+  latitude: z.string() 
     .min(1, "Latitude is required / अक्षांश आवश्यक है")
     .regex(/^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$/, "Invalid latitude (e.g., 23.4536) / अमान्य अक्षांश (उदा. 23.4536)"),
-  longitude: z.string() // Stays as string from form
+  longitude: z.string() 
     .min(1, "Longitude is required / देशांतर आवश्यक है")
     .regex(/^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/, "Invalid longitude (e.g., 81.4763) / अमान्य देशांतर (उदा. 81.4763)"),
   headingTowards: z.string().optional(),
@@ -124,7 +124,6 @@ export function ReportForm() {
     setIsSubmitting(true);
     toast.info("Submitting report... / रिपोर्ट सबमिट हो रही है...");
 
-    // Map form data to Supabase table column names
     const reportData = {
       email: data.email,
       division_name: data.divisionName,
@@ -133,15 +132,15 @@ export function ReportForm() {
       beat_name: data.beatName,
       compartment_no: data.compartmentNo,
       damage_done: data.damageDone,
-      damage_description: data.damageDescription || null, // Ensure optional fields are null if empty
+      damage_description: data.damageDescription || null,
       total_elephants: data.totalElephants,
       male_elephants: data.maleElephants,
       female_elephants: data.femaleElephants,
       unknown_elephants: data.unknownElephants,
       activity_date: data.activityDate,
       activity_time: data.activityTime,
-      latitude: parseFloat(data.latitude), // Convert to number for Supabase if column is numeric/float
-      longitude: parseFloat(data.longitude), // Convert to number
+      latitude: parseFloat(data.latitude), 
+      longitude: parseFloat(data.longitude), 
       heading_towards: data.headingTowards || null,
       local_name: data.localName || null,
       identification_marks: data.identificationMarks || null,
@@ -150,7 +149,8 @@ export function ReportForm() {
     };
 
     try {
-      const { error }_ = await supabase.from("activity_reports").insert([reportData]);
+      // Corrected line:
+      const { error } = await supabase.from("activity_reports").insert([reportData]);
 
       if (error) {
         console.error("Supabase submission error:", error);
