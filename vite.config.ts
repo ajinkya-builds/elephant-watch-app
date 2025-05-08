@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { VitePWA, VitePWAOptions } from "vite-plugin-pwa";
 
-// Keep your existing devErrorAndNavigationPlugin
+// devErrorAndNavigationPlugin is defined above, but we won't use it in dev for this test.
 export function devErrorAndNavigationPlugin(): Plugin {
   let stacktraceJsContent: string | null = null;
   let dyadShimContent: string | null = null;
@@ -71,11 +71,10 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
+
 const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
   injectRegister: false, 
-  // devOptions is no longer strictly necessary here if the plugin is conditionally added,
-  // but keeping it doesn't hurt and is good practice if the conditional logic were different.
   devOptions: { 
     enabled: false, 
   },
@@ -129,21 +128,21 @@ const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export default defineConfig(({ mode }) => {
-  const plugins = [react()]; // Start with base plugins
+  let pluginsConfig = [react()]; // Default to just react plugin
   
-  if (mode === 'development') {
-    plugins.unshift(devErrorAndNavigationPlugin()); 
-  } else if (mode === 'production') {
-    // Only add VitePWA plugin for production builds
-    plugins.push(VitePWA(pwaOptions));
+  if (mode === 'production') {
+    // For production, add PWA plugin. devErrorAndNavigationPlugin is not for prod.
+    pluginsConfig = [react(), VitePWA(pwaOptions)];
   }
+  // For development, pluginsConfig remains just [react()]
+  // The devErrorAndNavigationPlugin is NOT added for this test.
 
   return {
     server: {
       host: "::",
       port: 8080,
     },
-    plugins: plugins,
+    plugins: pluginsConfig, // Use the determined plugin configuration
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
