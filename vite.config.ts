@@ -2,7 +2,7 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
-import { VitePWA, VitePWAOptions } from "vite-plugin-pwa";
+// import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Temporarily commented out
 
 // Keep your existing devErrorAndNavigationPlugin
 export function devErrorAndNavigationPlugin(): Plugin {
@@ -71,35 +71,36 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
+/* // Temporarily commented out PWA options
 const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
-  injectRegister: false, // We will register manually in a React component
+  injectRegister: false, 
   devOptions: {
-    enabled: true, // Enable PWA in development for testing
+    enabled: true, 
     type: 'module',
   },
   manifest: {
     name: "Elephant Watch",
     short_name: "ElephantWatch",
     description: "Report elephant activity to help conservation efforts.",
-    theme_color: "#4CAF50", // A green theme color
+    theme_color: "#4CAF50", 
     background_color: "#ffffff",
     display: "standalone",
     scope: "/",
     start_url: "/",
     icons: [
       {
-        src: "pwa-192x192.png", // You'll need to add these icons to your public folder
+        src: "pwa-192x192.png", 
         sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "pwa-512x512.png", // You'll need to add these icons to your public folder
+        src: "pwa-512x512.png", 
         sizes: "512x512",
         type: "image/png",
       },
       {
-        src: "pwa-512x512.png", // Maskable icon
+        src: "pwa-512x512.png", 
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
@@ -107,11 +108,11 @@ const pwaOptions: Partial<VitePWAOptions> = {
     ],
   },
   workbox: {
-    globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"], // Cache these file types
+    globPatterns: ["**\/*.{js,css,html,ico,png,svg,woff,woff2}"], 
     runtimeCaching: [
       {
         urlPattern: /^https:\/\/pauafmgoewfdhwnsexzy\.supabase\.co\/.*/i, // Your Supabase URL
-        handler: "NetworkFirst", // Or 'NetworkOnly' if you don't want to cache API responses
+        handler: "NetworkFirst", 
         options: {
           cacheName: "supabase-api-cache",
           expiration: {
@@ -126,11 +127,13 @@ const pwaOptions: Partial<VitePWAOptions> = {
     ],
   },
 };
+*/
 
 export default defineConfig(({ mode }) => {
-  const plugins = [react(), VitePWA(pwaOptions)];
+  // const plugins = [react(), VitePWA(pwaOptions)]; // Temporarily modified
+  const plugins = [react()]; // Using only react plugin for now
   if (mode === 'development') {
-    plugins.unshift(devErrorAndNavigationPlugin()); // Add dev plugin only in development
+    plugins.unshift(devErrorAndNavigationPlugin()); 
   }
 
   return {
