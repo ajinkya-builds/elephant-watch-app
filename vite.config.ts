@@ -74,9 +74,10 @@ export function devErrorAndNavigationPlugin(): Plugin {
 const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
   injectRegister: false, 
-  devOptions: { // Explicitly disable PWA features in dev to prevent hangs and virtual module issues
-    enabled: false, // Set to false
-    // type: 'module', // Not needed if enabled is false
+  // devOptions is no longer strictly necessary here if the plugin is conditionally added,
+  // but keeping it doesn't hurt and is good practice if the conditional logic were different.
+  devOptions: { 
+    enabled: false, 
   },
   manifest: {
     name: "Elephant Watch",
@@ -128,10 +129,13 @@ const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export default defineConfig(({ mode }) => {
-  const plugins = [react(), VitePWA(pwaOptions)];
+  const plugins = [react()]; // Start with base plugins
   
   if (mode === 'development') {
     plugins.unshift(devErrorAndNavigationPlugin()); 
+  } else if (mode === 'production') {
+    // Only add VitePWA plugin for production builds
+    plugins.push(VitePWA(pwaOptions));
   }
 
   return {
