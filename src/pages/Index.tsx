@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Elephant } from "lucide-react";
+import { Home } from "lucide-react"; // Changed from Elephant to Home
 
 const Index = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100 p-4">
       <div className="text-center bg-white p-8 sm:p-12 rounded-xl shadow-2xl max-w-xl">
-        <Elephant className="w-20 h-20 text-green-600 mx-auto mb-6" />
+        <Home className="w-20 h-20 text-green-600 mx-auto mb-6" /> {/* Changed from Elephant to Home */}
         <h1 className="text-4xl sm:text-5xl font-bold mb-4 text-gray-800">Elephant Watch</h1>
         <p className="text-lg text-gray-600 mb-8">
           Report elephant activity to help conservation efforts. Your observations matter!
