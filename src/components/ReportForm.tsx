@@ -19,7 +19,7 @@ import { useState } from "react";
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
 import { ElephantSightingSection } from "./form-sections/ElephantSightingSection";
-import { LocationDateTimeSection } from "./form-sections/LocationDateTimeSection";
+import { LocationDateTimeSection } from "./form-sections/LocationDateTimeSection"; // Ensure this path and name are exact
 import { AdditionalInfoSection } from "./form-sections/AdditionalInfoSection";
 import { ReporterDetailsSection } from "./form-sections/ReporterDetailsSection";
 
@@ -76,8 +76,8 @@ export function ReportForm() {
       maleElephants: null,
       femaleElephants: null,
       unknownElephants: null,
-      activityDate: "", // Will be set by fetch or manually
-      activityTime: "", // Will be set by fetch or manually
+      activityDate: "", 
+      activityTime: "", 
       latitude: "",
       longitude: "",
       headingTowards: "",
@@ -97,7 +97,6 @@ export function ReportForm() {
     setIsFetchingData(true);
     toast.info("Fetching location, date, and time... / स्थान, दिनांक और समय प्राप्त किया जा रहा है...");
 
-    // Set Date and Time immediately
     const now = new Date();
     form.setValue("activityDate", now.toISOString().split('T')[0], { shouldValidate: true });
     form.setValue("activityTime", now.toTimeString().split(' ')[0].substring(0,5), { shouldValidate: true });
@@ -121,7 +120,7 @@ export function ReportForm() {
           errorMessage = "Location request timed out. Date & Time were set. / स्थान अनुरोध का समय समाप्त हो गया। दिनांक और समय सेट कर दिए गए हैं।";
         }
         toast.error(errorMessage);
-        setIsFetchingData(false); // Still set to false on error
+        setIsFetchingData(false); 
       },
       {
         enableHighAccuracy: true,
@@ -140,9 +139,6 @@ export function ReportForm() {
 
     toast.success("Report submitted successfully! (Simulated) / रिपोर्ट सफलतापूर्वक सबमिट की गई! (सिम्युलेटेड)");
     form.reset();
-    // Reset date and time to empty strings as per defaultValues if you want them cleared
-    // or set them to current again if that's preferred after submission.
-    // For now, form.reset() will use the defaultValues which are empty for these.
     setIsSubmitting(false);
   }
 
