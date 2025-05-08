@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react'; // Import React and Suspense
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,17 +7,26 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ReportActivityPage from "./pages/ReportActivityPage";
-import PwaReloader from "./components/PwaReloader";
+// REMOVE the static import: import PwaReloader from "./components/PwaReloader";
 
 const queryClient = new QueryClient();
+
+// Dynamically import PwaReloader only for production builds
+const LazyPwaReloader = import.meta.env.PROD
+  ? React.lazy(() => import("./components/PwaReloader"))
+  : null;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      {/* Only include PwaReloader in production builds */}
-      {import.meta.env.PROD && <PwaReloader />}
+      {/* Conditionally render PwaReloader using Suspense for React.lazy */}
+      {import.meta.env.PROD && LazyPwaReloader && (
+        <Suspense fallback={null}> {/* Fallback can be null or a minimal loading indicator */}
+          <LazyPwaReloader />
+        </Suspense>
+      )}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
