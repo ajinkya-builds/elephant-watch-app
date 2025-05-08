@@ -4,18 +4,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useState } from "react";
 
-import { ReporterInfoSection } from "./form-sections/ReporterInfoSection";
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
-import { ElephantSightingSection } from "./form-sections/ElephantSightingSection";
-import { GpsLocationSection } from "./form-sections/GpsLocationSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
+import { ElephantSightingSection } from "./form-sections/ElephantSightingSection";
+import { LocationDateTimeSection } from "./form-sections/LocationDateTimeSection";
 import { AdditionalInfoSection } from "./form-sections/AdditionalInfoSection";
+import { ReporterDetailsSection } from "./form-sections/ReporterDetailsSection";
 
-// Main Zod schema remains here as the single source of truth for the entire form
 const reportFormSchema = z.object({
   email: z.string().email("Invalid email address").min(1, "Email is required"),
   divisionName: z.string().min(1, "Division Name is required / वनमण्डल का नाम आवश्यक है"),
@@ -54,7 +61,7 @@ type ReportFormValues = z.infer<typeof reportFormSchema>;
 
 export function ReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(false);
 
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
@@ -62,17 +69,15 @@ export function ReportForm() {
       email: "",
       divisionName: "",
       rangeName: "",
-      // landType: undefined, // Let zod handle default if not set or set explicitly
       beatName: "",
       compartmentNo: "",
-      // damageDone: undefined,
       damageDescription: "",
       totalElephants: 0,
       maleElephants: null,
       femaleElephants: null,
       unknownElephants: null,
-      activityDate: new Date().toISOString().split('T')[0],
-      activityTime: new Date().toTimeString().split(' ')[0].substring(0,5),
+      activityDate: "", // Will be set by fetch or manually
+      activityTime: "", // Will be set by fetch or manually
       latitude: "",
       longitude: "",
       headingTowards: "",
@@ -83,14 +88,19 @@ export function ReportForm() {
     },
   });
 
-  const handleFetchLocation = () => {
+  const handleFetchData = () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser. / आपके ब्राउज़र द्वारा जियोलोकेशन समर्थित नहीं है।");
       return;
     }
 
-    setIsFetchingLocation(true);
-    toast.info("Fetching location... / स्थान प्राप्त किया जा रहा है...");
+    setIsFetchingData(true);
+    toast.info("Fetching location, date, and time... / स्थान, दिनांक और समय प्राप्त किया जा रहा है...");
+
+    // Set Date and Time immediately
+    const now = new Date();
+    form.setValue("activityDate", now.toISOString().split('T')[0], { shouldValidate: true });
+    form.setValue("activityTime", now.toTimeString().split(' ')[0].substring(0,5), { shouldValidate: true });
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -98,20 +108,20 @@ export function ReportForm() {
         const lon = position.coords.longitude.toFixed(6);
         form.setValue("latitude", lat, { shouldValidate: true });
         form.setValue("longitude", lon, { shouldValidate: true });
-        toast.success("Location fetched successfully! / स्थान सफलतापूर्वक प्राप्त हुआ!");
-        setIsFetchingLocation(false);
+        toast.success("Location, Date & Time fetched successfully! / स्थान, दिनांक और समय सफलतापूर्वक प्राप्त हुआ!");
+        setIsFetchingData(false);
       },
       (error) => {
-        let errorMessage = "Could not get location. / स्थान प्राप्त नहीं किया जा सका।";
+        let errorMessage = "Could not get location. Date & Time were set. / स्थान प्राप्त नहीं किया जा सका। दिनांक और समय सेट कर दिए गए हैं।";
         if (error.code === error.PERMISSION_DENIED) {
-          errorMessage = "Location permission denied. Please enable it in your browser settings. / स्थान की अनुमति अस्वीकृत। कृपया अपनी ब्राउज़र सेटिंग्स में इसे सक्षम करें।";
+          errorMessage = "Location permission denied. Date & Time were set. / स्थान की अनुमति अस्वीकृत। दिनांक और समय सेट कर दिए गए हैं।";
         } else if (error.code === error.POSITION_UNAVAILABLE) {
-          errorMessage = "Location information is unavailable. / स्थान की जानकारी अनुपलब्ध है।";
+          errorMessage = "Location information is unavailable. Date & Time were set. / स्थान की जानकारी अनुपलब्ध है। दिनांक और समय सेट कर दिए गए हैं।";
         } else if (error.code === error.TIMEOUT) {
-          errorMessage = "Location request timed out. / स्थान अनुरोध का समय समाप्त हो गया।";
+          errorMessage = "Location request timed out. Date & Time were set. / स्थान अनुरोध का समय समाप्त हो गया। दिनांक और समय सेट कर दिए गए हैं।";
         }
         toast.error(errorMessage);
-        setIsFetchingLocation(false);
+        setIsFetchingData(false); // Still set to false on error
       },
       {
         enableHighAccuracy: true,
@@ -130,24 +140,41 @@ export function ReportForm() {
 
     toast.success("Report submitted successfully! (Simulated) / रिपोर्ट सफलतापूर्वक सबमिट की गई! (सिम्युलेटेड)");
     form.reset();
+    // Reset date and time to empty strings as per defaultValues if you want them cleared
+    // or set them to current again if that's preferred after submission.
+    // For now, form.reset() will use the defaultValues which are empty for these.
     setIsSubmitting(false);
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <ReporterInfoSection control={form.control} />
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email <span className="text-red-500">*</span></FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="your.email@example.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
         <AdministrativeDetailsSection control={form.control} />
         <DamageAssessmentSection control={form.control} />
         <ElephantSightingSection control={form.control} />
-        <GpsLocationSection 
+        <LocationDateTimeSection 
           control={form.control} 
-          isFetchingLocation={isFetchingLocation} 
-          handleFetchLocation={handleFetchLocation} 
+          isFetching={isFetchingData} 
+          handleFetchData={handleFetchData} 
         />
         <AdditionalInfoSection control={form.control} />
+        <ReporterDetailsSection control={form.control} />
         
-        <Button type="submit" disabled={isSubmitting || isFetchingLocation} className="w-full sm:w-auto">
+        <Button type="submit" disabled={isSubmitting || isFetchingData} className="w-full sm:w-auto">
           {isSubmitting ? "Submitting... / सबमिट हो रहा है..." : "Submit Report / रिपोर्ट सबमिट करें"}
         </Button>
       </form>

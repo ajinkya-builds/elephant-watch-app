@@ -85,36 +85,6 @@ export function ElephantSightingSection({ control }: ElephantSightingSectionProp
           )}
         />
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={control}
-          name="activityDate"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>11) Date ? दिनांक? <span className="text-red-500">*</span></FormLabel>
-              <FormControl>
-                <Input type="date" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={control}
-          name="activityTime"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>12) Time/ समय ? <span className="text-red-500">*</span></FormLabel>
-              <FormControl>
-                <Input type="time" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
     </>
   );
 }
