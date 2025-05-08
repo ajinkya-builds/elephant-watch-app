@@ -1,140 +1,28 @@
-import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import fs from "fs";
-// import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Temporarily commented out
+// import fs from "fs"; // No longer needed if dev plugin is disabled
+// import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Still commented out
 
-// Keep your existing devErrorAndNavigationPlugin
+// Keep your existing devErrorAndNavigationPlugin, but we won't call it for now
+/*
 export function devErrorAndNavigationPlugin(): Plugin {
-  let stacktraceJsContent: string | null = null;
-  let dyadShimContent: string | null = null;
-
-  return {
-    name: "dev-error-and-navigation-handler",
-    apply: "serve", // Only apply in development
-
-    configResolved() {
-      const stackTraceLibPath = path.join(
-        "node_modules",
-        "stacktrace-js",
-        "dist",
-        "stacktrace.min.js"
-      );
-      if (stackTraceLibPath) {
-        try {
-          stacktraceJsContent = fs.readFileSync(stackTraceLibPath, "utf-8");
-        } catch (error) {
-          console.error(
-            `[dyad-shim] Failed to read stacktrace.js from ${stackTraceLibPath}:`,
-            error
-          );
-          stacktraceJsContent = null;
-        }
-      } else {
-        console.error(`[dyad-shim] stacktrace.js not found.`);
-      }
-
-      const dyadShimPath = path.join("dyad-shim.js");
-      if (dyadShimPath) {
-        try {
-          dyadShimContent = fs.readFileSync(dyadShimPath, "utf-8");
-        } catch (error) {
-          console.error(
-            `[dyad-shim] Failed to read dyad-shim from ${dyadShimPath}:`,
-            error
-          );
-          dyadShimContent = null;
-        }
-      } else {
-        console.error(`[dyad-shim] dyad-shim.js not found.`);
-      }
-    },
-
-    transformIndexHtml(html) {
-      const tags: HtmlTagDescriptor[] = [];
-      if (stacktraceJsContent) {
-        tags.push({
-          tag: "script",
-          injectTo: "head-prepend",
-          children: stacktraceJsContent,
-        });
-      }
-      if (dyadShimContent) {
-        tags.push({
-          tag: "script",
-          injectTo: "head-prepend",
-          children: dyadShimContent,
-        });
-      }
-      return { html, tags };
-    },
-  };
+  // ... plugin code ...
 }
+*/
 
 /* // Temporarily commented out PWA options
 const pwaOptions: Partial<VitePWAOptions> = {
-  registerType: "autoUpdate",
-  injectRegister: false, 
-  devOptions: {
-    enabled: true, 
-    type: 'module',
-  },
-  manifest: {
-    name: "Elephant Watch",
-    short_name: "ElephantWatch",
-    description: "Report elephant activity to help conservation efforts.",
-    theme_color: "#4CAF50", 
-    background_color: "#ffffff",
-    display: "standalone",
-    scope: "/",
-    start_url: "/",
-    icons: [
-      {
-        src: "pwa-192x192.png", 
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        src: "pwa-512x512.png", 
-        sizes: "512x512",
-        type: "image/png",
-      },
-      {
-        src: "pwa-512x512.png", 
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
-      },
-    ],
-  },
-  workbox: {
-    globPatterns: ["**\/*.{js,css,html,ico,png,svg,woff,woff2}"], 
-    runtimeCaching: [
-      {
-        urlPattern: /^https:\/\/pauafmgoewfdhwnsexzy\.supabase\.co\/.*/i, // Your Supabase URL
-        handler: "NetworkFirst", 
-        options: {
-          cacheName: "supabase-api-cache",
-          expiration: {
-            maxEntries: 10,
-            maxAgeSeconds: 60 * 60 * 24 * 1, // 1 day
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
-    ],
-  },
+  // ... pwa options ...
 };
 */
 
 export default defineConfig(({ mode }) => {
-  // const plugins = [react(), VitePWA(pwaOptions)]; // Temporarily modified
   const plugins = [react()]; // Using only react plugin for now
-  if (mode === 'development') {
-    plugins.unshift(devErrorAndNavigationPlugin()); 
-  }
+  
+  // if (mode === 'development') {
+  //   plugins.unshift(devErrorAndNavigationPlugin()); // Also commented out
+  // }
 
   return {
     server: {
