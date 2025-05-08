@@ -23,30 +23,33 @@ export function devErrorAndNavigationPlugin(): Plugin {
       if (stackTraceLibPath) {
         try {
           stacktraceJsContent = fs.readFileSync(stackTraceLibPath, "utf-8");
+          console.log("[devErrorAndNavigationPlugin] Successfully read stacktrace.js");
         } catch (error) {
           console.error(
-            `[dyad-shim] Failed to read stacktrace.js from ${stackTraceLibPath}:`,
+            `[devErrorAndNavigationPlugin] Failed to read stacktrace.js from ${stackTraceLibPath}:`,
             error
           );
           stacktraceJsContent = null;
         }
       } else {
-        console.error(`[dyad-shim] stacktrace.js not found.`);
+        console.error(`[devErrorAndNavigationPlugin] stacktrace.js not found at expected path: ${stackTraceLibPath}`);
       }
 
-      const dyadShimPath = path.join("dyad-shim.js");
+      const dyadShimPath = path.join("dyad-shim.js"); // Relative to project root
       if (dyadShimPath) {
         try {
           dyadShimContent = fs.readFileSync(dyadShimPath, "utf-8");
+          console.log("[devErrorAndNavigationPlugin] Successfully read dyad-shim.js");
         } catch (error) {
           console.error(
-            `[dyad-shim] Failed to read dyad-shim from ${dyadShimPath}:`,
+            `[devErrorAndNavigationPlugin] Failed to read dyad-shim.js from ${dyadShimPath}:`,
             error
           );
           dyadShimContent = null;
         }
       } else {
-        console.error(`[dyad-shim] dyad-shim.js not found.`);
+        // This case should not happen if path.join is used correctly with a filename
+        console.error(`[devErrorAndNavigationPlugin] dyad-shim.js path resolution failed.`);
       }
     },
 
@@ -66,6 +69,9 @@ export function devErrorAndNavigationPlugin(): Plugin {
           children: dyadShimContent,
         });
       }
+      if (tags.length > 0) {
+        console.log("[devErrorAndNavigationPlugin] Injecting shims into index.html");
+      }
       return { html, tags };
     },
   };
@@ -76,7 +82,7 @@ const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
   injectRegister: false, 
   devOptions: { 
-    enabled: false, // PWA features disabled for dev server
+    enabled: false, 
   },
   manifest: {
     name: "Elephant Watch",
@@ -128,7 +134,6 @@ const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export default defineConfig(({ mode }) => {
-  // Common configuration for both development and production
   const commonConfig = {
     server: {
       host: "::",
@@ -142,20 +147,18 @@ export default defineConfig(({ mode }) => {
   };
 
   if (mode === 'development') {
+    console.log("[vite.config.ts] Configuring for development mode.");
     return {
       ...commonConfig,
-      // For development: include devErrorAndNavigationPlugin and react
-      plugins: [devErrorAndNavigationPlugin(), react()], 
-      optimizeDeps: {
-        force: true, // Keep forcing dependency optimization for now
-      }
+      plugins: [devErrorAndNavigationPlugin(), react()],
+      // No optimizeDeps: { force: true } for this attempt
     };
   }
   
-  // Production mode (implicitly, if not development)
+  // Production mode
+  console.log("[vite.config.ts] Configuring for production mode.");
   return {
     ...commonConfig,
-    // For production: include react and VitePWA
     plugins: [react(), VitePWA(pwaOptions)], 
   };
 });
