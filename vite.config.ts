@@ -2,7 +2,7 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
-import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Re-enable import
+import { VitePWA, VitePWAOptions } from "vite-plugin-pwa";
 
 // Keep your existing devErrorAndNavigationPlugin
 export function devErrorAndNavigationPlugin(): Plugin {
@@ -74,10 +74,10 @@ export function devErrorAndNavigationPlugin(): Plugin {
 const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
   injectRegister: false, 
-  // devOptions: { // Keep devOptions commented out or set enabled: false
-  //   enabled: false, 
-  //   type: 'module',
-  // },
+  devOptions: { // Explicitly disable PWA features in dev to prevent hangs and virtual module issues
+    enabled: false, // Set to false
+    // type: 'module', // Not needed if enabled is false
+  },
   manifest: {
     name: "Elephant Watch",
     short_name: "ElephantWatch",
@@ -128,7 +128,7 @@ const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export default defineConfig(({ mode }) => {
-  const plugins = [react(), VitePWA(pwaOptions)]; // Re-enable VitePWA
+  const plugins = [react(), VitePWA(pwaOptions)];
   
   if (mode === 'development') {
     plugins.unshift(devErrorAndNavigationPlugin()); 
