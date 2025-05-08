@@ -2,7 +2,7 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
-import { VitePWA, VitePWAOptions } from "vite-plugin-pwa";
+// import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Commented out
 
 // Keep your existing devErrorAndNavigationPlugin definition
 export function devErrorAndNavigationPlugin(): Plugin {
@@ -77,61 +77,61 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
-// Keep your existing pwaOptions definition
-const pwaOptions: Partial<VitePWAOptions> = {
-  registerType: "autoUpdate",
-  injectRegister: false, 
-  devOptions: { 
-    enabled: false, 
-  },
-  manifest: {
-    name: "Elephant Watch",
-    short_name: "ElephantWatch",
-    description: "Report elephant activity to help conservation efforts.",
-    theme_color: "#4CAF50", 
-    background_color: "#ffffff",
-    display: "standalone",
-    scope: "/",
-    start_url: "/",
-    icons: [
-      {
-        src: "pwa-192x192.png", 
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        src: "pwa-512x512.png", 
-        sizes: "512x512",
-        type: "image/png",
-      },
-      {
-        src: "pwa-512x512.png", 
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
-      },
-    ],
-  },
-  workbox: {
-    globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"], 
-    runtimeCaching: [
-      {
-        urlPattern: /^https:\/\/pauafmgoewfdhwnsexzy\.supabase\.co\/.*/i, 
-        handler: "NetworkFirst", 
-        options: {
-          cacheName: "supabase-api-cache",
-          expiration: {
-            maxEntries: 10,
-            maxAgeSeconds: 60 * 60 * 24 * 1, // 1 day
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
-    ],
-  },
-};
+// Keep your existing pwaOptions definition, though it won't be used for now
+// const pwaOptions: Partial<VitePWAOptions> = { // Commented out
+//   registerType: "autoUpdate",
+//   injectRegister: false, 
+//   devOptions: { 
+//     enabled: false, 
+//   },
+//   manifest: {
+//     name: "Elephant Watch",
+//     short_name: "ElephantWatch",
+//     description: "Report elephant activity to help conservation efforts.",
+//     theme_color: "#4CAF50", 
+//     background_color: "#ffffff",
+//     display: "standalone",
+//     scope: "/",
+//     start_url: "/",
+//     icons: [
+//       {
+//         src: "pwa-192x192.png", 
+//         sizes: "192x192",
+//         type: "image/png",
+//       },
+//       {
+//         src: "pwa-512x512.png", 
+//         sizes: "512x512",
+//         type: "image/png",
+//       },
+//       {
+//         src: "pwa-512x512.png", 
+//         sizes: "512x512",
+//         type: "image/png",
+//         purpose: "maskable",
+//       },
+//     ],
+//   },
+//   workbox: {
+//     globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"], 
+//     runtimeCaching: [
+//       {
+//         urlPattern: /^https:\/\/pauafmgoewfdhwnsexzy\.supabase\.co\/.*/i, 
+//         handler: "NetworkFirst", 
+//         options: {
+//           cacheName: "supabase-api-cache",
+//           expiration: {
+//             maxEntries: 10,
+//             maxAgeSeconds: 60 * 60 * 24 * 1, // 1 day
+//           },
+//           cacheableResponse: {
+//             statuses: [0, 200],
+//           },
+//         },
+//       },
+//     ],
+//   },
+// };
 
 export default defineConfig(({ mode }) => {
   const commonConfig = {
@@ -151,7 +151,6 @@ export default defineConfig(({ mode }) => {
     return {
       ...commonConfig,
       plugins: [devErrorAndNavigationPlugin(), react()],
-      // No optimizeDeps: { force: true }
     };
   }
   
@@ -159,6 +158,7 @@ export default defineConfig(({ mode }) => {
   console.log("[vite.config.ts] Configuring for production mode.");
   return {
     ...commonConfig,
-    plugins: [react(), VitePWA(pwaOptions)], 
+    // plugins: [react(), VitePWA(pwaOptions)], // Commented out PWA plugin
+    plugins: [react()], // Only react plugin for production for now
   };
 });

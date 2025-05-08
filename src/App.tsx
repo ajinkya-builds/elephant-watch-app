@@ -7,14 +7,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ReportActivityPage from "./pages/ReportActivityPage";
-// REMOVE the static import: import PwaReloader from "./components/PwaReloader";
 
 const queryClient = new QueryClient();
 
 // Dynamically import PwaReloader only for production builds
-const LazyPwaReloader = import.meta.env.PROD
-  ? React.lazy(() => import("./components/PwaReloader"))
-  : null;
+// const LazyPwaReloader = import.meta.env.PROD // Commented out
+//   ? React.lazy(() => import("./components/PwaReloader"))
+//   : null;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -22,11 +21,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       {/* Conditionally render PwaReloader using Suspense for React.lazy */}
-      {import.meta.env.PROD && LazyPwaReloader && (
-        <Suspense fallback={null}> {/* Fallback can be null or a minimal loading indicator */}
+      {/* {import.meta.env.PROD && LazyPwaReloader && ( // Commented out
+        <Suspense fallback={null}> 
           <LazyPwaReloader />
         </Suspense>
-      )}
+      )} */}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
