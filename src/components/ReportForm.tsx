@@ -14,10 +14,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect, useCallback } from "react"; // Added useCallback
 
 import { supabase } from "@/lib/supabaseClient";
-import { savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils"; // Import localStorage utilities
+import { StoredReportData, savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils"; // Import StoredReportData
 
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
@@ -65,40 +65,13 @@ type ReportFormValues = z.infer<typeof reportFormSchema>;
 export function ReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine); // State to track online status
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Initial check
-    setIsOnline(navigator.onLine);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-  
-  // We will add the syncPendingReports function in the next step
-  // For now, just log if there are pending reports when online status changes
-  useEffect(() => {
-    if (isOnline) {
-      const pending = getPendingReports();
-      if (pending.length > 0) {
-        console.log(`${pending.length} reports pending sync.`);
-        // Here we will trigger the sync logic later
-      }
-    }
-  }, [isOnline]);
-
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false); // To prevent multiple syncs
 
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
     defaultValues: {
+      // ... (keep existing defaultValues)
       email: "",
       divisionName: "",
       rangeName: "",
@@ -120,6 +93,81 @@ export function ReportForm() {
       reporterMobile: "",
     },
   });
+
+  const syncPendingReports = useCallback(async () => {
+    if (isSyncing || !isOnline) return; // Don't sync if already syncing or offline
+
+    const pendingReports = getPendingReports();
+    if (pendingReports.length === 0) {
+      return;
+    }
+
+    setIsSyncing(true);
+    const syncToastId = toast.loading(`Syncing ${pendingReports.length} pending report(s)...`);
+
+    let successfulSyncs = 0;
+    let failedSyncs = 0;
+
+    for (const storedReport of pendingReports) {
+      try {
+        // The 'data' field in StoredReportData holds the Supabase-structured object
+        const { error } = await supabase.from("activity_reports").insert([storedReport.data]);
+        if (error) {
+          throw error; // Let the catch block handle it
+        }
+        removePendingReport(storedReport.id); // Remove from localStorage on success
+        successfulSyncs++;
+      } catch (error: any) {
+        console.error("Failed to sync report:", storedReport.id, error);
+        failedSyncs++;
+        // Report remains in localStorage for next attempt
+      }
+    }
+
+    toast.dismiss(syncToastId);
+    if (successfulSyncs > 0) {
+      toast.success(`${successfulSyncs} report(s) synced successfully!`);
+    }
+    if (failedSyncs > 0) {
+      toast.error(`${failedSyncs} report(s) failed to sync. They will be retried later.`);
+    }
+    if (successfulSyncs === 0 && failedSyncs === 0 && pendingReports.length > 0) {
+        toast.info("No reports needed syncing or all failed previously and remain pending.");
+    }
+
+
+    setIsSyncing(false);
+  }, [isOnline, isSyncing]); // Added dependencies for useCallback
+
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("You are back online!");
+      syncPendingReports(); // Attempt to sync when coming online
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.info("You are currently offline. Reports will be saved locally.");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Initial check and attempt to sync if online
+    if (navigator.onLine) {
+        setIsOnline(true);
+        syncPendingReports();
+    } else {
+        setIsOnline(false);
+    }
+
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [syncPendingReports]); // Added syncPendingReports to dependency array
 
   const handleFetchData = () => {
     // ... (keep existing handleFetchData logic)
@@ -155,7 +203,7 @@ export function ReportForm() {
   async function onSubmit(data: ReportFormValues) {
     setIsSubmitting(true);
 
-    const reportData = { // This is the data structure for Supabase
+    const reportData = { 
       email: data.email,
       division_name: data.divisionName,
       range_name: data.rangeName,
@@ -180,34 +228,31 @@ export function ReportForm() {
     };
 
     if (isOnline) {
-      toast.info("Submitting report online... / रिपोर्ट ऑनलाइन सबमिट हो रही है...");
+      const submissionToastId = toast.loading("Submitting report online...");
       try {
         const { error } = await supabase.from("activity_reports").insert([reportData]);
         if (error) {
           console.error("Supabase submission error:", error);
-          toast.error(`Online submission failed: ${error.message} / ऑनलाइन सबमिशन विफल`);
-          // Optional: Save to pending if online submission fails for some reason (e.g. server error)
-          // savePendingReport(reportData);
-          // toast.info("Report saved locally due to submission error.");
+          toast.error(`Online submission failed: ${error.message}. Report saved locally.`);
+          savePendingReport(reportData); // Save locally if online submission fails
         } else {
-          toast.success("Report submitted successfully online! / रिपोर्ट सफलतापूर्वक ऑनलाइन सबमिट की गई!");
+          toast.success("Report submitted successfully online!");
           form.reset();
         }
       } catch (error: any) {
         console.error("Unexpected error during online submission:", error);
-        toast.error(`An unexpected error occurred: ${error.message}`);
-        // savePendingReport(reportData);
-        // toast.info("Report saved locally due to unexpected error.");
+        toast.error(`An unexpected error occurred: ${error.message}. Report saved locally.`);
+        savePendingReport(reportData); // Save locally on unexpected error
       } finally {
+        toast.dismiss(submissionToastId);
         setIsSubmitting(false);
       }
     } else {
       // Offline: Save to localStorage
-      toast.info("You are offline. Report saved locally. / आप ऑफ़लाइन हैं। रिपोर्ट स्थानीय रूप से सहेजी गई।");
-      savePendingReport(reportData); // savePendingReport expects the Supabase-structured data
-      form.reset(); // Reset form even when offline
+      savePendingReport(reportData); 
+      toast.success("You are offline. Report saved locally and will be synced when online.");
+      form.reset(); 
       setIsSubmitting(false);
-      // Optionally, update UI to show number of pending reports
       console.log("Current pending reports:", getPendingReports().length);
     }
   }
@@ -216,8 +261,15 @@ export function ReportForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         {!isOnline && (
-          <div className="p-3 mb-4 text-sm text-yellow-700 bg-yellow-100 rounded-lg" role="alert">
+          <div className="p-3 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
             <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
+            Currently {getPendingReports().length} report(s) pending sync.
+          </div>
+        )}
+         {isOnline && getPendingReports().length > 0 && !isSyncing && (
+          <div className="p-3 mb-4 text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
+            <span className="font-medium">{getPendingReports().length} report(s) pending sync.</span>
+            <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300" onClick={syncPendingReports}>Sync Now</Button>
           </div>
         )}
         <FormField
@@ -245,7 +297,7 @@ export function ReportForm() {
         <AdditionalInfoSection control={form.control} />
         <ReporterDetailsSection control={form.control} />
         
-        <Button type="submit" disabled={isSubmitting || isFetchingData} className="w-full sm:w-auto">
+        <Button type="submit" disabled={isSubmitting || isFetchingData || isSyncing} className="w-full sm:w-auto">
           {isSubmitting 
             ? (isOnline ? "Submitting Online..." : "Saving Locally...") 
             : "Submit Report / रिपोर्ट सबमिट करें"}
