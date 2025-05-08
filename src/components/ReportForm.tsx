@@ -14,9 +14,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect
 
-import { supabase } from "@/lib/supabaseClient"; // Import Supabase client
+import { supabase } from "@/lib/supabaseClient";
+import { savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils"; // Import localStorage utilities
 
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
@@ -64,6 +65,36 @@ type ReportFormValues = z.infer<typeof reportFormSchema>;
 export function ReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine); // State to track online status
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check
+    setIsOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
+  // We will add the syncPendingReports function in the next step
+  // For now, just log if there are pending reports when online status changes
+  useEffect(() => {
+    if (isOnline) {
+      const pending = getPendingReports();
+      if (pending.length > 0) {
+        console.log(`${pending.length} reports pending sync.`);
+        // Here we will trigger the sync logic later
+      }
+    }
+  }, [isOnline]);
+
 
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
@@ -91,6 +122,7 @@ export function ReportForm() {
   });
 
   const handleFetchData = () => {
+    // ... (keep existing handleFetchData logic)
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser. / आपके ब्राउज़र द्वारा जियोलोकेशन समर्थित नहीं है।");
       return;
@@ -122,9 +154,8 @@ export function ReportForm() {
 
   async function onSubmit(data: ReportFormValues) {
     setIsSubmitting(true);
-    toast.info("Submitting report... / रिपोर्ट सबमिट हो रही है...");
 
-    const reportData = {
+    const reportData = { // This is the data structure for Supabase
       email: data.email,
       division_name: data.divisionName,
       range_name: data.rangeName,
@@ -148,28 +179,47 @@ export function ReportForm() {
       reporter_mobile: data.reporterMobile,
     };
 
-    try {
-      // Corrected line:
-      const { error } = await supabase.from("activity_reports").insert([reportData]);
-
-      if (error) {
-        console.error("Supabase submission error:", error);
-        toast.error(`Submission failed: ${error.message} / सबमिशन विफल: ${error.message}`);
-      } else {
-        toast.success("Report submitted successfully! / रिपोर्ट सफलतापूर्वक सबमिट की गई!");
-        form.reset();
+    if (isOnline) {
+      toast.info("Submitting report online... / रिपोर्ट ऑनलाइन सबमिट हो रही है...");
+      try {
+        const { error } = await supabase.from("activity_reports").insert([reportData]);
+        if (error) {
+          console.error("Supabase submission error:", error);
+          toast.error(`Online submission failed: ${error.message} / ऑनलाइन सबमिशन विफल`);
+          // Optional: Save to pending if online submission fails for some reason (e.g. server error)
+          // savePendingReport(reportData);
+          // toast.info("Report saved locally due to submission error.");
+        } else {
+          toast.success("Report submitted successfully online! / रिपोर्ट सफलतापूर्वक ऑनलाइन सबमिट की गई!");
+          form.reset();
+        }
+      } catch (error: any) {
+        console.error("Unexpected error during online submission:", error);
+        toast.error(`An unexpected error occurred: ${error.message}`);
+        // savePendingReport(reportData);
+        // toast.info("Report saved locally due to unexpected error.");
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error: any) {
-      console.error("Unexpected error during submission:", error);
-      toast.error(`An unexpected error occurred: ${error.message} / एक अप्रत्याशित त्रुटि हुई`);
-    } finally {
+    } else {
+      // Offline: Save to localStorage
+      toast.info("You are offline. Report saved locally. / आप ऑफ़लाइन हैं। रिपोर्ट स्थानीय रूप से सहेजी गई।");
+      savePendingReport(reportData); // savePendingReport expects the Supabase-structured data
+      form.reset(); // Reset form even when offline
       setIsSubmitting(false);
+      // Optionally, update UI to show number of pending reports
+      console.log("Current pending reports:", getPendingReports().length);
     }
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        {!isOnline && (
+          <div className="p-3 mb-4 text-sm text-yellow-700 bg-yellow-100 rounded-lg" role="alert">
+            <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
+          </div>
+        )}
         <FormField
           control={form.control}
           name="email"
@@ -196,7 +246,9 @@ export function ReportForm() {
         <ReporterDetailsSection control={form.control} />
         
         <Button type="submit" disabled={isSubmitting || isFetchingData} className="w-full sm:w-auto">
-          {isSubmitting ? "Submitting... / सबमिट हो रहा है..." : "Submit Report / रिपोर्ट सबमिट करें"}
+          {isSubmitting 
+            ? (isOnline ? "Submitting Online..." : "Saving Locally...") 
+            : "Submit Report / रिपोर्ट सबमिट करें"}
         </Button>
       </form>
     </Form>
