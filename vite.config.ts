@@ -2,7 +2,7 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
-// import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Commented out
+import { VitePWA, VitePWAOptions } from "vite-plugin-pwa";
 
 // Keep your existing devErrorAndNavigationPlugin definition
 export function devErrorAndNavigationPlugin(): Plugin {
@@ -77,9 +77,20 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
-// const pwaOptions: Partial<VitePWAOptions> = { // Commented out
-// ...
-// };
+const pwaOptions: Partial<VitePWAOptions> = {
+  // registerType: 'autoUpdate', // Keep it simple for now
+  injectRegister: 'auto', // Automatically registers the service worker
+  workbox: {
+    globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'], // Cache common static assets
+  },
+  // We already have a manifest.json in public, but VitePWA can also generate one.
+  // To use our existing one and avoid conflicts, we can set manifest to false or ensure paths align.
+  // For now, let's let it generate one to see if it works, then refine.
+  // manifest: false, // If you want to strictly use your public/manifest.json
+  devOptions: {
+    enabled: false, // Keep PWA features disabled for the dev server
+  }
+};
 
 export default defineConfig(({ mode }) => {
   const commonConfig = {
@@ -101,7 +112,7 @@ export default defineConfig(({ mode }) => {
     return {
       ...commonConfig,
       plugins: [devErrorAndNavigationPlugin(), react()],
-      base: '/', // Base path for development is root
+      base: '/', 
     };
   }
   
@@ -109,7 +120,7 @@ export default defineConfig(({ mode }) => {
   console.log("[vite.config.ts] Configuring for production mode.");
   return {
     ...commonConfig,
-    plugins: [react()], // Only react plugin for production for now (PWA commented out)
-    base: `/${GITHUB_REPO_NAME}/`, // Base path for GitHub Pages
+    plugins: [react(), VitePWA(pwaOptions)], 
+    base: `/${GITHUB_REPO_NAME}/`, 
   };
 });

@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react'; // Import React and Suspense
+import React, { Suspense } from 'react'; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,9 +11,9 @@ import ReportActivityPage from "./pages/ReportActivityPage";
 const queryClient = new QueryClient();
 
 // Dynamically import PwaReloader only for production builds
-// const LazyPwaReloader = import.meta.env.PROD // Commented out
-//   ? React.lazy(() => import("./components/PwaReloader"))
-//   : null;
+const LazyPwaReloader = import.meta.env.PROD 
+  ? React.lazy(() => import("./components/PwaReloader"))
+  : null;
 
 // Test comment for redeploy
 const App = () => (
@@ -22,11 +22,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       {/* Conditionally render PwaReloader using Suspense for React.lazy */}
-      {/* {import.meta.env.PROD && LazyPwaReloader && ( // Commented out
+      {import.meta.env.PROD && LazyPwaReloader && ( 
         <Suspense fallback={null}> 
           <LazyPwaReloader />
         </Suspense>
-      )} */}
+      )}
       <BrowserRouter basename="/elephant-watch-app">
         <Routes>
           <Route path="/" element={<Index />} />
