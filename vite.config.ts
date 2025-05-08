@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { VitePWA, VitePWAOptions } from "vite-plugin-pwa";
 
-// devErrorAndNavigationPlugin is defined above, but we won't use it in dev for this test.
+// Keep your existing devErrorAndNavigationPlugin definition
 export function devErrorAndNavigationPlugin(): Plugin {
   let stacktraceJsContent: string | null = null;
   let dyadShimContent: string | null = null;
@@ -71,7 +71,7 @@ export function devErrorAndNavigationPlugin(): Plugin {
   };
 }
 
-
+// Keep your existing pwaOptions definition
 const pwaOptions: Partial<VitePWAOptions> = {
   registerType: "autoUpdate",
   injectRegister: false, 
@@ -128,21 +128,33 @@ const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export default defineConfig(({ mode }) => {
-  let pluginsConfig = [react()]; // Default to just react plugin
-  
-  if (mode === 'production') {
-    // For production, add PWA plugin. devErrorAndNavigationPlugin is not for prod.
-    pluginsConfig = [react(), VitePWA(pwaOptions)];
+  if (mode === 'development') {
+    // Development mode: only react plugin and force optimizeDeps
+    return {
+      server: {
+        host: "::",
+        port: 8080,
+      },
+      plugins: [react()], // Only the react plugin
+      resolve: {
+        alias: {
+          "@": path.resolve(__dirname, "./src"),
+        },
+      },
+      optimizeDeps: {
+        force: true, // Force Vite to re-bundle dependencies
+      }
+    };
   }
-  // For development, pluginsConfig remains just [react()]
-  // The devErrorAndNavigationPlugin is NOT added for this test.
-
+  
+  // Production mode: react plugin and VitePWA plugin
+  // The devErrorAndNavigationPlugin is not added here as it's for 'serve' (dev)
   return {
-    server: {
+    server: { // server config is less relevant for 'build' but harmless
       host: "::",
       port: 8080,
     },
-    plugins: pluginsConfig, // Use the determined plugin configuration
+    plugins: [react(), VitePWA(pwaOptions)],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
