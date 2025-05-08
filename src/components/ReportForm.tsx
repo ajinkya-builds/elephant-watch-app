@@ -25,6 +25,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { useState } from "react";
+import { LocateFixed } from "lucide-react"; // Icon for the button
 
 const reportFormSchema = z.object({
   email: z.string().email("Invalid email address").min(1, "Email is required"),
@@ -89,6 +90,8 @@ const damageOptions = [
 
 export function ReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
     defaultValues: {
@@ -113,6 +116,44 @@ export function ReportForm() {
       reporterMobile: "",
     },
   });
+
+  const handleFetchLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser. / आपके ब्राउज़र द्वारा जियोलोकेशन समर्थित नहीं है।");
+      return;
+    }
+
+    setIsFetchingLocation(true);
+    toast.info("Fetching location... / स्थान प्राप्त किया जा रहा है...");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(6); // Using 6 decimal places for precision
+        const lon = position.coords.longitude.toFixed(6);
+        form.setValue("latitude", lat, { shouldValidate: true });
+        form.setValue("longitude", lon, { shouldValidate: true });
+        toast.success("Location fetched successfully! / स्थान सफलतापूर्वक प्राप्त हुआ!");
+        setIsFetchingLocation(false);
+      },
+      (error) => {
+        let errorMessage = "Could not get location. / स्थान प्राप्त नहीं किया जा सका।";
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = "Location permission denied. Please enable it in your browser settings. / स्थान की अनुमति अस्वीकृत। कृपया अपनी ब्राउज़र सेटिंग्स में इसे सक्षम करें।";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMessage = "Location information is unavailable. / स्थान की जानकारी अनुपलब्ध है।";
+        } else if (error.code === error.TIMEOUT) {
+          errorMessage = "Location request timed out. / स्थान अनुरोध का समय समाप्त हो गया।";
+        }
+        toast.error(errorMessage);
+        setIsFetchingLocation(false);
+      },
+      {
+        enableHighAccuracy: true, // Request high accuracy
+        timeout: 10000, // 10 seconds timeout
+        maximumAge: 0 // Don't use a cached position
+      }
+    );
+  };
 
   async function onSubmit(data: ReportFormValues) {
     setIsSubmitting(true);
@@ -368,6 +409,25 @@ export function ReportForm() {
           />
         </div>
 
+        <div className="space-y-2 mb-4">
+          <Button 
+            type="button" 
+            onClick={handleFetchLocation} 
+            disabled={isFetchingLocation}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <LocateFixed className="mr-2 h-4 w-4" />
+            {isFetchingLocation 
+              ? "Fetching Location... / स्थान प्राप्त हो रहा है..." 
+              : "Get Current Location / वर्तमान स्थान प्राप्त करें"}
+          </Button>
+          <FormDescription className="text-xs">
+            Click to attempt auto-filling Latitude and Longitude. Requires location permission.
+            अक्षांश और देशांतर को स्वतः भरने का प्रयास करने के लिए क्लिक करें। स्थान अनुमति की आवश्यकता है।
+          </FormDescription>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -472,7 +532,7 @@ export function ReportForm() {
           )}
         />
         
-        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+        <Button type="submit" disabled={isSubmitting || isFetchingLocation} className="w-full sm:w-auto">
           {isSubmitting ? "Submitting... / सबमिट हो रहा है..." : "Submit Report / रिपोर्ट सबमिट करें"}
         </Button>
       </form>
