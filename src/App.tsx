@@ -15,6 +15,7 @@ const queryClient = new QueryClient();
 //   ? React.lazy(() => import("./components/PwaReloader"))
 //   : null;
 
+// Test comment for redeploy
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -26,7 +27,7 @@ const App = () => (
           <LazyPwaReloader />
         </Suspense>
       )} */}
-      <BrowserRouter>
+      <BrowserRouter basename="/elephant-watch-app">
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/report-activity" element={<ReportActivityPage />} />
