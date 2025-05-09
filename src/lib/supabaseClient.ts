@@ -8,8 +8,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
     "Supabase URL or Anon Key is missing. Make sure you have VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY set in your .env file."
   );
-  // You might want to throw an error here or handle it more gracefully
-  // For now, we'll proceed, but Supabase operations will fail.
+  throw new Error("Supabase URL or Anon Key is missing.");
 }
 
-export const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
+// Create the Supabase client with additional headers
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      Accept: "application/json", // Ensure the response format is JSON
+    },
+  },
+});

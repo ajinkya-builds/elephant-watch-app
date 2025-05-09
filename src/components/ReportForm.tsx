@@ -14,10 +14,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useState, useEffect, useCallback } from "react"; // Added useCallback
+import { useState, useEffect, useCallback } from "react";
 
 import { supabase } from "@/lib/supabaseClient";
-import { StoredReportData, savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils"; // Import StoredReportData
+import { StoredReportData, savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils";
 
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
@@ -37,18 +37,18 @@ const reportFormSchema = z.object({
   compartmentNo: z.string().min(1, "Compartment Number is required / कक्ष क्रमांक आवश्यक है"),
   damageDone: z.string().min(1, "Damage information is required / हानि की जानकारी आवश्यक है"),
   damageDescription: z.string().optional(),
-  totalElephants: z.coerce.number({invalid_type_error: "Must be a number / संख्या होनी चाहिए"})
+  totalElephants: z.coerce.number({ invalid_type_error: "Must be a number / संख्या होनी चाहिए" })
     .min(0, "Total elephants cannot be negative / हाथियों की कुल संख्या नकारात्मक नहीं हो सकती")
     .int("Must be a whole number / पूर्णांक होना चाहिए"),
-  maleElephants: z.coerce.number({invalid_type_error: "Must be a number / संख्या होनी चाहिए"}).min(0).int().optional().nullable(),
-  femaleElephants: z.coerce.number({invalid_type_error: "Must be a number / संख्या होनी चाहिए"}).min(0).int().optional().nullable(),
-  unknownElephants: z.coerce.number({invalid_type_error: "Must be a number / संख्या होनी चाहिए"}).min(0).int().optional().nullable(),
+  maleElephants: z.coerce.number({ invalid_type_error: "Must be a number / संख्या होनी चाहिए" }).min(0).int().optional().nullable(),
+  femaleElephants: z.coerce.number({ invalid_type_error: "Must be a number / संख्या होनी चाहिए" }).min(0).int().optional().nullable(),
+  unknownElephants: z.coerce.number({ invalid_type_error: "Must be a number / संख्या होनी चाहिए" }).min(0).int().optional().nullable(),
   activityDate: z.string().min(1, "Date is required / दिनांक आवश्यक है"),
   activityTime: z.string().min(1, "Time is required / समय आवश्यक है"),
-  latitude: z.string() 
+  latitude: z.string()
     .min(1, "Latitude is required / अक्षांश आवश्यक है")
     .regex(/^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$/, "Invalid latitude (e.g., 23.4536) / अमान्य अक्षांश (उदा. 23.4536)"),
-  longitude: z.string() 
+  longitude: z.string()
     .min(1, "Longitude is required / देशांतर आवश्यक है")
     .regex(/^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/, "Invalid longitude (e.g., 81.4763) / अमान्य देशांतर (उदा. 81.4763)"),
   headingTowards: z.string().optional(),
@@ -66,12 +66,31 @@ export function ReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isSyncing, setIsSyncing] = useState(false); // To prevent multiple syncs
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [user, setUser] = useState(null); // Add user state
 
+  // Fetch the authenticated user
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    fetchUser();
+  }, []);
+
+  // Redirect if the user is not logged in
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-lg font-semibold">You must be logged in to access this page.</p>
+      </div>
+    );
+  }
+
+  // Existing form logic continues here...
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
     defaultValues: {
-      // ... (keep existing defaultValues)
       email: "",
       divisionName: "",
       rangeName: "",
