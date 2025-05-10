@@ -9,42 +9,59 @@ export function Header() {
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        // Fetch user details from custom users table
-        const { data: user } = await supabase
-          .from("users")
-          .select("email")
-          .eq("email", session.user.email)
-          .single();
-        
-        if (user) {
-          setUserEmail(user.email);
+    const getSession = () => {
+      const sessionStr = localStorage.getItem('session');
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr);
+        if (new Date(session.expires_at) > new Date()) {
+          setUserEmail(session.user.email);
+        } else {
+          // Session expired
+          handleLogout();
         }
       }
     };
-    getUser();
-  }, []);
+
+    getSession();
+  }, [navigate]);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Error logging out");
-    } else {
+    try {
+      // Remove session from localStorage
+      localStorage.removeItem('session');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Error signing out from Supabase:", error);
+      }
+
+      // Clear user email
+      setUserEmail(null);
+      
+      // Show success message
       toast.success("Logged out successfully");
-      navigate("/");
+      
+      // Force reload the page to clear any cached state
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Error during logout:", error);
+      toast.error("Error during logout");
     }
   };
 
   return (
-    <header className="w-full border-b">
+    <header className="w-full border-b bg-white">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Wild Elephant Monitoring System</h1>
+        <h1 className="text-xl font-bold text-green-800">Wild Elephant Monitoring System</h1>
         {userEmail && (
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{userEmail}</span>
-            <Button variant="outline" onClick={handleLogout}>
+            <Button 
+              variant="outline" 
+              onClick={handleLogout}
+              className="border-green-600 text-green-600 hover:bg-green-50"
+            >
               Logout
             </Button>
           </div>
