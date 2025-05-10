@@ -7,7 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ReportActivityPage from "./pages/ReportActivityPage";
-import Login from "./components/Login"; // Import the Login component
+import Login from "./components/Login";
+import { Header } from "./components/Header";
 import { supabase } from "@/lib/supabaseClient";
 
 const queryClient = new QueryClient();
@@ -19,34 +20,49 @@ const LazyPwaReloader = import.meta.env.PROD
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check if the user is authenticated
+  // Check if the user is authenticated and set up session listener
   useEffect(() => {
     const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      setIsAuthenticated(!!data.session); // Set to true if a session exists
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      setIsLoading(false);
     };
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
     checkAuth();
+
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* Conditionally render PwaReloader using Suspense for React.lazy */}
         {import.meta.env.PROD && LazyPwaReloader && (
           <Suspense fallback={null}>
             <LazyPwaReloader />
           </Suspense>
         )}
         <BrowserRouter basename={import.meta.env.DEV ? "/" : "/elephant-watch-app"}>
+          {isAuthenticated && <Header />}
           <Routes>
             {!isAuthenticated ? (
-              // If not authenticated, show the login page
               <Route path="*" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
             ) : (
-              // If authenticated, show the app routes
               <>
                 <Route path="/" element={<Index />} />
                 <Route path="/report-activity" element={<ReportActivityPage />} />

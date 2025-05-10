@@ -93,6 +93,17 @@ export function ReportForm() {
     },
   });
 
+  // Fetch and set user's email
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        form.setValue("email", user.email);
+      }
+    };
+    getUser();
+  }, [form]);
+
   const syncPendingReports = useCallback(async () => {
     if (isSyncing || !isOnline) return; // Don't sync if already syncing or offline
 
