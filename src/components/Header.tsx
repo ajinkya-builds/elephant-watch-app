@@ -10,8 +10,19 @@ export function Header() {
 
   React.useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserEmail(user?.email || null);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        // Fetch user details from custom users table
+        const { data: user } = await supabase
+          .from("users")
+          .select("email")
+          .eq("email", session.user.email)
+          .single();
+        
+        if (user) {
+          setUserEmail(user.email);
+        }
+      }
     };
     getUser();
   }, []);

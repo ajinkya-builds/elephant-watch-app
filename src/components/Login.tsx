@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import bcrypt from "bcryptjs";
 
 interface LoginProps {
   onLogin: () => void;
@@ -20,13 +21,31 @@ export default function Login({ onLogin }: LoginProps) {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Fetch user from your custom users table
+      const { data: user, error: fetchError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      if (fetchError || !user) {
+        throw new Error("User not found");
+      }
+
+      // Verify password using bcrypt
+      const isValidPassword = await bcrypt.compare(password, user.password_hash);
+      if (!isValidPassword) {
+        throw new Error("Invalid password");
+      }
+
+      // Create a session in Supabase auth
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: password, // This will be used for the session only
       });
 
-      if (error) {
-        throw error;
+      if (signInError) {
+        throw signInError;
       }
 
       toast.success("Logged in successfully!");
