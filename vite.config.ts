@@ -83,6 +83,7 @@ export function devErrorAndNavigationPlugin(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const commonConfig = {
+    base: mode === 'production' ? '/elephant-watch-app/' : '/',
     server: {
       host: "::",
       port: 8085,
@@ -92,6 +93,10 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+    },
+    build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
     },
   };
 
