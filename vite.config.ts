@@ -1,5 +1,5 @@
 import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs";
 // import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Commented out
@@ -85,7 +85,8 @@ export default defineConfig(({ mode }) => {
   const commonConfig = {
     server: {
       host: "::",
-      port: 8080,
+      port: 8085,
+      strictPort: true,
     },
     resolve: {
       alias: {

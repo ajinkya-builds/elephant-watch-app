@@ -64,20 +64,22 @@ export default function Login() {
       localStorage.setItem('session', JSON.stringify(session));
       
       // Set up Supabase session for API calls
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: "dummy-password-for-session", // This is just for the session
-      });
+      // Set an explicit flag in localStorage to indicate we're logged in with our custom auth
+      localStorage.setItem('loggedIn', 'true');
+      
+      // Store the user object separately for easier access
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      
+      // We won't use Supabase auth directly since we have a custom auth flow
 
-      if (signInError) {
-        console.error("Error setting up session:", signInError);
-        // Continue anyway since we have our custom session
-      }
+      // Log that we're using custom auth instead of Supabase auth
+      console.log("Using custom auth with localStorage session");
 
       toast.success("Logged in successfully!");
       
-      // Navigate to the intended destination or home page
-      const from = (location.state as any)?.from?.pathname || "/home";
+      // Navigate to the intended destination or report activity page
+      const from = (location.state as any)?.from?.pathname || "/report-activity";
+      console.log('Login: redirecting to', from);
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error("Login error:", error);

@@ -13,12 +13,26 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   useEffect(() => {
     const checkAuth = () => {
       const sessionStr = localStorage.getItem('session');
+      console.log('ProtectedRoute: checking session', sessionStr ? 'exists' : 'missing');
+      
       if (sessionStr) {
         const session = JSON.parse(sessionStr);
-        if (new Date(session.expires_at) > new Date()) {
+        const now = new Date();
+        const expiresAt = new Date(session.expires_at);
+        const isExpired = expiresAt <= now;
+        
+        console.log('ProtectedRoute: session details', { 
+          userId: session.user.id,
+          expires: session.expires_at,
+          isExpired,
+          currentTime: now.toISOString()
+        });
+        
+        if (!isExpired) {
           setIsAuthenticated(true);
         } else {
           // Session expired
+          console.log('ProtectedRoute: session expired, removing');
           localStorage.removeItem('session');
           setIsAuthenticated(false);
         }
