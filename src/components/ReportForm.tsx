@@ -67,27 +67,7 @@ export function ReportForm() {
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [user, setUser] = useState(null); // Add user state
 
-  // Fetch the authenticated user
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-    fetchUser();
-  }, []);
-
-  // Redirect if the user is not logged in
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-lg font-semibold">You must be logged in to access this page.</p>
-      </div>
-    );
-  }
-
-  // Existing form logic continues here...
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
     defaultValues: {
