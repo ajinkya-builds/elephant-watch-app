@@ -77,8 +77,8 @@ export default function Login() {
 
       toast.success("Logged in successfully!");
       
-      // Navigate to the intended destination or report activity page
-      const from = (location.state as any)?.from?.pathname || "/report-activity";
+      // Navigate to the intended destination or home page
+      const from = (location.state as any)?.from?.pathname || "/home";
       console.log('Login: redirecting to', from);
       navigate(from, { replace: true });
     } catch (error: any) {
