@@ -7,14 +7,30 @@ import { toast } from "sonner";
 export function Header() {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    const getSession = () => {
+    const getSession = async () => {
       const sessionStr = localStorage.getItem('session');
       if (sessionStr) {
         const session = JSON.parse(sessionStr);
         if (new Date(session.expires_at) > new Date()) {
           setUserEmail(session.user.email);
+          
+          // Check if user is admin
+          try {
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .single();
+              
+            if (!error && profile && profile.role === 'admin') {
+              setIsAdmin(true);
+            }
+          } catch (error) {
+            console.error('Error checking admin status:', error);
+          }
         } else {
           // Session expired
           handleLogout();
@@ -57,6 +73,15 @@ export function Header() {
         {userEmail && (
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{userEmail}</span>
+            {isAdmin && (
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/admin')}
+                className="border-amber-600 text-amber-600 hover:bg-amber-50"
+              >
+                Admin
+              </Button>
+            )}
             <Button 
               variant="outline" 
               onClick={handleLogout}

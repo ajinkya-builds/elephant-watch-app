@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ReportActivityPage from "./pages/ReportActivityPage";
 import Dashboard from "./pages/Dashboard";
+import Admin from "./pages/Admin";
 import Login from "./components/Login";
 import { Header } from "./components/Header";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -57,6 +58,15 @@ const App = () => {
                 <ProtectedRoute>
                   <Header />
                   <Index />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Header />
+                  <Admin />
                 </ProtectedRoute>
               }
             />
