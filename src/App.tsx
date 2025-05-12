@@ -12,6 +12,10 @@ import Admin from "./pages/Admin";
 import Login from "./components/Login";
 import { Header } from "./components/Header";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import AdminUsers from "./pages/AdminUsers";
+import AdminObservations from "./pages/AdminObservations";
+import AdminStatistics from "./pages/AdminStatistics";
+import AdminSettings from "./pages/AdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +71,42 @@ const App = () => {
                 <ProtectedRoute>
                   <Header />
                   <Admin />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <Header />
+                  <AdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/observations"
+              element={
+                <ProtectedRoute>
+                  <Header />
+                  <AdminObservations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/statistics"
+              element={
+                <ProtectedRoute>
+                  <Header />
+                  <AdminStatistics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <ProtectedRoute>
+                  <Header />
+                  <AdminSettings />
                 </ProtectedRoute>
               }
             />

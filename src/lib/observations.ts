@@ -50,6 +50,40 @@ export interface DashboardStats {
   };
 }
 
+interface DashboardFilters {
+  division?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+interface HeatmapPoint {
+  lat: number;
+  lng: number;
+  total_elephants: number | null;
+}
+
+interface ElephantData {
+  total_elephants: number | null;
+  male_elephants: number | null;
+  female_elephants: number | null;
+  calves: number | null;
+  division: string | null;
+  loss_type: string | null;
+  indirect_sign: string | null;
+}
+
+interface CountResult {
+  count: number;
+}
+
+interface TypeCount {
+  count: number;
+  loss_type?: string;
+  indirect_sign?: string;
+  division?: string;
+  observation_type?: string;
+}
+
 // Helper function to extract the count value from view data
 function getCount(data: any): number {
   if (!data) return 0;
@@ -212,108 +246,206 @@ function createMockDashboardData(): DashboardStats {
   };
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+export async function getDashboardStats(filters?: DashboardFilters): Promise<DashboardStats> {
   try {
+    // Base query builder function
+    const buildQuery = <T>(query: any) => {
+      if (filters?.division) {
+        query = query.eq('division', filters.division);
+      }
+      if (filters?.startDate) {
+        query = query.gte('observation_date', filters.startDate);
+      }
+      if (filters?.endDate) {
+        query = query.lte('observation_date', filters.endDate);
+      }
+      return query;
+    };
+
     // Fetch total observations count
-    const { data: totalData, error: totalError } = await supabase
-      .from('observations')
-      .select('count');
+    let query = supabase.from('observations').select('count');
+    query = buildQuery(query);
+    const { data: totalData, error: totalError } = await query as { data: CountResult[] | null, error: any };
 
     if (totalError) throw totalError;
 
     // Fetch direct sightings count
-    const { data: directData, error: directError } = await supabase
-      .from('observations')
-      .select('count')
-      .eq('observation_type', 'elephant');
+    query = supabase.from('observations').select('count').eq('observation_type', 'elephant');
+    query = buildQuery(query);
+    const { data: directData, error: directError } = await query as { data: CountResult[] | null, error: any };
 
     if (directError) throw directError;
 
     // Fetch indirect signs count
-    const { data: indirectData, error: indirectError } = await supabase
-      .from('observations')
-      .select('count')
-      .eq('observation_type', 'indirect');
+    query = supabase.from('observations').select('count').eq('observation_type', 'indirect');
+    query = buildQuery(query);
+    const { data: indirectData, error: indirectError } = await query as { data: CountResult[] | null, error: any };
 
     if (indirectError) throw indirectError;
 
     // Fetch loss reports count
-    const { data: lossData, error: lossError } = await supabase
-      .from('observations')
-      .select('count')
-      .eq('observation_type', 'loss');
+    query = supabase.from('observations').select('count').eq('observation_type', 'loss');
+    query = buildQuery(query);
+    const { data: lossData, error: lossError } = await query as { data: CountResult[] | null, error: any };
 
     if (lossError) throw lossError;
 
     // Fetch recent observations
-    const { data: recentObservations, error: recentError } = await supabase
+    query = supabase
       .from('observations')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('observation_date', { ascending: false })
+      .order('observation_time', { ascending: false })
       .limit(10);
+    query = buildQuery(query);
+    const { data: recentObservations, error: recentError } = await query as { data: Observation[] | null, error: any };
 
     if (recentError) throw recentError;
 
-    // Fetch division stats
-    const { data: divisionStats, error: divisionError } = await supabase
-      .from('division_stats')
-      .select('*');
+    // Fetch heatmap data
+    query = supabase
+      .from('observations')
+      .select('lat, lng, total_elephants')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null);
+    query = buildQuery(query);
+    const { data: heatmapData, error: heatmapError } = await query as { data: HeatmapPoint[] | null, error: any };
+
+    if (heatmapError) throw heatmapError;
+
+    // Fetch KPI data
+    query = supabase
+      .from('observations')
+      .select(`
+        total_elephants,
+        male_elephants,
+        female_elephants,
+        calves,
+        division,
+        loss_type,
+        indirect_sign
+      `)
+      .eq('observation_type', 'elephant');
+    query = buildQuery(query);
+    const { data: elephantData, error: elephantError } = await query as { data: ElephantData[] | null, error: any };
+
+    if (elephantError) throw elephantError;
+
+    // Process KPI data
+    const kpis = {
+      totalElephants: 0,
+      maleElephants: 0,
+      femaleElephants: 0,
+      unknownElephants: 0,
+      totalCalves: 0,
+      lossTypes: {} as Record<string, number>,
+      indirectSigns: {} as Record<string, number>,
+      divisionStats: {} as Record<string, DivisionStat>
+    };
+
+    // Calculate elephant statistics
+    elephantData?.forEach(obs => {
+      kpis.totalElephants += obs.total_elephants || 0;
+      kpis.maleElephants += obs.male_elephants || 0;
+      kpis.femaleElephants += obs.female_elephants || 0;
+      kpis.totalCalves += obs.calves || 0;
+      
+      if (obs.division) {
+        if (!kpis.divisionStats[obs.division]) {
+          kpis.divisionStats[obs.division] = {
+            total: 0,
+            direct: 0,
+            indirect: 0,
+            loss: 0,
+            elephants: 0
+          };
+        }
+        kpis.divisionStats[obs.division].elephants += obs.total_elephants || 0;
+      }
+    });
+
+    // Calculate unknown elephants
+    kpis.unknownElephants = kpis.totalElephants - (kpis.maleElephants + kpis.femaleElephants);
+
+    // Fetch and process loss types
+    query = supabase
+      .from('observations')
+      .select('loss_type, count')
+      .eq('observation_type', 'loss')
+      .not('loss_type', 'is', null)
+      .group_by('loss_type');
+    query = buildQuery(query);
+    const { data: lossTypes, error: lossTypesError } = await query as { data: TypeCount[] | null, error: any };
+
+    if (lossTypesError) throw lossTypesError;
+    lossTypes?.forEach(type => {
+      if (type.loss_type) {
+        kpis.lossTypes[type.loss_type] = type.count;
+      }
+    });
+
+    // Fetch and process indirect signs
+    query = supabase
+      .from('observations')
+      .select('indirect_sign, count')
+      .eq('observation_type', 'indirect')
+      .not('indirect_sign', 'is', null)
+      .group_by('indirect_sign');
+    query = buildQuery(query);
+    const { data: indirectSigns, error: indirectSignsError } = await query as { data: TypeCount[] | null, error: any };
+
+    if (indirectSignsError) throw indirectSignsError;
+    indirectSigns?.forEach(sign => {
+      if (sign.indirect_sign) {
+        kpis.indirectSigns[sign.indirect_sign] = sign.count;
+      }
+    });
+
+    // Process division statistics
+    query = supabase
+      .from('observations')
+      .select('division, observation_type, count')
+      .not('division', 'is', null)
+      .group_by('division, observation_type');
+    query = buildQuery(query);
+    const { data: divisionData, error: divisionError } = await query as { data: TypeCount[] | null, error: any };
 
     if (divisionError) throw divisionError;
+    divisionData?.forEach(div => {
+      if (div.division) {
+        if (!kpis.divisionStats[div.division]) {
+          kpis.divisionStats[div.division] = {
+            total: 0,
+            direct: 0,
+            indirect: 0,
+            loss: 0,
+            elephants: 0
+          };
+        }
+        kpis.divisionStats[div.division].total += div.count;
+        switch (div.observation_type) {
+          case 'elephant':
+            kpis.divisionStats[div.division].direct += div.count;
+            break;
+          case 'indirect':
+            kpis.divisionStats[div.division].indirect += div.count;
+            break;
+          case 'loss':
+            kpis.divisionStats[div.division].loss += div.count;
+            break;
+        }
+      }
+    });
 
-    // Process the data into the required format
-    const stats: DashboardStats = {
+    return {
       totalObservations: getCount(totalData),
       directSightings: getCount(directData),
       indirectSigns: getCount(indirectData),
       lossReports: getCount(lossData),
       recentObservations: recentObservations || [],
-      heatmapData: (recentObservations || []).map(obs => [obs.lat, obs.lng, obs.total_elephants || 1]),
-      kpis: {
-        totalElephants: 0, // Calculate from observations
-        maleElephants: 0,
-        femaleElephants: 0,
-        unknownElephants: 0,
-        totalCalves: 0,
-        lossTypes: {},
-        indirectSigns: {},
-        divisionStats: {}
-      }
+      heatmapData: heatmapData?.map(point => [point.lat, point.lng, point.total_elephants || 1]) || [],
+      kpis
     };
-
-    // Calculate KPIs from the data
-    if (recentObservations) {
-      stats.kpis.totalElephants = recentObservations.reduce((sum, obs) => sum + (obs.total_elephants || 0), 0);
-      stats.kpis.maleElephants = recentObservations.reduce((sum, obs) => sum + (obs.male_elephants || 0), 0);
-      stats.kpis.femaleElephants = recentObservations.reduce((sum, obs) => sum + (obs.female_elephants || 0), 0);
-      stats.kpis.unknownElephants = recentObservations.reduce((sum, obs) => sum + (obs.unknown_elephants || 0), 0);
-      stats.kpis.totalCalves = recentObservations.reduce((sum, obs) => sum + (obs.calves || 0), 0);
-
-      // Calculate loss types and indirect signs
-      recentObservations.forEach(obs => {
-        if (obs.loss_type) {
-          stats.kpis.lossTypes[obs.loss_type] = (stats.kpis.lossTypes[obs.loss_type] || 0) + 1;
-        }
-        if (obs.indirect_sign) {
-          stats.kpis.indirectSigns[obs.indirect_sign] = (stats.kpis.indirectSigns[obs.indirect_sign] || 0) + 1;
-        }
-      });
-    }
-
-    // Process division stats
-    if (divisionStats) {
-      divisionStats.forEach(stat => {
-        stats.kpis.divisionStats[stat.division] = {
-          total: stat.total || 0,
-          direct: stat.direct || 0,
-          indirect: stat.indirect || 0,
-          loss: stat.loss || 0,
-          elephants: stat.elephants || 0
-        };
-      });
-    }
-
-    return stats;
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     // Return mock data in case of error

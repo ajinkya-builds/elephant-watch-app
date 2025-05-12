@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { LogOut, UserCircle } from "lucide-react";
 
 export function Header() {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
+  const [userAvatar, setUserAvatar] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const getSession = async () => {
@@ -16,7 +18,7 @@ export function Header() {
         const session = JSON.parse(sessionStr);
         if (new Date(session.expires_at) > new Date()) {
           setUserEmail(session.user.email);
-          
+          setUserAvatar(session.user.user_metadata?.avatar_url || null);
           // Check if user is admin
           try {
             const { data: profile, error } = await supabase
@@ -24,7 +26,6 @@ export function Header() {
               .select('role')
               .eq('id', session.user.id)
               .single();
-              
             if (!error && profile && profile.role === 'admin') {
               setIsAdmin(true);
             }
@@ -37,7 +38,6 @@ export function Header() {
         }
       }
     };
-
     getSession();
   }, [navigate]);
 
@@ -45,19 +45,15 @@ export function Header() {
     try {
       // Remove session from localStorage
       localStorage.removeItem('session');
-      
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error("Error signing out from Supabase:", error);
       }
-
       // Clear user email
       setUserEmail(null);
-      
       // Show success message
       toast.success("Logged out successfully");
-      
       // Force reload the page to clear any cached state
       window.location.href = "/";
     } catch (error) {
@@ -69,15 +65,41 @@ export function Header() {
   return (
     <header className="w-full border-b bg-white">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-green-800">Wild Elephant Monitoring System</h1>
+        <div className="flex items-center gap-8">
+          <span
+            className="text-xl font-bold text-green-800 cursor-pointer hover:underline"
+            onClick={() => navigate('/home')}
+            title="Go to Home"
+          >
+            Wild Elephant Monitoring System
+          </span>
+        </div>
         {userEmail && (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{userEmail}</span>
+          <div className="flex items-center gap-4 bg-white rounded-xl shadow px-4 py-2 border">
+            {userAvatar ? (
+              <img
+                src={userAvatar}
+                alt="User Avatar"
+                className="w-10 h-10 rounded-full object-cover border"
+              />
+            ) : (
+              <UserCircle className="w-10 h-10 text-gray-400" />
+            )}
+            <div className="flex flex-col items-start">
+              <span className="font-medium text-gray-800 text-sm">{userEmail}</span>
+              <Button
+                variant="link"
+                className="p-0 h-auto text-blue-600 text-xs"
+                onClick={() => alert('Profile management coming soon!')}
+              >
+                Manage your Account
+              </Button>
+            </div>
             {isAdmin && (
               <Button 
                 variant="outline" 
                 onClick={() => navigate('/admin')}
-                className="border-amber-600 text-amber-600 hover:bg-amber-50"
+                className="border-amber-600 text-amber-600 hover:bg-amber-50 ml-2"
               >
                 Admin
               </Button>
@@ -85,9 +107,9 @@ export function Header() {
             <Button 
               variant="outline" 
               onClick={handleLogout}
-              className="border-green-600 text-green-600 hover:bg-green-50"
+              className="border-green-600 text-green-600 hover:bg-green-50 ml-2"
             >
-              Logout
+              <LogOut className="w-4 h-4 mr-1" /> Logout
             </Button>
           </div>
         )}

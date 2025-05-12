@@ -19,6 +19,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { format } from "date-fns";
 
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
@@ -87,11 +96,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Add filter states
+  const [selectedDivision, setSelectedDivision] = useState<string>('all');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [divisions, setDivisions] = useState<string[]>([]);
 
+  // Modified fetchDashboardData to include filters
   const fetchDashboardData = useCallback(async () => {
     try {
-      const dashboardStats = await getDashboardStats();
+      const filters = {
+        division: selectedDivision === 'all' ? undefined : selectedDivision,
+        startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+        endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+      };
+      const dashboardStats = await getDashboardStats(filters);
       setStats(dashboardStats);
+      
+      // Update divisions list if not already set
+      if (divisions.length === 0 && dashboardStats.kpis.divisionStats) {
+        setDivisions(['all', ...Object.keys(dashboardStats.kpis.divisionStats)]);
+      }
+      
       setError(null);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -100,7 +127,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDivision, startDate, endDate]);
 
   useEffect(() => {
     let mounted = true;
@@ -169,11 +196,73 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Elephant Watch Dashboard</h1>
           <Button
             className="bg-white text-green-800 hover:bg-gray-100 font-medium shadow-sm"
-            onClick={() => navigate("/new-observation")}
+            onClick={() => navigate("/report-activity")}
           >
-            Add New Observation
+            Report New Activity
           </Button>
         </div>
+      </div>
+    </div>
+  );
+
+  // Add Filter Component
+  const FilterSection = () => (
+    <div className="mb-8 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+      <h3 className="text-lg font-semibold text-green-800 mb-4">Filters</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+          <Select value={selectedDivision} onValueChange={setSelectedDivision}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select Division" />
+            </SelectTrigger>
+            <SelectContent>
+              {divisions.map((division) => (
+                <SelectItem key={division} value={division}>
+                  {division === 'all' ? 'All Divisions' : division}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+          <DatePicker
+            date={startDate}
+            setDate={setStartDate}
+            placeholder="Select start date"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+          <DatePicker
+            date={endDate}
+            setDate={setEndDate}
+            placeholder="Select end date"
+          />
+        </div>
+      </div>
+      
+      <div className="mt-4 flex justify-end">
+        <Button
+          variant="outline"
+          className="mr-2"
+          onClick={() => {
+            setSelectedDivision('all');
+            setStartDate(null);
+            setEndDate(null);
+          }}
+        >
+          Clear Filters
+        </Button>
+        <Button 
+          className="bg-green-700 text-white hover:bg-green-800"
+          onClick={() => fetchDashboardData()}
+        >
+          Apply Filters
+        </Button>
       </div>
     </div>
   );
@@ -239,6 +328,9 @@ export default function Dashboard() {
       <DashboardHeader />
 
       <div className="container mx-auto px-6 py-8">
+        {/* Add Filter Section below header */}
+        <FilterSection />
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
