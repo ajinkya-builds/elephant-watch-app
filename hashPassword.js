@@ -1,5 +1,13 @@
 import bcrypt from "bcryptjs";
 
+const password = process.argv[2]; // Get password from command line argument
+
+if (!password) {
+  console.error("Please provide a password as an argument");
+  console.log("Usage: node hashPassword.js <password>");
+  process.exit(1);
+}
+
 const hashPassword = async (password) => {
   try {
     const salt = await bcrypt.genSalt(10); // Generate a salt
@@ -10,5 +18,4 @@ const hashPassword = async (password) => {
   }
 };
 
-// Replace "your-plain-text-password" with the password you want to hash
-hashPassword("prasarsenal");
+hashPassword(password);

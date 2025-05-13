@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import bcrypt from "bcryptjs";
-import { PawPrint } from "lucide-react";
+import { PawPrint, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,13 +16,29 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email format
+    if (!validateEmail(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       console.log("Attempting to login with email:", email);
+      
+      // Log the Supabase configuration
+      console.log("Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
       
       // Fetch user from your custom users table
       const { data: user, error: fetchError } = await supabase
@@ -30,16 +47,29 @@ export default function Login() {
         .eq("email", email)
         .single();
 
-      console.log("User fetch result:", { user, fetchError });
+      // Log the complete response
+      console.log("Complete Supabase response:", {
+        data: user,
+        error: fetchError,
+        message: fetchError?.message,
+        details: fetchError?.details
+      });
 
       if (fetchError) {
         console.error("Error fetching user:", fetchError);
-        throw new Error("User not found");
+        // Log the specific error details
+        console.error("Error details:", {
+          code: fetchError.code,
+          message: fetchError.message,
+          details: fetchError.details,
+          hint: fetchError.hint
+        });
+        throw new Error("User not found. Please check your email address.");
       }
 
       if (!user) {
         console.log("No user found with email:", email);
-        throw new Error("User not found");
+        throw new Error("User not found. Please check your email address.");
       }
 
       console.log("Found user:", user);
@@ -49,7 +79,7 @@ export default function Login() {
       console.log("Password validation result:", isValidPassword);
 
       if (!isValidPassword) {
-        throw new Error("Invalid password");
+        throw new Error("Incorrect password. Please try again.");
       }
 
       // Store user session in localStorage
@@ -58,23 +88,14 @@ export default function Login() {
           id: user.id,
           email: user.email,
         },
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+        expires_at: new Date(Date.now() + (rememberMe ? 30 : 24) * 60 * 60 * 1000).toISOString(), // 30 days if remember me, 24 hours if not
       };
       
       localStorage.setItem('session', JSON.stringify(session));
-      
-      // Set up Supabase session for API calls
-      // Set an explicit flag in localStorage to indicate we're logged in with our custom auth
       localStorage.setItem('loggedIn', 'true');
-      
-      // Store the user object separately for easier access
       localStorage.setItem('currentUser', JSON.stringify(user));
-      
-      // We won't use Supabase auth directly since we have a custom auth flow
 
-      // Log that we're using custom auth instead of Supabase auth
       console.log("Using custom auth with localStorage session");
-
       toast.success("Logged in successfully!");
       
       // Navigate to the intended destination or home page
@@ -122,6 +143,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   className="focus:ring-green-600"
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -133,14 +155,33 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="focus:ring-green-600"
+                  disabled={isLoading}
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="remember" className="text-sm font-normal">
+                  Remember me
+                </Label>
               </div>
               <Button 
                 type="submit" 
                 className="w-full bg-green-600 hover:bg-green-700" 
                 disabled={isLoading}
               >
-                {isLoading ? "Logging in..." : "Login"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  "Login"
+                )}
               </Button>
             </form>
           </CardContent>

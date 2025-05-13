@@ -8,8 +8,8 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import { getDashboardStats, DashboardStats } from "@/lib/observations";
 import { toast } from "sonner";
-import { Pie } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend, Title } from 'chart.js';
 import { supabase, checkSupabaseConnection } from "@/lib/supabaseClient";
 import {
   Table,
@@ -28,9 +28,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
+import * as Portal from '@radix-ui/react-portal';
 
 // Register Chart.js components
-ChartJS.register(ArcElement, Tooltip, Legend, Title);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend, Title);
+
+// Add style for map container
+const mapStyles = `
+  .map-container canvas {
+    will-read-frequently: true;
+  }
+`;
 
 // Fix for default marker icons in Leaflet with Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -90,6 +98,16 @@ function MapBoundsAdjuster({ data }: { data: Array<[number, number, number]> }) 
   return null;
 }
 
+// Add new interface for heatmap filters
+interface HeatmapFilters {
+  division: string;
+  range: string;
+  beat: string;
+  intensityThreshold: number;
+  startDate: Date | null;
+  endDate: Date | null;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -102,12 +120,128 @@ export default function Dashboard() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [divisions, setDivisions] = useState<string[]>([]);
+  const [ranges, setRanges] = useState<string[]>([]);
+  const [beats, setBeats] = useState<string[]>([]);
 
-  // Modified fetchDashboardData to include filters
+  // --- Activity Heatmap Filters ---
+  const [heatmapFilters, setHeatmapFilters] = useState<HeatmapFilters>({
+    division: 'all',
+    range: 'all',
+    beat: 'all',
+    intensityThreshold: 0,
+    startDate: null as Date | null,
+    endDate: null as Date | null
+  });
+  const [pendingHeatmapFilters, setPendingHeatmapFilters] = useState<HeatmapFilters>({
+    division: 'all',
+    range: 'all',
+    beat: 'all',
+    intensityThreshold: 0,
+    startDate: null as Date | null,
+    endDate: null as Date | null
+  });
+  const [heatmapData, setHeatmapData] = useState<Array<[number, number, number]>>([]);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [heatmapError, setHeatmapError] = useState<Error | null>(null);
+
+  const applyHeatmapFilters = () => {
+    setHeatmapFilters({ ...pendingHeatmapFilters });
+  };
+
+  const fetchHeatmapData = useCallback(async () => {
+    setHeatmapLoading(true);
+    setHeatmapError(null);
+    try {
+      const filters = {
+        division: heatmapFilters.division === 'all' ? undefined : heatmapFilters.division,
+        range: heatmapFilters.range === 'all' ? undefined : encodeURIComponent(heatmapFilters.range),
+        beat: heatmapFilters.beat === 'all' ? undefined : encodeURIComponent(heatmapFilters.beat),
+        startDate: heatmapFilters.startDate ? format(heatmapFilters.startDate, 'yyyy-MM-dd') : undefined,
+        endDate: heatmapFilters.endDate ? format(heatmapFilters.endDate, 'yyyy-MM-dd') : undefined,
+      };
+      let query = supabase.from('v_activity_heatmap').select('*');
+      if (filters.division) query = query.eq('division_name', filters.division);
+      if (filters.range) query = query.eq('range_name', decodeURIComponent(filters.range));
+      if (filters.beat) query = query.eq('beat_name', decodeURIComponent(filters.beat));
+      if (filters.startDate) query = query.gte('activity_date', filters.startDate);
+      if (filters.endDate) query = query.lte('activity_date', filters.endDate);
+      const { data, error } = await query;
+      if (error) throw error;
+      setHeatmapData(data ? data.map(point => [point.lat, point.lng, point.intensity]) : []);
+    } catch (error) {
+      setHeatmapError(error as Error);
+      setHeatmapData([]);
+    } finally {
+      setHeatmapLoading(false);
+    }
+  }, [heatmapFilters]);
+
+  useEffect(() => {
+    fetchHeatmapData();
+  }, [fetchHeatmapData]);
+
+  // --- Recent Observations Filters ---
+  const [observationsFilters, setObservationsFilters] = useState({
+    division: 'all',
+    range: 'all',
+    beat: 'all',
+    startDate: null as Date | null,
+    endDate: null as Date | null
+  });
+  const [pendingObservationsFilters, setPendingObservationsFilters] = useState({
+    division: 'all',
+    range: 'all',
+    beat: 'all',
+    startDate: null as Date | null,
+    endDate: null as Date | null
+  });
+  const [recentObservations, setRecentObservations] = useState([]);
+  const [recentObsLoading, setRecentObsLoading] = useState(false);
+  const [recentObsError, setRecentObsError] = useState<Error | null>(null);
+
+  const applyObservationFilters = () => {
+    setObservationsFilters({ ...pendingObservationsFilters });
+  };
+
+  const fetchRecentObservations = useCallback(async () => {
+    setRecentObsLoading(true);
+    setRecentObsError(null);
+    try {
+      const filters = {
+        division: observationsFilters.division === 'all' ? undefined : observationsFilters.division,
+        range: observationsFilters.range === 'all' ? undefined : encodeURIComponent(observationsFilters.range),
+        beat: observationsFilters.beat === 'all' ? undefined : encodeURIComponent(observationsFilters.beat),
+        startDate: observationsFilters.startDate ? format(observationsFilters.startDate, 'yyyy-MM-dd') : undefined,
+        endDate: observationsFilters.endDate ? format(observationsFilters.endDate, 'yyyy-MM-dd') : undefined,
+      };
+      let query = supabase.from('v_recent_observations').select('*');
+      if (filters.division) query = query.eq('division_name', filters.division);
+      if (filters.range) query = query.eq('range_name', decodeURIComponent(filters.range));
+      if (filters.beat) query = query.eq('beat_name', decodeURIComponent(filters.beat));
+      if (filters.startDate) query = query.gte('activity_date', filters.startDate);
+      if (filters.endDate) query = query.lte('activity_date', filters.endDate);
+      const { data, error } = await query;
+      if (error) throw error;
+      setRecentObservations(data || []);
+    } catch (error) {
+      setRecentObsError(error as Error);
+      setRecentObservations([]);
+    } finally {
+      setRecentObsLoading(false);
+    }
+  }, [observationsFilters]);
+
+  useEffect(() => {
+    fetchRecentObservations();
+  }, [fetchRecentObservations]);
+
+  // Modified fetchDashboardData to include better error handling
   const fetchDashboardData = useCallback(async () => {
     try {
       const filters = {
         division: selectedDivision === 'all' ? undefined : selectedDivision,
+        range: heatmapFilters.range === 'all' ? undefined : encodeURIComponent(heatmapFilters.range),
+        beat: heatmapFilters.beat === 'all' ? undefined : encodeURIComponent(heatmapFilters.beat),
         startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
         endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
       };
@@ -118,16 +252,45 @@ export default function Dashboard() {
       if (divisions.length === 0 && dashboardStats.kpis.divisionStats) {
         setDivisions(['all', ...Object.keys(dashboardStats.kpis.divisionStats)]);
       }
+
+      // Fetch unique ranges and beats
+      const { data: rangesData, error: rangesError } = await supabase
+        .from('activity_reports')
+        .select('range_name')
+        .not('range_name', 'is', null)
+        .order('range_name');
+
+      if (rangesError) {
+        console.error("Error fetching ranges:", rangesError);
+        toast.error("Failed to load range data");
+      } else if (rangesData) {
+        const uniqueRanges = ['all', ...new Set(rangesData.map(r => r.range_name))];
+        setRanges(uniqueRanges);
+      }
+
+      const { data: beatsData, error: beatsError } = await supabase
+        .from('activity_reports')
+        .select('beat_name')
+        .not('beat_name', 'is', null)
+        .order('beat_name');
+
+      if (beatsError) {
+        console.error("Error fetching beats:", beatsError);
+        toast.error("Failed to load beat data");
+      } else if (beatsData) {
+        const uniqueBeats = ['all', ...new Set(beatsData.map(b => b.beat_name))];
+        setBeats(uniqueBeats);
+      }
       
       setError(null);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       setError(error as Error);
-      toast.error("Failed to load dashboard data");
+      toast.error("Failed to load dashboard data. Please try again later.");
     } finally {
       setLoading(false);
     }
-  }, [selectedDivision, startDate, endDate]);
+  }, [selectedDivision, heatmapFilters.range, heatmapFilters.beat, startDate, endDate]);
 
   useEffect(() => {
     let mounted = true;
@@ -156,7 +319,13 @@ export default function Dashboard() {
               
               console.log("New activity report received:", payload);
               try {
-                const dashboardStats = await getDashboardStats();
+                const dashboardStats = await getDashboardStats({
+                  division: selectedDivision === 'all' ? undefined : selectedDivision,
+                  range: heatmapFilters.range === 'all' ? undefined : heatmapFilters.range,
+                  beat: heatmapFilters.beat === 'all' ? undefined : heatmapFilters.beat,
+                  startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+                  endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+                });
                 setStats(dashboardStats);
                 toast.success("Dashboard updated with new activity report");
               } catch (error) {
@@ -186,7 +355,7 @@ export default function Dashboard() {
         subscription.unsubscribe();
       }
     };
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData, selectedDivision, heatmapFilters.range, heatmapFilters.beat, startDate, endDate]);
 
   // Common header component for all states
   const DashboardHeader = () => (
@@ -205,72 +374,10 @@ export default function Dashboard() {
     </div>
   );
 
-  // Add Filter Component
-  const FilterSection = () => (
-    <div className="mb-8 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-      <h3 className="text-lg font-semibold text-green-800 mb-4">Filters</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
-          <Select value={selectedDivision} onValueChange={setSelectedDivision}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select Division" />
-            </SelectTrigger>
-            <SelectContent>
-              {divisions.map((division) => (
-                <SelectItem key={division} value={division}>
-                  {division === 'all' ? 'All Divisions' : division}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-          <DatePicker
-            date={startDate}
-            setDate={setStartDate}
-            placeholder="Select start date"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-          <DatePicker
-            date={endDate}
-            setDate={setEndDate}
-            placeholder="Select end date"
-          />
-        </div>
-      </div>
-      
-      <div className="mt-4 flex justify-end">
-        <Button
-          variant="outline"
-          className="mr-2"
-          onClick={() => {
-            setSelectedDivision('all');
-            setStartDate(null);
-            setEndDate(null);
-          }}
-        >
-          Clear Filters
-        </Button>
-        <Button 
-          className="bg-green-700 text-white hover:bg-green-800"
-          onClick={() => fetchDashboardData()}
-        >
-          Apply Filters
-        </Button>
-      </div>
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Header with gradient background */}
+        <style>{mapStyles}</style>
         <DashboardHeader />
         <div className="container mx-auto py-8 px-4">
           <div className="flex items-center justify-center h-[60vh]">
@@ -287,7 +394,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Header with gradient background */}
+        <style>{mapStyles}</style>
         <DashboardHeader />
         <div className="container mx-auto py-12 px-4">
           <div className="bg-white border border-red-200 rounded-lg shadow-sm p-8 max-w-3xl mx-auto">
@@ -324,266 +431,460 @@ export default function Dashboard() {
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with gradient background */}
+      <style>{mapStyles}</style>
       <DashboardHeader />
 
       <div className="container mx-auto px-6 py-8">
-        {/* Add Filter Section below header */}
-        <FilterSection />
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-green-800 text-lg font-medium">Total Observations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-green-700">{stats?.totalObservations || 0}</p>
-              <p className="text-sm text-gray-500 mt-1">Total records in the system</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-green-800 text-lg font-medium">Loss Reports</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-green-700">{stats?.lossReports || 0}</p>
-              <p className="text-sm text-gray-500 mt-1">Incidents reported</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Elephant Statistics */}
+        {/* Top Half: Summary Statistics */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4 text-green-800 border-b border-gray-200 pb-2">Elephant Statistics</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <h2 className="text-2xl font-bold mb-4 text-green-800 border-b border-gray-200 pb-2">Summary Statistics</h2>
+          
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
               <CardHeader className="pb-2">
-                <CardTitle className="text-green-800 text-lg font-medium">Total Elephants</CardTitle>
+                <CardTitle className="text-green-800 text-lg font-medium">Total Observations</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-green-700">{stats?.kpis.totalElephants || 0}</p>
-                <p className="text-sm text-gray-500 mt-1">Observed in all regions</p>
+                <p className="text-4xl font-bold text-green-700">{stats?.totalObservations || 0}</p>
+                <p className="text-sm text-gray-500 mt-1">Total records in the system</p>
               </CardContent>
             </Card>
 
             <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
               <CardHeader className="pb-2">
-                <CardTitle className="text-green-800 text-lg font-medium">Male Elephants</CardTitle>
+                <CardTitle className="text-green-800 text-lg font-medium">Loss Reports</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-green-700">{stats?.kpis.maleElephants || 0}</p>
-                <p className="text-sm text-gray-500 mt-1">{stats?.kpis.maleElephants && stats.kpis.totalElephants ? `${Math.round((stats.kpis.maleElephants / stats.kpis.totalElephants) * 100)}% of total` : '0% of total'}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-green-800 text-lg font-medium">Female Elephants</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-green-700">{stats?.kpis.femaleElephants || 0}</p>
-                <p className="text-sm text-gray-500 mt-1">{stats?.kpis.femaleElephants && stats.kpis.totalElephants ? `${Math.round((stats.kpis.femaleElephants / stats.kpis.totalElephants) * 100)}% of total` : '0% of total'}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-green-800 text-lg font-medium">Calves</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-green-700">{stats?.kpis.totalCalves || 0}</p>
-                <p className="text-sm text-gray-500 mt-1">{stats?.kpis.totalCalves && stats.kpis.totalElephants ? `${Math.round((stats.kpis.totalCalves / stats.kpis.totalElephants) * 100)}% of total` : '0% of total'}</p>
+                <p className="text-4xl font-bold text-green-700">{stats?.lossReports || 0}</p>
+                <p className="text-sm text-gray-500 mt-1">Incidents reported</p>
               </CardContent>
             </Card>
           </div>
-        </div>
 
-        {/* Charts and Maps */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-green-800">Division Statistics</h2>
+          {/* Elephant Statistics */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-green-800 border-b border-gray-200 pb-2">Elephant Statistics</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-green-800 text-lg font-medium">Total Elephants</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-green-700">{stats?.kpis.totalElephants || 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">Observed in all regions</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-green-800 text-lg font-medium">Male Elephants</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-green-700">{stats?.kpis.maleElephants || 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{stats?.kpis.maleElephants && stats.kpis.totalElephants ? `${Math.round((stats.kpis.maleElephants / stats.kpis.totalElephants) * 100)}% of total` : '0% of total'}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-green-800 text-lg font-medium">Female Elephants</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-green-700">{stats?.kpis.femaleElephants || 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{stats?.kpis.femaleElephants && stats.kpis.totalElephants ? `${Math.round((stats.kpis.femaleElephants / stats.kpis.totalElephants) * 100)}% of total` : '0% of total'}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-100 shadow-sm hover:shadow transition-shadow duration-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-green-800 text-lg font-medium">Calves</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-green-700">{stats?.kpis.totalCalves || 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{stats?.kpis.totalCalves && stats.kpis.totalElephants ? `${Math.round((stats.kpis.totalCalves / stats.kpis.totalElephants) * 100)}% of total` : '0% of total'}</p>
+                </CardContent>
+              </Card>
             </div>
-            <div className="p-4 h-[400px] flex items-center justify-center">
-              {stats?.kpis.divisionStats && Object.keys(stats.kpis.divisionStats).length > 0 ? (
-                <div className="w-full h-full flex flex-col items-center">
-                  <Pie 
-                    data={{
-                      labels: Object.keys(stats.kpis.divisionStats),
-                      datasets: [
-                        {
-                          label: 'Number of Elephants',
-                          data: Object.values(stats.kpis.divisionStats).map(div => div.elephants),
-                          backgroundColor: [
-                            'rgba(44, 123, 229, 0.7)',   // Blue
-                            'rgba(255, 136, 0, 0.7)',    // Orange
-                            'rgba(152, 77, 255, 0.7)',   // Purple
-                            'rgba(16, 152, 84, 0.7)',    // Green
-                            'rgba(255, 65, 105, 0.7)',   // Pink/Red
-                            'rgba(255, 205, 86, 0.7)',   // Yellow
-                            'rgba(75, 192, 192, 0.7)',   // Teal
-                            'rgba(201, 203, 207, 0.7)',  // Gray
-                          ],
-                          borderColor: [
-                            'rgba(44, 123, 229, 1)',      // Blue
-                            'rgba(255, 136, 0, 1)',      // Orange
-                            'rgba(152, 77, 255, 1)',     // Purple
-                            'rgba(16, 152, 84, 1)',      // Green
-                            'rgba(255, 65, 105, 1)',     // Pink/Red
-                            'rgba(255, 205, 86, 1)',     // Yellow
-                            'rgba(75, 192, 192, 1)',     // Teal
-                            'rgba(201, 203, 207, 1)',    // Gray
-                          ],
-                          borderWidth: 1,
-                        },
-                      ],
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        title: {
-                          display: false,
-                        },
-                        legend: {
-                          position: 'right',
-                          labels: {
-                            font: {
-                              size: 12
+          </div>
+
+          {/* Division Statistics */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-green-800 border-b border-gray-200 pb-2">Division Statistics</h2>
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+              <div className="p-4 h-[400px] flex items-center justify-center">
+                {stats?.kpis.divisionStats && Object.keys(stats.kpis.divisionStats).length > 0 ? (
+                  <div className="w-full h-full flex flex-col items-center">
+                    <Bar 
+                      data={{
+                        labels: Object.keys(stats.kpis.divisionStats),
+                        datasets: [
+                          {
+                            label: 'Number of Elephants',
+                            data: Object.values(stats.kpis.divisionStats).map(div => div.elephants),
+                            backgroundColor: 'rgba(16, 152, 84, 0.7)',   // Green
+                            borderColor: 'rgba(16, 152, 84, 1)',        // Green border
+                            borderWidth: 1,
+                          }
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          title: {
+                            display: false,
+                          },
+                          legend: {
+                            display: false,
+                          },
+                          tooltip: {
+                            backgroundColor: 'rgba(16, 152, 84, 0.8)',
+                            titleFont: {
+                              weight: 'bold',
+                              size: 14
                             },
-                            usePointStyle: true,
-                            pointStyle: 'circle'
+                            bodyFont: {
+                              size: 13
+                            },
+                            padding: 12,
+                            cornerRadius: 6,
+                            callbacks: {
+                              title: function(tooltipItems) {
+                                return tooltipItems[0].label;
+                              },
+                              label: function(context) {
+                                const value = context.raw || 0;
+                                return `Number of elephants: ${value}`;
+                              }
+                            }
                           }
                         },
-                        tooltip: {
-                          backgroundColor: 'rgba(16, 152, 84, 0.8)',
-                          titleFont: {
-                            weight: 'bold',
-                            size: 14
-                          },
-                          bodyFont: {
-                            size: 13
-                          },
-                          padding: 12,
-                          cornerRadius: 6,
-                          callbacks: {
-                            title: function(tooltipItems) {
-                              return tooltipItems[0].label;
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            title: {
+                              display: true,
+                              text: 'Number of Elephants',
+                              font: {
+                                size: 12,
+                                weight: 'bold'
+                              }
                             },
-                            label: function(context) {
-                              const value = context.raw || 0;
-                              return `No of elephants: ${value}`;
+                            ticks: {
+                              precision: 0
+                            }
+                          },
+                          x: {
+                            title: {
+                              display: true,
+                              text: 'Division',
+                              font: {
+                                size: 12,
+                                weight: 'bold'
+                              }
                             }
                           }
                         }
-                      }
-                    }}
-                  />
-                  <div className="mt-4 text-center text-sm text-gray-600">
-                    Elephant population distribution by division
+                      }}
+                    />
+                    <div className="mt-4 text-center text-sm text-gray-600">
+                      Elephant population distribution by division
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center text-gray-500">
-                  No division statistics available
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-green-800">Activity Heatmap</h2>
-            </div>
-            <div className="h-[400px]">
-              {stats?.heatmapData && stats.heatmapData.length > 0 ? (
-                <MapContainer 
-                  center={[0, 0]} 
-                  zoom={2} 
-                  style={{ height: "100%", width: "100%" }}
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  />
-                  {stats.heatmapData && stats.heatmapData.length > 0 && (
-                    <>
-                      <HeatmapLayer data={stats.heatmapData} />
-                      <MapBoundsAdjuster data={stats.heatmapData} />
-                    </>
-                  )}
-                </MapContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
-                  No location data available for heatmap
-                </div>
-              )}
+                ) : (
+                  <div className="text-center text-gray-500">
+                    No division statistics available
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Observations */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-green-800">Recent Observations</h2>
+        {/* Bottom Half: Activity Details */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4 text-green-800 border-b border-gray-200 pb-2">Activity Details</h2>
+          
+          {/* Activity Heatmap */}
+          <div className="mb-8 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-green-800">Activity Heatmap</h2>
+            </div>
+            <div className="p-4">
+              {/* Heatmap Filters */}
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+                  <Select 
+                    value={pendingHeatmapFilters.division} 
+                    onValueChange={(value) => setPendingHeatmapFilters(prev => ({ ...prev, division: value }))}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Division" />
+                    </SelectTrigger>
+                    <Portal.Root>
+                      <SelectContent className="bg-white z-[9999]">
+                        {divisions.map((division) => (
+                          <SelectItem key={division} value={division}>
+                            {division === 'all' ? 'All Divisions' : division}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Portal.Root>
+                  </Select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Range</label>
+                  <Select 
+                    value={pendingHeatmapFilters.range} 
+                    onValueChange={(value) => setPendingHeatmapFilters(prev => ({ ...prev, range: value }))}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Range" />
+                    </SelectTrigger>
+                    <Portal.Root>
+                      <SelectContent className="bg-white z-[9999]">
+                        {ranges.map((range) => (
+                          <SelectItem key={range} value={range}>
+                            {range === 'all' ? 'All Ranges' : range}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Portal.Root>
+                  </Select>
+                </div>
+                
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Beat</label>
+                  <Select 
+                    value={pendingHeatmapFilters.beat} 
+                    onValueChange={(value) => setPendingHeatmapFilters(prev => ({ ...prev, beat: value }))}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Beat" />
+                    </SelectTrigger>
+                    <Portal.Root>
+                      <SelectContent className="bg-white z-[9999]">
+                        {beats.map((beat) => (
+                          <SelectItem key={beat} value={beat}>
+                            {beat === 'all' ? 'All Beats' : beat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Portal.Root>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Intensity</label>
+                  <Select 
+                    value={pendingHeatmapFilters.intensityThreshold.toString()} 
+                    onValueChange={(value) => 
+                      setPendingHeatmapFilters(prev => ({ ...prev, intensityThreshold: parseInt(value) }))
+                    }
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Minimum Intensity" />
+                    </SelectTrigger>
+                    <Portal.Root>
+                      <SelectContent className="bg-white z-[9999]">
+                        <SelectItem value="0">All Intensities</SelectItem>
+                        <SelectItem value="1">Low (1+)</SelectItem>
+                        <SelectItem value="3">Medium (3+)</SelectItem>
+                        <SelectItem value="5">High (5+)</SelectItem>
+                        <SelectItem value="8">Very High (8+)</SelectItem>
+                      </SelectContent>
+                    </Portal.Root>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                  <div className="flex gap-2">
+                    <DatePicker
+                      date={pendingHeatmapFilters.startDate}
+                      setDate={(date) => setPendingHeatmapFilters(prev => ({ ...prev, startDate: date }))}
+                      placeholder="Start"
+                    />
+                    <DatePicker
+                      date={pendingHeatmapFilters.endDate}
+                      setDate={(date) => setPendingHeatmapFilters(prev => ({ ...prev, endDate: date }))}
+                      placeholder="End"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-end">
+                  <Button className="w-full bg-green-700 text-white" onClick={applyHeatmapFilters}>
+                    Apply Filter
+                  </Button>
+                </div>
+              </div>
+
+              <div className="h-[400px]">
+                {heatmapData && heatmapData.length > 0 ? (
+                  <MapContainer 
+                    center={[0, 0]} 
+                    zoom={2} 
+                    style={{ height: "100%", width: "100%" }}
+                    className="map-container"
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    {heatmapData.map((point, index) => (
+                      <HeatmapLayer key={index} data={[point]} />
+                    ))}
+                    <MapBoundsAdjuster data={heatmapData} />
+                  </MapContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    No location data available for heatmap
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <div>
-            {stats?.recentObservations && stats.recentObservations.length > 0 ? (
+
+          {/* Recent Observations */}
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-green-800">Recent Observations</h2>
+            </div>
+            <div className="p-4">
+              {/* Observations Filters */}
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+                  <Select 
+                    value={pendingObservationsFilters.division} 
+                    onValueChange={(value) => setPendingObservationsFilters(prev => ({ ...prev, division: value }))}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Division" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-[9999]">
+                      {divisions.map((division) => (
+                        <SelectItem key={division} value={division}>
+                          {division === 'all' ? 'All Divisions' : division}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Range</label>
+                  <Select 
+                    value={pendingObservationsFilters.range} 
+                    onValueChange={(value) => setPendingObservationsFilters(prev => ({ ...prev, range: value }))}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Range" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-[9999]">
+                      {ranges.map((range) => (
+                        <SelectItem key={range} value={range}>
+                          {range === 'all' ? 'All Ranges' : range}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Beat</label>
+                  <Select 
+                    value={pendingObservationsFilters.beat} 
+                    onValueChange={(value) => setPendingObservationsFilters(prev => ({ ...prev, beat: value }))}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Beat" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-[9999]">
+                      {beats.map((beat) => (
+                        <SelectItem key={beat} value={beat}>
+                          {beat === 'all' ? 'All Beats' : beat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <DatePicker
+                    date={pendingObservationsFilters.startDate}
+                    setDate={(date) => setPendingObservationsFilters(prev => ({ ...prev, startDate: date }))}
+                    placeholder="Select start date"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <DatePicker
+                    date={pendingObservationsFilters.endDate}
+                    setDate={(date) => setPendingObservationsFilters(prev => ({ ...prev, endDate: date }))}
+                    placeholder="Select end date"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button className="w-full bg-green-700 text-white" onClick={applyObservationFilters}>
+                    Apply Filter
+                  </Button>
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium text-gray-700">Date</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-700">Time</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-700">Division</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-700">Type</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-700">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {stats.recentObservations.map((obs, index) => {
-                      // Format the date and time
-                      const date = obs.observation_date || 
-                                  (obs.created_at ? new Date(obs.created_at).toISOString().split('T')[0] : '');
-                      const time = obs.observation_time || '';
-                      
-                      return (
-                        <tr key={obs.id || `obs-${index}`} className="hover:bg-gray-50">
-                          <td className="px-6 py-4">{date}</td>
-                          <td className="px-6 py-4">{time}</td>
-                          <td className="px-6 py-4">{obs.division || ''}</td>
-                          <td className="px-6 py-4">
-                            <span className={
-                              `px-2 py-1 rounded-full text-xs font-medium ${
-                                obs.observation_type === 'elephant' ? 'bg-green-100 text-green-800' : 
-                                obs.observation_type === 'indirect' ? 'bg-blue-100 text-blue-800' : 
-                                'bg-red-100 text-red-800'
-                              }`
-                            }>
-                              {obs.observation_type || ''}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            {obs.observation_type === 'elephant' && obs.total_elephants ? 
-                              `${obs.total_elephants} elephants observed` : ''}
-                            {obs.observation_type === 'indirect' && obs.indirect_sign ? 
-                              obs.indirect_sign : ''}
-                            {obs.observation_type === 'loss' && obs.loss_type ? 
-                              obs.loss_type : ''}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                {recentObservations && recentObservations.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Date</th>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Time</th>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Division</th>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Range</th>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Beat</th>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {recentObservations.map((obs, index) => {
+                        // Format the date and time
+                        const date = obs.activity_date || 
+                                    (obs.created_at ? new Date(obs.created_at).toISOString().split('T')[0] : '');
+                        const time = obs.activity_time || '';
+                        
+                        return (
+                          <tr key={obs.id || `obs-${index}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">{date}</td>
+                            <td className="px-6 py-4">{time}</td>
+                            <td className="px-6 py-4">{obs.division_name || ''}</td>
+                            <td className="px-6 py-4">{obs.range_name || ''}</td>
+                            <td className="px-6 py-4">{obs.beat_name || ''}</td>
+                            <td className="px-6 py-4">
+                              {obs.total_elephants > 0 ? 
+                                `${obs.total_elephants} elephants observed` : ''}
+                              {obs.damage_description ? 
+                                obs.damage_description : ''}
+                              {obs.identification_marks ? 
+                                obs.identification_marks : ''}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    No observations available
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="p-6 text-center text-gray-500">
-                No observations recorded yet
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

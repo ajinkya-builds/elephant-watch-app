@@ -3,7 +3,15 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, UserCircle } from "lucide-react";
+import { LogOut, UserCircle, Settings, User } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Header() {
   const navigate = useNavigate();
@@ -86,31 +94,44 @@ export function Header() {
               <UserCircle className="w-10 h-10 text-gray-400" />
             )}
             <div className="flex flex-col items-start">
-              <span className="font-medium text-gray-800 text-sm">{userEmail}</span>
-              <Button
-                variant="link"
-                className="p-0 h-auto text-blue-600 text-xs"
-                onClick={() => alert('Profile management coming soon!')}
-              >
-                Manage your Account
-              </Button>
+              <span className="font-medium text-gray-800 text-xs">{userEmail}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-blue-600 text-[10px] hover:text-blue-800"
+                  >
+                    Manage your Account
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            {isAdmin && (
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/admin')}
-                className="border-amber-600 text-amber-600 hover:bg-amber-50 ml-2"
-              >
-                Admin
-              </Button>
-            )}
-            <Button 
-              variant="outline" 
-              onClick={handleLogout}
-              className="border-green-600 text-green-600 hover:bg-green-50 ml-2"
-            >
-              <LogOut className="w-4 h-4 mr-1" /> Logout
-            </Button>
           </div>
         )}
       </div>
