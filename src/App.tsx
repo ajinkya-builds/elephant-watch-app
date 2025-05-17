@@ -16,6 +16,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminObservations from "./pages/AdminObservations";
 import AdminStatistics from "./pages/AdminStatistics";
 import AdminSettings from "./pages/AdminSettings";
+import AdminLogs from "./pages/AdminLogs";
 
 const queryClient = new QueryClient();
 
@@ -107,6 +108,15 @@ const App = () => {
                 <ProtectedRoute>
                   <Header />
                   <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/logs"
+              element={
+                <ProtectedRoute>
+                  <Header />
+                  <AdminLogs />
                 </ProtectedRoute>
               }
             />

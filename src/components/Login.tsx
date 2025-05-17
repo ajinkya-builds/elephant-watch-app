@@ -10,6 +10,47 @@ import { PawPrint, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 
+// Helper to get browser info
+function getBrowserInfo() {
+  return navigator.userAgent;
+}
+
+// Helper to get IP address
+async function getIpAddress() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    const data = await res.json();
+    return data.ip;
+  } catch {
+    return '';
+  }
+}
+
+const logLoginAttempt = async ({
+  user_email,
+  status,
+  ip,
+  browser,
+}: {
+  user_email: string;
+  status: "success" | "failed";
+  ip: string;
+  browser: string;
+}) => {
+  const logData = {
+    user_email: user_email || "",
+    status: status || "",
+    time: new Date().toISOString(),
+    ip: ip || "",
+    browser: browser || "",
+  };
+  console.log("Logging login attempt:", logData);
+  const { error } = await supabase.from("login_logs").insert([logData]);
+  if (error) {
+    console.error("Supabase insert error:", error);
+  }
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,61 +67,29 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate email format
     if (!validateEmail(email)) {
       toast.error("Please enter a valid email address");
       return;
     }
 
     setIsLoading(true);
+    let loginStatus: "success" | "failed" = "failed";
+    let ip = "";
+    let browser = getBrowserInfo();
 
     try {
-      console.log("Attempting to login with email:", email);
-      
-      // Log the Supabase configuration
-      console.log("Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
-      
-      // Fetch user from your custom users table
+      ip = await getIpAddress();
+
       const { data: user, error: fetchError } = await supabase
         .from("users")
         .select("*")
         .eq("email", email)
         .single();
 
-      // Log the complete response
-      console.log("Complete Supabase response:", {
-        data: user,
-        error: fetchError,
-        message: fetchError?.message,
-        details: fetchError?.details
-      });
+      if (fetchError || !user) throw new Error("User not found. Please check your email address.");
 
-      if (fetchError) {
-        console.error("Error fetching user:", fetchError);
-        // Log the specific error details
-        console.error("Error details:", {
-          code: fetchError.code,
-          message: fetchError.message,
-          details: fetchError.details,
-          hint: fetchError.hint
-        });
-        throw new Error("User not found. Please check your email address.");
-      }
-
-      if (!user) {
-        console.log("No user found with email:", email);
-        throw new Error("User not found. Please check your email address.");
-      }
-
-      console.log("Found user:", user);
-
-      // Verify password using bcrypt
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
-      console.log("Password validation result:", isValidPassword);
-
-      if (!isValidPassword) {
-        throw new Error("Incorrect password. Please try again.");
-      }
+      if (!isValidPassword) throw new Error("Incorrect password. Please try again.");
 
       // Store user session in localStorage
       const session = {
@@ -88,24 +97,28 @@ export default function Login() {
           id: user.id,
           email: user.email,
         },
-        expires_at: new Date(Date.now() + (rememberMe ? 30 : 24) * 60 * 60 * 1000).toISOString(), // 30 days if remember me, 24 hours if not
+        expires_at: new Date(Date.now() + (rememberMe ? 30 : 24) * 60 * 60 * 1000).toISOString(),
       };
       
-      localStorage.setItem('session', JSON.stringify(session));
-      localStorage.setItem('loggedIn', 'true');
-      localStorage.setItem('currentUser', JSON.stringify(user));
+      localStorage.setItem("session", JSON.stringify(session));
+      localStorage.setItem("loggedIn", "true");
+      localStorage.setItem("currentUser", JSON.stringify(user));
 
-      console.log("Using custom auth with localStorage session");
       toast.success("Logged in successfully!");
       
-      // Navigate to the intended destination or home page
+      loginStatus = "success";
       const from = (location.state as any)?.from?.pathname || "/home";
-      console.log('Login: redirecting to', from);
       navigate(from, { replace: true });
     } catch (error: any) {
-      console.error("Login error:", error);
       toast.error(error.message || "Failed to login");
     } finally {
+      // Always log the attempt
+      await logLoginAttempt({
+        user_email: email,
+        status: loginStatus,
+        ip,
+        browser,
+      });
       setIsLoading(false);
     }
   };

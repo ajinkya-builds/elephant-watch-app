@@ -28,8 +28,18 @@ const ReportActivityPage = () => {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
-  // Handle form submission
+  // Helper to get IP address
+  async function getIpAddress() {
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const data = await res.json();
+      return data.ip;
+    } catch {
+      return '';
+    }
+  }
 
+  // Handle form submission
   const handleSubmit = async (data: any) => {
     try {
       setIsLoading(true);
@@ -78,6 +88,7 @@ const ReportActivityPage = () => {
       const adminUrl = import.meta.env.VITE_SUPABASE_URL;
       
       // Log a masked version of the key for debugging
+      if (!adminKey) throw new Error('Supabase service role key is not set in environment variables.');
       console.log(`Using service key: ${adminKey.substring(0, 5)}...${adminKey.substring(adminKey.length - 5)}`);
       
       // Make a direct fetch request with the service role key
@@ -99,8 +110,23 @@ const ReportActivityPage = () => {
       
       const insertData = await response.json();
 
+      // Log activity after successful submission
+      try {
+        const ip = await getIpAddress();
+        await supabase.from('activity_logs').insert([
+          {
+            user_email: session.user.email,
+            action: 'report_submitted',
+            time: new Date().toISOString(),
+            ip,
+            created_at: new Date().toISOString()
+          }
+        ]);
+      } catch (logError) {
+        console.error('Failed to log activity:', logError);
+      }
+
       toast.success('Report submitted successfully!');
-      // Navigate to dashboard instead of non-existent reports page
       navigate('/dashboard');
     } catch (error) {
       console.error('Error submitting report:', error);
