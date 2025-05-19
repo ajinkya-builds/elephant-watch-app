@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabaseClient";
+import { adminClient } from "@/lib/supabaseClient";
 import { toast } from "sonner";
-import bcrypt from "bcryptjs";
 import { PawPrint, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from '@/contexts/AuthContext';
 
 // Helper to get browser info
 function getBrowserInfo() {
@@ -26,99 +26,87 @@ async function getIpAddress() {
   }
 }
 
-const logLoginAttempt = async ({
-  user_email,
-  status,
-  ip,
-  browser,
-}: {
-  user_email: string;
-  status: "success" | "failed";
-  ip: string;
-  browser: string;
-}) => {
-  const logData = {
-    user_email: user_email || "",
-    status: status || "",
-    time: new Date().toISOString(),
-    ip: ip || "",
-    browser: browser || "",
-  };
-  console.log("Logging login attempt:", logData);
-  const { error } = await supabase.from("login_logs").insert([logData]);
-  if (error) {
-    console.error("Supabase insert error:", error);
+const logLoginAttempt = async (identifier: string, status: 'success' | 'failed') => {
+  try {
+    const { data: browserInfo } = await adminClient.rpc('get_browser_info');
+    const { data: ipInfo } = await adminClient.rpc('get_ip_info');
+
+    const loginData = {
+      user_identifier: identifier,
+      login_type: identifier.includes('@') ? 'email' : 'phone',
+      status,
+      time: new Date().toISOString(),
+      ip: ipInfo?.ip || null,
+      browser: browserInfo?.user_agent || null
+    };
+
+    const { error } = await adminClient
+      .from('login_logs')
+      .insert([loginData]);
+
+    if (error) {
+      console.error('Error logging login attempt:', error);
+    }
+  } catch (error) {
+    console.error('Error logging login attempt:', error);
   }
 };
 
 export default function Login() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn } = useAuth();
 
-  const validateEmail = (email: string) => {
+  const validateIdentifier = (value: string) => {
+    // Check if it's an email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    // Check if it's a phone number
+    const phoneRegex = /^\d{10}$/;
+    
+    return emailRegex.test(value) || phoneRegex.test(value);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateEmail(email)) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-
     setIsLoading(true);
-    let loginStatus: "success" | "failed" = "failed";
-    let ip = "";
-    let browser = getBrowserInfo();
+    setError(null);
 
     try {
-      ip = await getIpAddress();
+      // Validate identifier
+      if (!validateIdentifier(identifier)) {
+        setError("Please enter a valid email or phone number");
+        setIsLoading(false);
+        return;
+      }
 
-      const { data: user, error: fetchError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
+      console.log('Starting login process for:', identifier);
 
-      if (fetchError || !user) throw new Error("User not found. Please check your email address.");
-
-      const isValidPassword = await bcrypt.compare(password, user.password_hash);
-      if (!isValidPassword) throw new Error("Incorrect password. Please try again.");
-
-      // Store user session in localStorage
-      const session = {
-        user: {
-          id: user.id,
-          email: user.email,
-        },
-        expires_at: new Date(Date.now() + (rememberMe ? 30 : 24) * 60 * 60 * 1000).toISOString(),
-      };
+      // Attempt to sign in
+      const user = await signIn(identifier, password, rememberMe);
+      console.log('Sign in completed:', user);
       
-      localStorage.setItem("session", JSON.stringify(session));
-      localStorage.setItem("loggedIn", "true");
-      localStorage.setItem("currentUser", JSON.stringify(user));
+      if (!user) {
+        throw new Error('No user data received after login');
+      }
 
-      toast.success("Logged in successfully!");
+      // Set redirect path to home page by default
+      const redirectPath = location.state?.from || '/';
+      console.log("Redirecting to:", redirectPath);
       
-      loginStatus = "success";
-      const from = (location.state as any)?.from?.pathname || "/home";
-      navigate(from, { replace: true });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to login");
-    } finally {
-      // Always log the attempt
-      await logLoginAttempt({
-        user_email: email,
-        status: loginStatus,
-        ip,
-        browser,
-      });
+      // Small delay to ensure auth state is updated
+      setTimeout(() => {
+        setIsLoading(false);
+        navigate(redirectPath);
+      }, 500);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err instanceof Error ? err.message : "An error occurred during login");
+      toast.error(err instanceof Error ? err.message : "Login failed. Please try again.");
       setIsLoading(false);
     }
   };
@@ -141,19 +129,19 @@ export default function Login() {
           <CardHeader>
             <CardTitle className="text-green-800">Login</CardTitle>
             <CardDescription>
-              Enter your credentials to access the system
+              Enter your email or phone number to access the system
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="identifier">Email or Phone Number</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  type="text"
+                  placeholder="Enter email or 10-digit phone number"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                   className="focus:ring-green-600"
                   disabled={isLoading}

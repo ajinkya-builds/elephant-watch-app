@@ -86,7 +86,7 @@ export default defineConfig(({ mode }) => {
     base: mode === 'production' ? '/elephant-watch-app/' : '/',
     server: {
       host: "::",
-      port: 8085,
+      port: 8080,
       strictPort: true,
     },
     resolve: {

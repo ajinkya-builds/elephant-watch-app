@@ -17,6 +17,7 @@ import AdminObservations from "./pages/AdminObservations";
 import AdminStatistics from "./pages/AdminStatistics";
 import AdminSettings from "./pages/AdminSettings";
 import AdminLogs from "./pages/AdminLogs";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -36,93 +37,145 @@ const App = () => {
             <LazyPwaReloader />
           </Suspense>
         )}
-        <BrowserRouter basename={import.meta.env.DEV ? "/" : "/elephant-watch-app"}>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/report-activity"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <ReportActivityPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/home"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <Admin />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/users"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <AdminUsers />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/observations"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <AdminObservations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/statistics"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <AdminStatistics />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <AdminSettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/logs"
-              element={
-                <ProtectedRoute>
-                  <Header />
-                  <AdminLogs />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AuthProvider>
+          <BrowserRouter basename={import.meta.env.DEV ? "/" : "/elephant-watch-app"}>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              
+              {/* Root path - Home page with role selection */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Header />
+                    <Index />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Dashboard - Main dashboard for authenticated users */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Header />
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Report Activity - Accessible by all roles */}
+              <Route
+                path="/report"
+                element={
+                  <ProtectedRoute>
+                    <Header />
+                    <ReportActivityPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin Routes - Only accessible by admin */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Header />
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Header />
+                    <AdminUsers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/observations"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Header />
+                    <AdminObservations />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/statistics"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Header />
+                    <AdminStatistics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Header />
+                    <AdminSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/logs"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Header />
+                    <AdminLogs />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Manager Routes - Accessible by admin and manager */}
+              <Route
+                path="/manager/users"
+                element={
+                  <ProtectedRoute requiredRole="manager">
+                    <Header />
+                    <AdminUsers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/manager/observations"
+                element={
+                  <ProtectedRoute requiredRole="manager">
+                    <Header />
+                    <AdminObservations />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/manager/statistics"
+                element={
+                  <ProtectedRoute requiredRole="manager">
+                    <Header />
+                    <AdminStatistics />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Data Collector Routes - Accessible by all roles */}
+              <Route
+                path="/collector/report"
+                element={
+                  <ProtectedRoute>
+                    <Header />
+                    <ReportActivityPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

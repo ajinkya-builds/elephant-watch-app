@@ -1,74 +1,83 @@
-import React, { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth';
+import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredRole?: UserRole;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const { user, isLoading, canManageUsers, canViewReports, canEditReports } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    const checkAuth = () => {
-      const sessionStr = localStorage.getItem('session');
-      console.log('ProtectedRoute: checking session', sessionStr ? 'exists' : 'missing');
-      
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr);
-        const now = new Date();
-        const expiresAt = new Date(session.expires_at);
-        const isExpired = expiresAt <= now;
-        
-        console.log('ProtectedRoute: session details', { 
-          userId: session.user.id,
-          expires: session.expires_at,
-          isExpired,
-          currentTime: now.toISOString()
-        });
-        
-        if (!isExpired) {
-          setIsAuthenticated(true);
-        } else {
-          // Session expired
-          console.log('ProtectedRoute: session expired, removing');
-          localStorage.removeItem('session');
-          setIsAuthenticated(false);
-        }
-      } else {
-        setIsAuthenticated(false);
-      }
-    };
+  console.log("ProtectedRoute:", {
+    pathname: location.pathname,
+    user: user?.email_or_phone,
+    userRole: user?.role,
+    isLoading,
+    requiredRole
+  });
 
-    checkAuth();
-
-    // Set up storage event listener for cross-tab synchronization
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'session') {
-        checkAuth();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  if (isAuthenticated === null) {
-    // Still checking authentication
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Checking authentication...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    // Redirect to login page with the return url
-    return <Navigate to="/" state={{ from: location }} replace />;
+  if (!user) {
+    console.log("No user found, redirecting to login");
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Check role-based permissions
+  if (requiredRole) {
+    console.log("Checking role permissions:", { userRole: user.role, requiredRole });
+    switch (requiredRole) {
+      case 'admin':
+        if (user.role !== 'admin') {
+          console.log("User is not admin, redirecting to home");
+          return <Navigate to="/" replace />;
+        }
+        break;
+      case 'manager':
+        if (!['admin', 'manager'].includes(user.role)) {
+          console.log("User is not manager or admin, redirecting to home");
+          return <Navigate to="/" replace />;
+        }
+        break;
+      case 'data_collector':
+        // All roles can access data collector features
+        break;
+    }
+  }
+
+  // Check feature-specific permissions
+  if (location.pathname.startsWith('/admin/users') && !canManageUsers()) {
+    console.log("User cannot manage users, redirecting to home");
+    return <Navigate to="/" replace />;
+  }
+
+  if (location.pathname.startsWith('/reports/edit') && !canEditReports()) {
+    console.log("User cannot edit reports, redirecting to reports");
+    return <Navigate to="/reports" replace />;
+  }
+
+  if (location.pathname.startsWith('/reports') && !canViewReports()) {
+    console.log("User cannot view reports, redirecting to home");
+    return <Navigate to="/" replace />;
+  }
+
+  // Add dashboard access check
+  if (location.pathname === '/dashboard') {
+    if (user.role === 'data_collector') {
+      console.log("Data collector cannot access dashboard, redirecting to home");
+      return <Navigate to="/" replace />;
+    }
   }
 
   return <>{children}</>;

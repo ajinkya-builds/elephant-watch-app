@@ -365,7 +365,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Elephant Watch Dashboard</h1>
           <Button
             className="bg-white text-green-800 hover:bg-gray-100 font-medium shadow-sm"
-            onClick={() => navigate("/report-activity")}
+            onClick={() => navigate("/report")}
           >
             Report New Activity
           </Button>

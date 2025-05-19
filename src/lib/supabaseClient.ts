@@ -3,44 +3,36 @@ import { createClient } from '@supabase/supabase-js';
 // These environment variables will be read from your .env file
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
   console.error(
-    "Supabase URL or Anon Key is missing. Make sure you have VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY set in your .env file."
+    "Supabase URL, Anon Key, or Service Key is missing. Make sure you have VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_SUPABASE_SERVICE_ROLE_KEY set in your .env file."
   );
-  throw new Error("Supabase URL or Anon Key is missing.");
+  throw new Error("Missing Supabase credentials");
 }
 
-// Create the Supabase client with additional configuration
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create two clients - one for regular operations and one for admin operations
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  },
-  global: {
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'apikey': supabaseAnonKey
-    },
-  },
-  db: {
-    schema: 'public'
+    autoRefreshToken: false,
+    persistSession: false
   }
 });
 
 // Helper function to check Supabase connection
-export async function checkSupabaseConnection() {
+export const checkSupabaseConnection = async () => {
   try {
-    const { data, error } = await supabase.from('activity_reports').select('count').limit(1);
+    // Use a simple health check instead of querying users table
+    const { data, error } = await supabase.rpc('get_service_status');
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Supabase connection check failed:', error);
+    console.error('Supabase connection error:', error);
     return false;
   }
-}
+};
 
 // Helper function to subscribe to realtime changes
 export function subscribeToRealtimeChanges(
@@ -67,3 +59,14 @@ export function subscribeToRealtimeChanges(
 
   return channel;
 }
+
+// Update the user type to include mobile
+export type User = {
+  id: string;
+  email: string;
+  mobile: string;
+  password_hash: string;
+  role: 'admin' | 'user';
+  created_at: string;
+  updated_at: string;
+};
