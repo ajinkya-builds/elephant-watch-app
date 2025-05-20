@@ -1,42 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-
-// Create two clients - one for regular operations and one for admin operations
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
-const adminClient = createClient(supabaseUrl || '', supabaseServiceKey || '', {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+import { supabase } from '@/lib/supabaseClient';
+import { User, Session } from '@supabase/supabase-js';
 
 export type UserRole = 'admin' | 'manager' | 'data_collector';
 
-export interface User {
+export interface ExtendedUser {
   id: string;
-  email_or_phone: string;
+  auth_id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
   role: UserRole;
+  position: 'Ranger' | 'DFO' | 'Officer' | 'Guard';
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
 }
 
-interface AuthState {
-  user: User | null;
-  loading: boolean;
-  error: string | null;
-}
-
 export type AuthContextType = {
-  user: User | null;
+  user: ExtendedUser | null;
+  session: Session | null;
   loading: boolean;
   error: string | null;
-  signIn: (identifier: string, password: string, rememberMe: boolean) => Promise<User>;
+  signIn: (identifier: string, password: string, rememberMe?: boolean) => Promise<ExtendedUser>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
   canCreateUserWithRole: (role: UserRole) => boolean;
@@ -44,122 +31,147 @@ export type AuthContextType = {
   canViewReports: () => boolean;
   canEditReports: () => boolean;
   hasPermission: (permission: string) => boolean;
-  isLoading: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
+  const [state, setState] = useState<{
+    user: ExtendedUser | null;
+    session: Session | null;
+    loading: boolean;
+    error: string | null;
+  }>({
     user: null,
+    session: null,
     loading: true,
-    error: null,
+    error: null
   });
 
   useEffect(() => {
-    // Check for Supabase credentials
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-      console.error('Missing Supabase credentials');
+    // Set up Supabase auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          setState(prev => ({ ...prev, session, loading: true }));
+          await refreshUser();
+        } else if (event === 'SIGNED_OUT') {
+          setState({ user: null, session: null, loading: false, error: null });
+        }
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setState(prev => ({ ...prev, session, loading: true }));
+        refreshUser();
+      } else {
+        setState(prev => ({ ...prev, loading: false }));
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const refreshUser = async () => {
+    try {
+      if (!state.session?.user?.id) {
+        setState(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', state.session.user.id)
+        .single();
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        user: profile as ExtendedUser,
+        loading: false,
+        error: null
+      }));
+    } catch (error: any) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: 'Missing Supabase credentials. Please check your environment variables.'
+        error: error.message
       }));
-      return;
     }
+  };
 
-    // Check for existing session
-    const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
-    if (userId) {
-      (async () => {
-        try {
-          const { data: user, error } = await adminClient
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
-
-          if (error || !user) {
-            localStorage.removeItem('userId');
-            sessionStorage.removeItem('userId');
-            setState({ user: null, loading: false, error: null });
-          } else {
-            setState({ user: user as User, loading: false, error: null });
-          }
-        } catch (error) {
-          console.error('Error fetching user:', error);
-          setState(prev => ({
-            ...prev,
-            loading: false,
-            error: 'Failed to fetch user data. Please try logging in again.'
-          }));
-        }
-      })();
-    } else {
-      setState(prev => ({ ...prev, loading: false }));
-    }
-  }, []);
-
-  const signIn = async (identifier: string, password: string, rememberMe: boolean) => {
+  const signIn = async (identifier: string, password: string, rememberMe: boolean = false) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      // Find user by email/phone using adminClient
-      const { data: user, error: userError } = await adminClient
-        .from('users')
-        .select('*')
-        .eq('email_or_phone', identifier)
-        .single();
-
-      if (userError) {
-        console.error('User lookup error:', userError);
-        throw new Error('Invalid email/phone or password');
-      }
-
-      if (!user) {
-        throw new Error('Invalid email/phone or password');
-      }
-
-      // Check if user is active
-      if (user.status !== 'active') {
-        throw new Error('Account is inactive. Please contact administrator.');
-      }
-
-      // Verify password
-      const isValidPassword = await bcrypt.compare(password, user.password_hash);
-      if (!isValidPassword) {
-        throw new Error('Invalid email/phone or password');
-      }
-
-      // Store user ID in storage based on remember me
-      if (rememberMe) {
-        localStorage.setItem('userId', user.id);
-      } else {
-        sessionStorage.setItem('userId', user.id);
-      }
-
-      // Log successful login using adminClient
-      await adminClient.from('login_logs').insert({
-        user_id: user.id,
-        login_type: identifier.includes('@') ? 'email' : 'phone',
-        user_agent: navigator.userAgent,
-        ip_address: '127.0.0.1',
-        status: 'success',
-      }).single();
-
-      setState({
-        user: user as User,
-        loading: false,
-        error: null
+      // Determine if identifier is email or phone
+      const isEmail = identifier.includes('@');
+      
+      // Log authentication attempt
+      console.log('Attempting authentication with:', {
+        type: isEmail ? 'email' : 'phone',
+        identifier: isEmail ? identifier : '******' // Don't log phone numbers
       });
 
-      return user;
-    } catch (error: any) {
+      const credentials = isEmail 
+        ? { email: identifier, password }
+        : { phone: identifier, password };
+
+      const { data, error } = await supabase.auth.signInWithPassword(credentials);
+
+      if (error) {
+        console.error('Authentication error:', error);
+        throw error;
+      }
+
+      if (!data.user || !data.session) {
+        console.error('No user data received');
+        throw new Error('No user data received after authentication');
+      }
+
+      console.log('Authentication successful, fetching user profile...');
+
+      // Get the user profile using the correct columns
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .or(`email.eq.${identifier},phone.eq.${identifier}`)
+        .single();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw profileError;
+      }
+
+      if (!profile) {
+        console.error('No profile found for user');
+        throw new Error('User profile not found');
+      }
+
+      console.log('User profile fetched successfully');
+
+      setState(prev => ({
+        ...prev,
+        user: profile as ExtendedUser,
+        session: data.session,
+        loading: false,
+        error: null
+      }));
+
+      return profile as ExtendedUser;
+
+    } catch (error) {
       console.error('Login error:', error);
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error.message || 'An error occurred during login'
+        error: error instanceof Error ? error.message : 'An error occurred during login'
       }));
       throw error;
     }
@@ -168,31 +180,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
-      localStorage.removeItem('userId');
-      sessionStorage.removeItem('userId');
-      setState({ user: null, loading: false, error: null });
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } catch (error: any) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error.message || 'An error occurred during logout'
+        error: error.message
       }));
       throw error;
-    }
-  };
-
-  const refreshUser = async () => {
-    const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
-    if (userId) {
-      const { data: user, error } = await adminClient
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (!error && user) {
-        setState({ user: user as User, loading: false, error: null });
-      }
     }
   };
 
@@ -226,14 +222,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = (permission: string): boolean => {
     if (!state.user) return false;
-
-    const rolePermissions: Record<UserRole, string[]> = {
-      admin: ['manage_users', 'view_reports', 'manage_settings'],
-      manager: ['view_reports', 'manage_data_collectors'],
-      data_collector: ['submit_data', 'view_own_data'],
-    };
-
-    return rolePermissions[state.user.role]?.includes(permission) || false;
+    
+    // Add your permission logic here
+    switch (permission) {
+      case 'create_user':
+        return canManageUsers();
+      case 'edit_reports':
+        return canEditReports();
+      case 'view_reports':
+        return canViewReports();
+      default:
+        return false;
+    }
   };
 
   return (
@@ -247,8 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canManageUsers,
         canViewReports,
         canEditReports,
-        hasPermission,
-        isLoading: state.loading,
+        hasPermission
       }}
     >
       {children}
