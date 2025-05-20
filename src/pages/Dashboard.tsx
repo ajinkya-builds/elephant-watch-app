@@ -108,6 +108,29 @@ interface HeatmapFilters {
   endDate: Date | null;
 }
 
+// Add new interfaces for KPI data
+interface DashboardKPISummary {
+  total_activities: number;
+  total_users: number;
+  total_days: number;
+  total_elephants_sighted: number;
+  today_activities: number;
+  today_active_users: number;
+  weekly_activities: number;
+  weekly_active_users: number;
+}
+
+interface DailyActivitySummary {
+  activity_date: string;
+  total_activities: number;
+  unique_users: number;
+  total_elephants_sighted: number;
+  female_elephants_sighted: number;
+  male_elephants_sighted: number;
+  calves_sighted: number;
+  unknown_elephants_sighted: number;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -245,43 +268,83 @@ export default function Dashboard() {
         startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
         endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
       };
-      const dashboardStats = await getDashboardStats(filters);
+
+      // Fetch all required data in parallel
+      const [
+        totalData,
+        divisionData,
+        observationTypes,
+        indirectSigns,
+        lossTypes,
+        todayReports,
+        activeElephants,
+        userTrends,
+        reportTrends,
+        recentObs,
+        heatmapData
+      ] = await Promise.all([
+        supabase.from('v_total_observations').select('*').single(),
+        supabase.from('v_division_stats').select('*'),
+        supabase.from('v_observation_type_counts').select('*'),
+        supabase.from('v_indirect_sighting_counts').select('*'),
+        supabase.from('v_loss_type_counts').select('*'),
+        supabase.from('v_today_reports').select('*').single(),
+        supabase.from('v_active_elephants').select('*').single(),
+        supabase.from('v_user_activity_trends').select('*').single(),
+        supabase.from('v_report_trends').select('*').single(),
+        supabase.from('v_recent_observations').select('*').limit(10),
+        supabase.from('v_activity_heatmap').select('*')
+      ]);
+
+      // Transform the data into the expected format
+      const dashboardStats: DashboardStats = {
+        totalObservations: totalData.data?.total_count || 0,
+        directSightings: observationTypes.data?.find(t => t.observation_type === 'direct')?.count || 0,
+        indirectSigns: indirectSigns.data?.reduce((sum, t) => sum + t.count, 0) || 0,
+        lossReports: totalData.data?.total_loss_reports || 0,
+        recentObservations: recentObs.data || [],
+        heatmapData: heatmapData.data?.map(point => [point.lat, point.lng, point.intensity]) || [],
+        kpis: {
+          totalElephants: totalData.data?.total_elephants || 0,
+          femaleElephants: totalData.data?.total_female_elephants || 0,
+          maleElephants: totalData.data?.total_male_elephants || 0,
+          totalCalves: totalData.data?.total_calves || 0,
+          unknownElephants: totalData.data?.total_unknown_elephants || 0,
+          lossTypes: lossTypes.data?.reduce((acc, curr) => ({
+            ...acc,
+            [curr.loss_type]: curr.count
+          }), {}) || {},
+          indirectSigns: indirectSigns.data?.reduce((acc, curr) => ({
+            ...acc,
+            [curr.indirect_sighting_type]: curr.count
+          }), {}) || {},
+          totalObservations: totalData.data?.total_count || 0,
+          observationsChange: reportTrends.data ? 
+            ((reportTrends.data.current_week_reports - reportTrends.data.previous_week_reports) / 
+             reportTrends.data.previous_week_reports * 100) : 0,
+          activeElephants: activeElephants.data?.count || 0,
+          activeUsers: userTrends.data?.current_week_users || 0,
+          usersChange: userTrends.data ? 
+            ((userTrends.data.current_week_users - userTrends.data.previous_week_users) / 
+             userTrends.data.previous_week_users * 100) : 0,
+          reportsToday: todayReports.data?.count || 0,
+          reportsChange: reportTrends.data ? 
+            ((reportTrends.data.current_week_reports - reportTrends.data.previous_week_reports) / 
+             reportTrends.data.previous_week_reports * 100) : 0,
+          divisionStats: divisionData.data?.reduce((acc, curr) => ({
+            ...acc,
+            [curr.division_name]: {
+              total: curr.total_observations,
+              direct: observationTypes.data?.find(t => t.observation_type === 'direct')?.count || 0,
+              indirect: indirectSigns.data?.reduce((sum, t) => sum + t.count, 0) || 0,
+              loss: lossTypes.data?.reduce((sum, t) => sum + t.count, 0) || 0,
+              elephants: curr.elephants
+            }
+          }), {}) || {}
+        }
+      };
+
       setStats(dashboardStats);
-      
-      // Update divisions list if not already set
-      if (divisions.length === 0 && dashboardStats.kpis.divisionStats) {
-        setDivisions(['all', ...Object.keys(dashboardStats.kpis.divisionStats)]);
-      }
-
-      // Fetch unique ranges and beats
-      const { data: rangesData, error: rangesError } = await supabase
-        .from('activity_reports')
-        .select('range_name')
-        .not('range_name', 'is', null)
-        .order('range_name');
-
-      if (rangesError) {
-        console.error("Error fetching ranges:", rangesError);
-        toast.error("Failed to load range data");
-      } else if (rangesData) {
-        const uniqueRanges = ['all', ...new Set(rangesData.map(r => r.range_name))];
-        setRanges(uniqueRanges);
-      }
-
-      const { data: beatsData, error: beatsError } = await supabase
-        .from('activity_reports')
-        .select('beat_name')
-        .not('beat_name', 'is', null)
-        .order('beat_name');
-
-      if (beatsError) {
-        console.error("Error fetching beats:", beatsError);
-        toast.error("Failed to load beat data");
-      } else if (beatsData) {
-        const uniqueBeats = ['all', ...new Set(beatsData.map(b => b.beat_name))];
-        setBeats(uniqueBeats);
-      }
-      
       setError(null);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -294,7 +357,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     let mounted = true;
-    let subscription: any = null;
 
     async function initializeDashboard() {
       try {
@@ -309,35 +371,47 @@ export default function Dashboard() {
         // Fetch initial data
         await fetchDashboardData();
 
-        // Set up real-time subscription
-        subscription = supabase
-          .channel('activity-reports-changes')
-          .on('postgres_changes', 
-            { event: 'INSERT', schema: 'public', table: 'activity_reports' }, 
-            async (payload) => {
-              if (!mounted) return;
-              
-              console.log("New activity report received:", payload);
-              try {
-                const dashboardStats = await getDashboardStats({
-                  division: selectedDivision === 'all' ? undefined : selectedDivision,
-                  range: heatmapFilters.range === 'all' ? undefined : heatmapFilters.range,
-                  beat: heatmapFilters.beat === 'all' ? undefined : heatmapFilters.beat,
-                  startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-                  endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
-                });
-                setStats(dashboardStats);
-                toast.success("Dashboard updated with new activity report");
-              } catch (error) {
-                console.error("Error refreshing dashboard data:", error);
-                toast.error("Failed to update dashboard with new activity report");
-              }
-            }
-          )
-          .subscribe((status) => {
-            console.log("Subscription status:", status);
-          });
+        // Set up real-time subscription only if we're in a browser environment
+        if (typeof window !== 'undefined') {
+          try {
+            const subscription = supabase
+              .channel('activity-reports-changes')
+              .on('postgres_changes', 
+                { event: 'INSERT', schema: 'public', table: 'activity_reports' }, 
+                async (payload) => {
+                  if (!mounted) return;
+                  
+                  console.log("New activity report received:", payload);
+                  try {
+                    const dashboardStats = await getDashboardStats({
+                      division: selectedDivision === 'all' ? undefined : selectedDivision,
+                      range: heatmapFilters.range === 'all' ? undefined : heatmapFilters.range,
+                      beat: heatmapFilters.beat === 'all' ? undefined : heatmapFilters.beat,
+                      startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+                      endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+                    });
+                    setStats(dashboardStats);
+                    toast.success("Dashboard updated with new activity report");
+                  } catch (error) {
+                    console.error("Error refreshing dashboard data:", error);
+                    toast.error("Failed to update dashboard with new activity report");
+                  }
+                }
+              )
+              .subscribe((status) => {
+                console.log("Subscription status:", status);
+              });
 
+            return () => {
+              if (subscription) {
+                subscription.unsubscribe();
+              }
+            };
+          } catch (wsError) {
+            console.warn("WebSocket subscription failed:", wsError);
+            // Continue without real-time updates
+          }
+        }
       } catch (error) {
         if (mounted) {
           console.error("Dashboard initialization error:", error);
@@ -351,11 +425,128 @@ export default function Dashboard() {
 
     return () => {
       mounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
     };
   }, [fetchDashboardData, selectedDivision, heatmapFilters.range, heatmapFilters.beat, startDate, endDate]);
+
+  // Add new state for KPI data
+  const [kpiSummary, setKpiSummary] = useState<DashboardKPISummary | null>(null);
+  const [dailySummary, setDailySummary] = useState<DailyActivitySummary[]>([]);
+  const [kpiLoading, setKpiLoading] = useState(true);
+  const [kpiError, setKpiError] = useState<Error | null>(null);
+
+  // Add new function to fetch KPI data
+  const fetchKPIData = useCallback(async () => {
+    setKpiLoading(true);
+    setKpiError(null);
+    try {
+      // Fetch KPI summary
+      const { data: kpiData, error: kpiError } = await supabase
+        .from('v_dashboard_kpi_summary')
+        .select('*')
+        .single();
+      
+      if (kpiError) throw kpiError;
+      setKpiSummary(kpiData);
+
+      // Fetch daily summary
+      const { data: dailyData, error: dailyError } = await supabase
+        .from('v_daily_activity_summary')
+        .select('*')
+        .order('activity_date', { ascending: false })
+        .limit(7);
+      
+      if (dailyError) throw dailyError;
+      setDailySummary(dailyData);
+    } catch (error) {
+      setKpiError(error as Error);
+    } finally {
+      setKpiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchKPIData();
+  }, [fetchKPIData]);
+
+  // Add KPI cards component
+  const KPICards = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Activities</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{kpiSummary?.total_activities || 0}</div>
+          <p className="text-xs text-muted-foreground">
+            {kpiSummary?.today_activities || 0} today
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{kpiSummary?.total_users || 0}</div>
+          <p className="text-xs text-muted-foreground">
+            {kpiSummary?.today_active_users || 0} today
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Elephants</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{kpiSummary?.total_elephants_sighted || 0}</div>
+          <p className="text-xs text-muted-foreground">
+            Across {kpiSummary?.total_days || 0} days
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Weekly Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{kpiSummary?.weekly_activities || 0}</div>
+          <p className="text-xs text-muted-foreground">
+            {kpiSummary?.weekly_active_users || 0} active users
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Add daily summary chart component
+  const DailySummaryChart = () => {
+    const chartData = {
+      labels: dailySummary.map(d => format(new Date(d.activity_date), 'MMM dd')),
+      datasets: [
+        {
+          label: 'Activities',
+          data: dailySummary.map(d => d.total_activities),
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        },
+        {
+          label: 'Elephants Sighted',
+          data: dailySummary.map(d => d.total_elephants_sighted),
+          backgroundColor: 'rgba(153, 102, 255, 0.5)',
+        }
+      ]
+    };
+
+    return (
+      <Card className="col-span-4">
+        <CardHeader>
+          <CardTitle>Daily Activity Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Bar data={chartData} />
+        </CardContent>
+      </Card>
+    );
+  };
 
   // Common header component for all states
   const DashboardHeader = () => (
