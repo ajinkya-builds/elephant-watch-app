@@ -7,10 +7,12 @@ A modern web application for reporting and tracking elephant sightings and activ
 - **User Authentication**: Secure login system for authorized personnel
 - **Elephant Activity Reporting**: Multi-step form to report elephant sightings with details
 - **Geolocation**: Capture precise location data for sightings
+- **Live Compass Integration**: Use device compass for accurate direction tracking with lock feature
 - **Administrative Data**: Record division, range, beat, and compartment information
 - **Elephant Details**: Document number of elephants, gender distribution, and identifying features
 - **Damage Assessment**: Record and categorize any damage caused by elephants
 - **Data Persistence**: All reports are stored in a Supabase database
+- **Mobile-First Design**: Optimized for field use on mobile devices
 
 ## Technology Stack
 
@@ -21,6 +23,7 @@ A modern web application for reporting and tracking elephant sightings and activ
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Custom authentication with bcrypt
 - **Build Tool**: Vite
+- **Device APIs**: Geolocation and Device Orientation APIs
 
 ## Getting Started
 
@@ -29,6 +32,7 @@ A modern web application for reporting and tracking elephant sightings and activ
 - Node.js (v16 or later)
 - npm or yarn
 - Supabase account and project
+- Modern mobile device with compass support (for compass feature)
 
 ### Installation
 
@@ -57,53 +61,74 @@ A modern web application for reporting and tracking elephant sightings and activ
 
 ### Database Setup
 
-Create the following table in your Supabase database:
+The application uses several tables in Supabase. Run the following migration script to set up your database:
 
 ```sql
-CREATE TABLE activity_reports (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  activity_date DATE NOT NULL,
-  activity_time TIME NOT NULL,
-  latitude TEXT NOT NULL,
-  longitude TEXT NOT NULL,
-  total_elephants TEXT NOT NULL,
-  male_elephants TEXT,
-  female_elephants TEXT,
-  unknown_elephants TEXT,
-  division_name TEXT NOT NULL,
-  range_name TEXT NOT NULL,
-  beat_name TEXT NOT NULL,
-  compartment_no TEXT NOT NULL,
-  heading_towards TEXT,
-  local_name TEXT,
-  identification_marks TEXT,
-  reporter_name TEXT NOT NULL,
-  reporter_mobile TEXT NOT NULL,
-  land_type TEXT NOT NULL,
-  damage_done TEXT NOT NULL,
-  damage_description TEXT,
-  email TEXT NOT NULL,
-  user_id UUID NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- See migrations/activity_reports.sql for the complete schema
+```
+
+### Device Permissions
+
+For the compass feature to work:
+
+1. The app must be served over HTTPS (except for localhost)
+2. Users must grant permission to access device orientation
+3. Device must have compass hardware support
+4. For iOS 13+, users will be prompted for permission when using the compass feature
+
+## Usage
+
+### Compass Feature
+
+The app includes a built-in compass feature that allows users to:
+
+1. Start compass tracking using the device's internal compass
+2. Lock the bearing at any point for accurate recording
+3. Manually input bearing if needed
+4. Visual feedback with rotating compass icon
+5. Support for both iOS and Android devices
+
+## Development
+
+### Running Tests
+```bash
+npm run test
+```
+
+### Building for Production
+```bash
+npm run build
+```
+
+### Preview Production Build
+```bash
+npm run preview
 ```
 
 ## Deployment
 
-This application can be deployed to any static hosting service like Netlify, Vercel, or GitHub Pages.
+This application can be deployed to any static hosting service like Netlify, Vercel, or GitHub Pages. Make sure to:
 
-```bash
-# Build for production
-npm run build
-
-# Preview the production build locally
-npm run preview
-```
+1. Configure environment variables in your hosting platform
+2. Enable HTTPS for device APIs to work
+3. Set up proper CORS policies in Supabase
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Thanks to all contributors and maintainers
+- Built with [shadcn/ui](https://ui.shadcn.com/)
+- Powered by [Supabase](https://supabase.io/)

@@ -1,6 +1,6 @@
 {
-  "name": "Elephant Watch App",
   "short_name": "Elephant Watch",
+  "name": "Wild Elephant Monitoring System",
   "description": "Track and monitor elephant activities",
   "icons": [
     {
@@ -19,8 +19,8 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "/elephant-watch-app/",
+  "start_url": ".",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000"
+  "theme_color": "#16a34a",
+  "background_color": "#ffffff"
 }

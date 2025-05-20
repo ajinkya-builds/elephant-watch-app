@@ -6,13 +6,9 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-  throw new Error('Missing Supabase credentials');
-}
-
 // Create two clients - one for regular operations and one for admin operations
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+const adminClient = createClient(supabaseUrl || '', supabaseServiceKey || '', {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -60,16 +56,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error: null,
   });
 
-  // Check for existing session on mount
   useEffect(() => {
+    // Check for Supabase credentials
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      console.error('Missing Supabase credentials');
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Missing Supabase credentials. Please check your environment variables.'
+      }));
+      return;
+    }
+
+    // Check for existing session
     const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
     if (userId) {
-      adminClient
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
-        .then(({ data: user, error }) => {
+      (async () => {
+        try {
+          const { data: user, error } = await adminClient
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
           if (error || !user) {
             localStorage.removeItem('userId');
             sessionStorage.removeItem('userId');
@@ -77,9 +86,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             setState({ user: user as User, loading: false, error: null });
           }
-        });
+        } catch (error) {
+          console.error('Error fetching user:', error);
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Failed to fetch user data. Please try logging in again.'
+          }));
+        }
+      })();
     } else {
-      setState({ user: null, loading: false, error: null });
+      setState(prev => ({ ...prev, loading: false }));
     }
   }, []);
 

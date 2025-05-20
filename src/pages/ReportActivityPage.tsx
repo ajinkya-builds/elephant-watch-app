@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ReportStepper } from "@/components/ReportStepper";
+import { ActivityReportStepper } from "@/components/ActivityReportStepper";
 import { supabase } from '@/lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
 import { useAuth } from '@/contexts/AuthContext';
+import { ActivityReport } from '@/lib/schemas/activityReport';
 
 const ReportActivityPage = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +26,7 @@ const ReportActivityPage = () => {
     return null;
   }
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: ActivityReport) => {
     try {
       setIsLoading(true);
       
@@ -81,8 +82,8 @@ const ReportActivityPage = () => {
           <li>Fields marked with <span className="text-red-500">*</span> are required. / <span className="text-red-500">*</span> से चिह्नित फ़ील्ड अनिवार्य हैं।</li>
         </ul>
       </section>
-      <main className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-lg shadow">
-        <ReportStepper onSubmit={handleSubmit} isLoading={isLoading} />
+      <main>
+        <ActivityReportStepper />
       </main>
     </div>
   );

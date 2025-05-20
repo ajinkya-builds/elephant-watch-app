@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +18,8 @@ import AdminStatistics from "./pages/AdminStatistics";
 import AdminSettings from "./pages/AdminSettings";
 import AdminLogs from "./pages/AdminLogs";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { checkSupabaseConnection } from "@/lib/supabaseClient";
+import { toast } from "sonner";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,18 @@ const LazyPwaReloader = import.meta.env.PROD
   : null;
 
 const App = () => {
+  useEffect(() => {
+    const testConnection = async () => {
+      const isConnected = await checkSupabaseConnection();
+      if (isConnected) {
+        toast.success('Connected to Supabase successfully!');
+      } else {
+        toast.error('Failed to connect to Supabase. Please check your credentials.');
+      }
+    };
+    testConnection();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -37,8 +51,8 @@ const App = () => {
             <LazyPwaReloader />
           </Suspense>
         )}
-        <AuthProvider>
-          <BrowserRouter basename={import.meta.env.DEV ? "/" : "/elephant-watch-app"}>
+        <BrowserRouter basename={import.meta.env.DEV ? "/" : "/elephant-watch-app"}>
+          <AuthProvider>
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -174,8 +188,8 @@ const App = () => {
 
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </AuthProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

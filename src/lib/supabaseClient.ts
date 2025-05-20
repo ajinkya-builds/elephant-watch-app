@@ -5,6 +5,12 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
+// Log masked values for debugging
+console.log('Supabase Configuration:');
+console.log('URL:', supabaseUrl?.substring(0, 20) + '...');
+console.log('Anon Key:', supabaseAnonKey?.substring(0, 10) + '...');
+console.log('Service Key:', supabaseServiceKey?.substring(0, 10) + '...');
+
 if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
   console.error(
     "Supabase URL, Anon Key, or Service Key is missing. Make sure you have VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_SUPABASE_SERVICE_ROLE_KEY set in your .env file."
@@ -13,20 +19,51 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
 }
 
 // Create two clients - one for regular operations and one for admin operations
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-export const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: false,
-    persistSession: false
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
   }
 });
 
-// Helper function to check Supabase connection
+export const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
+
+// Helper function to check Supabase connection and auth
 export const checkSupabaseConnection = async () => {
   try {
-    // Use a simple health check instead of querying users table
-    const { data, error } = await supabase.rpc('get_service_status');
-    if (error) throw error;
+    // Check if we have a session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return false;
+    }
+
+    if (!session) {
+      console.log('No active session');
+      return false;
+    }
+
+    // Try to query the users table to test the connection
+    const { error: userError } = await supabase
+      .from('users')
+      .select('count')
+      .limit(1)
+      .single();
+    
+    if (userError) {
+      console.error('Supabase connection error:', userError);
+      return false;
+    }
+
+    console.log('Supabase connection successful');
     return true;
   } catch (error) {
     console.error('Supabase connection error:', error);
@@ -60,13 +97,23 @@ export function subscribeToRealtimeChanges(
   return channel;
 }
 
+// Helper function to get current user
+export async function getCurrentUser() {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error('Error getting user:', error);
+    return null;
+  }
+  return session?.user || null;
+}
+
 // Update the user type to include mobile
 export type User = {
   id: string;
-  email: string;
-  mobile: string;
+  email_or_phone: string;
   password_hash: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'manager' | 'data_collector';
+  status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
 };
