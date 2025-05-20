@@ -8,10 +8,10 @@ import { DateTimeLocationStep } from '@/components/form-steps/DateTimeLocationSt
 import { ObservationTypeStep } from '@/components/form-steps/ObservationTypeStep';
 import { CompassBearingStep } from '@/components/form-steps/CompassBearingStep';
 import { PhotoStep } from '@/components/form-steps/PhotoStep';
-import { adminClient } from '@/lib/supabaseClient';
 import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 
 interface StepConfig {
   type: FormStep;
@@ -71,7 +71,7 @@ function StepperContent() {
       console.log('Current user:', user);
 
       // First get all users to debug
-      const { data: allUsers, error: usersError } = await adminClient
+      const { data: allUsers, error: usersError } = await supabase
         .from('users')
         .select('*');
 
@@ -84,7 +84,7 @@ function StepperContent() {
       }
 
       // Now try to find the specific user
-      const { data: userData, error: userError } = await adminClient
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
@@ -113,7 +113,7 @@ function StepperContent() {
 
       console.log('Submitting data:', submissionData);
 
-      const { error } = await adminClient
+      const { error } = await supabase
         .from('activity_reports')
         .insert([submissionData]);
 

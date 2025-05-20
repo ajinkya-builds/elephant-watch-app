@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { adminClient } from "@/lib/supabaseClient";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toast } from "sonner";
 import { PawPrint, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from '@/contexts/AuthContext';
+import { checkSupabaseConnection } from "@/lib/supabaseClient";
 
 // Helper to get browser info
 function getBrowserInfo() {
@@ -28,19 +29,21 @@ async function getIpAddress() {
 
 const logLoginAttempt = async (identifier: string, status: 'success' | 'failed') => {
   try {
-    const { data: browserInfo } = await adminClient.rpc('get_browser_info');
-    const { data: ipInfo } = await adminClient.rpc('get_ip_info');
+    const { data: browserInfo } = await supabaseAdmin.rpc('get_browser_info');
+    const { data: ipInfo } = await supabaseAdmin.rpc('get_ip_info');
 
+    const isEmail = identifier.includes('@');
     const loginData = {
-      user_identifier: identifier,
-      login_type: identifier.includes('@') ? 'email' : 'phone',
+      email: isEmail ? identifier : null,
+      phone: !isEmail ? identifier : null,
+      login_type: isEmail ? 'email' : 'phone',
       status,
       time: new Date().toISOString(),
       ip: ipInfo?.ip || null,
       browser: browserInfo?.user_agent || null
     };
 
-    const { error } = await adminClient
+    const { error } = await supabaseAdmin
       .from('login_logs')
       .insert([loginData]);
 
@@ -61,6 +64,16 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useAuth();
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        toast.error("Failed to connect to Supabase. Please check your configuration.");
+      }
+    };
+    checkConnection();
+  }, []);
 
   const validateIdentifier = (value: string) => {
     // Check if it's an email

@@ -20,7 +20,7 @@ async function checkUser() {
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email_or_phone', '9179866656')
+      .eq('phone', '9179866656')
       .single();
 
     if (error) {
@@ -35,7 +35,9 @@ async function checkUser() {
 
     console.log('User found:', {
       id: user.id,
-      email_or_phone: user.email_or_phone,
+      auth_id: user.auth_id,
+      email: user.email,
+      phone: user.phone,
       role: user.role,
       status: user.status,
       created_at: user.created_at,

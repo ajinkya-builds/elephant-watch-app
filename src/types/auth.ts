@@ -2,7 +2,8 @@ export type UserRole = 'admin' | 'manager' | 'data_collector';
 
 export interface User {
   id: string;
-  email_or_phone: string;
+  email: string | null;
+  phone: string | null;
   role: UserRole;
   created_at: string;
   updated_at: string;

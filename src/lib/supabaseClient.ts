@@ -1,24 +1,42 @@
 import { createClient } from '@supabase/supabase-js';
 
 // These environment variables will be read from your .env file
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
-// Log masked values for debugging
-console.log('Supabase Configuration:');
-console.log('URL:', supabaseUrl?.substring(0, 20) + '...');
-console.log('Anon Key:', supabaseAnonKey?.substring(0, 10) + '...');
-console.log('Service Key:', supabaseServiceKey?.substring(0, 10) + '...');
+// Debug environment variables
+console.log('=== Supabase Client Configuration Debug ===');
+console.log('URL:', {
+  value: supabaseUrl,
+  length: supabaseUrl?.length,
+  type: typeof supabaseUrl,
+  firstChar: supabaseUrl?.[0],
+  lastChar: supabaseUrl?.[supabaseUrl.length - 1],
+  hasSpaces: supabaseUrl?.includes(' '),
+  hasNewlines: supabaseUrl?.includes('\n'),
+});
 
-if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-  console.error(
-    "Supabase URL, Anon Key, or Service Key is missing. Make sure you have VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_SUPABASE_SERVICE_ROLE_KEY set in your .env file."
-  );
-  throw new Error("Missing Supabase credentials");
+console.log('Anon Key:', {
+  exists: !!supabaseAnonKey,
+  length: supabaseAnonKey?.length,
+  type: typeof supabaseAnonKey,
+  firstChar: supabaseAnonKey?.[0],
+  lastChar: supabaseAnonKey?.[supabaseAnonKey.length - 1],
+  hasSpaces: supabaseAnonKey?.includes(' '),
+  hasNewlines: supabaseAnonKey?.includes('\n'),
+  parts: supabaseAnonKey?.split('.').length,
+});
+
+// Validate URL and key
+if (!supabaseUrl || !supabaseUrl.startsWith('https://')) {
+  throw new Error('Invalid VITE_SUPABASE_URL format');
 }
 
-// Create two clients - one for regular operations and one for admin operations
+if (!supabaseAnonKey || !supabaseAnonKey.startsWith('eyJ')) {
+  throw new Error('Invalid VITE_SUPABASE_ANON_KEY format');
+}
+
+// Create the Supabase client with minimal configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -27,90 +45,96 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-export const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
-
-// Helper function to check Supabase connection and auth
+// Helper function to check Supabase connection
 export const checkSupabaseConnection = async () => {
   try {
-    // Check if we have a session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Testing Supabase connection...');
     
+    // 1. Test auth endpoint
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
-      console.error('Session error:', sessionError);
+      console.error('Auth endpoint test failed:', sessionError);
       return false;
     }
+    console.log('✓ Auth endpoint accessible');
 
-    if (!session) {
-      console.log('No active session');
-      return false;
-    }
-
-    // Try to query the users table to test the connection
-    const { error: userError } = await supabase
+    // 2. Test public data access
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('count')
       .limit(1)
       .single();
-    
+
     if (userError) {
-      console.error('Supabase connection error:', userError);
+      console.error('Database access test failed:', {
+        code: userError.code,
+        message: userError.message,
+        hint: userError.hint
+      });
       return false;
     }
+    console.log('✓ Database accessible');
 
-    console.log('Supabase connection successful');
     return true;
   } catch (error) {
-    console.error('Supabase connection error:', error);
+    console.error('Connection check failed:', error);
     return false;
   }
 };
 
-// Helper function to subscribe to realtime changes
-export function subscribeToRealtimeChanges(
-  table: string,
-  callback: (payload: any) => void
-) {
-  const channel = supabase.channel(`${table}-changes`);
-  
-  channel
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: table
-    }, callback)
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to ${table} changes`);
-      } else if (status === 'CHANNEL_ERROR') {
-        console.error(`Error subscribing to ${table} changes`);
-      } else if (status === 'CLOSED') {
-        console.log(`Unsubscribed from ${table} changes`);
-      }
-    });
-
-  return channel;
-}
-
 // Helper function to get current user
-export async function getCurrentUser() {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error) {
-    console.error('Error getting user:', error);
+export const getCurrentUser = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return session?.user ?? null;
+  } catch (error) {
+    console.error('Error getting current user:', error);
     return null;
   }
-  return session?.user || null;
-}
+};
 
-// Update the user type to include mobile
+// Helper function for authentication
+export const signInWithRedirect = async (provider: 'google' | 'phone' | 'email', options: any = {}) => {
+  try {
+    let signInResult;
+    
+    if (provider === 'google') {
+      signInResult = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+    } else if (provider === 'phone') {
+      signInResult = await supabase.auth.signInWithPassword({
+        phone: options.phone,
+        password: options.password
+      });
+    } else {
+      signInResult = await supabase.auth.signInWithPassword({
+        email: options.email,
+        password: options.password
+      });
+    }
+
+    if (signInResult.error) {
+      console.error('Sign in failed:', signInResult.error);
+      throw signInResult.error;
+    }
+
+    return signInResult;
+  } catch (error) {
+    console.error('Sign in error:', error);
+    throw error;
+  }
+};
+
+// Update the user type to include separate email and phone fields
 export type User = {
   id: string;
-  email_or_phone: string;
+  email: string | null;
+  phone: string | null;
   password_hash: string;
   role: 'admin' | 'manager' | 'data_collector';
   status: 'active' | 'inactive';

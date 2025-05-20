@@ -1,0 +1,28 @@
+[auth]
+site_url = "https://pauafmgoewfdhwnsexzy.supabase.co"
+additional_redirect_urls = [
+  "http://localhost:8080/**",
+  "https://pauafmgoewfdhwnsexzy.supabase.co/**"
+]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.phone]
+enable_signup = true
+enable_signin = true
+enable_confirmations = false
+provider = "twilio"
+
+[auth.external.google]
+enabled = true
+client_id = "your-google-client-id"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+
+[studio]
+port = 54323
+api_url = "https://pauafmgoewfdhwnsexzy.supabase.co" 

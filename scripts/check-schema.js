@@ -46,16 +46,25 @@ async function checkSchema() {
         console.log(`
 CREATE TABLE public.users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email_or_phone TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
+  auth_id UUID REFERENCES auth.users(id),
+  email TEXT,
+  phone TEXT,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'data_collector')),
+  position TEXT CHECK (position IN ('Ranger', 'DFO', 'Officer', 'Guard')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT users_auth_id_key UNIQUE (auth_id),
+  CONSTRAINT users_email_key UNIQUE (email),
+  CONSTRAINT users_phone_key UNIQUE (phone)
 );
 
 -- Create indexes
-CREATE INDEX idx_users_email_or_phone ON public.users(email_or_phone);
+CREATE INDEX idx_users_auth_id ON public.users(auth_id);
+CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_users_phone ON public.users(phone);
 CREATE INDEX idx_users_role ON public.users(role);
 CREATE INDEX idx_users_status ON public.users(status);
         `);

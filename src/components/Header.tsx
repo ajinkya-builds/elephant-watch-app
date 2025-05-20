@@ -64,7 +64,7 @@ export function Header() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.email_or_phone}</p>
+                    <p className="text-sm font-medium leading-none">{user?.email || user?.phone}</p>
                     <p className="text-xs leading-none text-muted-foreground capitalize">
                       {user?.role.replace('_', ' ')}
                     </p>

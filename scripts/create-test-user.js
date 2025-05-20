@@ -17,20 +17,31 @@ const supabase = createClient(
 
 async function createTestUser() {
   try {
-    // Generate a hashed password
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('test123', salt);
+    // First create auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      phone: '9179866656',
+      password: 'test123',
+      phone_confirm: true
+    });
+
+    if (authError) {
+      console.error('Error creating auth user:', authError);
+      return;
+    }
 
     const now = new Date().toISOString();
-    // Create the user
+    // Create the user profile
     const { data, error } = await supabase
       .from('users')
       .insert([
         {
-          email_or_phone: '9179866656',
+          auth_id: authData.user.id,
+          phone: '9179866656',
           role: 'data_collector',
-          password_hash: passwordHash,
           status: 'active',
+          first_name: 'Test',
+          last_name: 'User',
+          position: 'Ranger',
           created_at: now,
           updated_at: now
         }
@@ -39,7 +50,7 @@ async function createTestUser() {
       .single();
 
     if (error) {
-      console.error('Error creating user:', error);
+      console.error('Error creating user profile:', error);
       return;
     }
 

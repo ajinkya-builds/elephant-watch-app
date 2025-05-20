@@ -1,69 +1,39 @@
--- Drop existing policies
-DROP POLICY IF EXISTS "Users can view their own data" ON users;
-DROP POLICY IF EXISTS "Service role can view all users" ON users;
-DROP POLICY IF EXISTS "Service role can insert users" ON users;
-DROP POLICY IF EXISTS "Users can update their own data" ON users;
-DROP POLICY IF EXISTS "Service role can update users" ON users;
-DROP POLICY IF EXISTS "Users are viewable by admins" ON users;
-DROP POLICY IF EXISTS "Users are viewable by managers" ON users;
-DROP POLICY IF EXISTS "Users are insertable by admins" ON users;
-DROP POLICY IF EXISTS "Users are insertable by managers" ON users;
-DROP POLICY IF EXISTS "Users are updatable by admins" ON users;
-DROP POLICY IF EXISTS "Users are updatable by managers" ON users;
-DROP POLICY IF EXISTS "Enable read access for all users" ON users;
-DROP POLICY IF EXISTS "Service role has full access" ON users;
-DROP POLICY IF EXISTS "Allow public read access for auth" ON users;
+-- Drop all existing policies
+DO $$ 
+BEGIN
+  -- Get all policy names for the users table
+  FOR r IN (
+    SELECT policyname 
+    FROM pg_policies 
+    WHERE tablename = 'users' AND schemaname = 'public'
+  ) LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON users', r.policyname);
+  END LOOP;
+END $$;
 
 -- Enable RLS
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE login_logs ENABLE ROW LEVEL SECURITY;
 
--- Create a policy for authentication queries (no auth required)
-CREATE POLICY "Allow authentication queries"
-ON users FOR SELECT
-USING (true)
-WITH CHECK (true);
+-- Create base policies without circular references
 
--- Allow service role to do everything
-CREATE POLICY "Service role has full access"
+-- 1. Service role has full access (no conditions)
+CREATE POLICY "service_role_access"
 ON users FOR ALL
-USING (auth.role() = 'service_role')
-WITH CHECK (auth.role() = 'service_role');
+USING (current_setting('role') = 'service_role');
 
--- Allow users to update their own data
-CREATE POLICY "Users can update their own data"
-ON users FOR UPDATE
+-- 2. Allow public read access for auth
+CREATE POLICY "public_read"
+ON users FOR SELECT
+USING (current_setting('role') IN ('anon', 'authenticated'));
+
+-- 3. Allow authenticated users to manage their own data
+CREATE POLICY "self_manage"
+ON users FOR ALL
 USING (
-  auth.uid() = id 
-  OR auth.role() = 'service_role'
-  OR email_or_phone = auth.jwt()->>'email_or_phone'
-)
-WITH CHECK (
-  auth.uid() = id 
-  OR auth.role() = 'service_role'
-  OR email_or_phone = auth.jwt()->>'email_or_phone'
+  current_setting('role') = 'authenticated' AND
+  current_setting('request.jwt.claims', true)::jsonb->>'sub' = id::text
 );
 
--- Create policies for login_logs table
-CREATE POLICY "Anyone can insert login logs"
-ON login_logs FOR INSERT
-WITH CHECK (true);
-
-CREATE POLICY "Admins can view all login logs"
-ON login_logs FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE id = auth.uid()
-    AND role = 'admin'
-  )
-);
-
-CREATE POLICY "Users can view their own login logs"
-ON login_logs FOR SELECT
-USING (
-  user_identifier IN (
-    SELECT email_or_phone FROM users
-    WHERE id = auth.uid()
-  )
-); 
+-- Add helpful comments
+COMMENT ON TABLE users IS 'User profiles with role-based access control';
+COMMENT ON COLUMN users.role IS 'User role: admin, manager, or data_collector'; 

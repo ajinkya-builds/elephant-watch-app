@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Camera, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { adminClient } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function PhotoStep() {
@@ -51,8 +51,8 @@ export function PhotoStep() {
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
 
-      // Upload to Supabase Storage using admin client
-      const { error: uploadError } = await adminClient.storage
+      // Upload to Supabase Storage using regular client
+      const { error: uploadError } = await supabase.storage
         .from('elephant-watch')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -100,7 +100,7 @@ export function PhotoStep() {
 
       // Remove from Supabase Storage if it was uploaded
       if (formData.photo_url.startsWith('activity-photos/')) {
-        const { error } = await adminClient.storage
+        const { error } = await supabase.storage
           .from('elephant-watch')
           .remove([formData.photo_url]);
 

@@ -10,18 +10,18 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, isLoading, canManageUsers, canViewReports, canEditReports } = useAuth();
+  const { user, loading, canManageUsers, canViewReports, canEditReports } = useAuth();
   const location = useLocation();
 
   console.log("ProtectedRoute:", {
     pathname: location.pathname,
-    user: user?.email_or_phone,
+    user: user?.email || user?.phone,
     userRole: user?.role,
-    isLoading,
+    loading,
     requiredRole
   });
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-green-600" />
