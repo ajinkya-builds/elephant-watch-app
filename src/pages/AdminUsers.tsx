@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,83 +6,57 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase, adminClient } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
+import { createClient } from '@supabase/supabase-js';
 import { toast } from "sonner";
-import { UserRole } from "@/types/auth";
-import bcrypt from 'bcryptjs';
+import { UserRole, ExtendedUser } from "@/contexts/AuthContext";
+
+// Create a service role client for admin operations
+const adminClient = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 
 export default function AdminUsers() {
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<ExtendedUser[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editUser, setEditUser] = useState<any>(null);
-  const [showOnlyCreated, setShowOnlyCreated] = useState(false);
+  const [editUser, setEditUser] = useState<ExtendedUser | null>(null);
   const [newUser, setNewUser] = useState({
-    email_or_phone: "",
+    email: "",
+    phone: "",
+    password: "",
+    first_name: "",
+    last_name: "",
     role: "data_collector" as UserRole,
-    password: ""
+    position: "Ranger" as "Ranger" | "DFO" | "Officer" | "Guard"
   });
   const navigate = useNavigate();
   const { user, canCreateUserWithRole } = useAuth();
 
-  // Fetch users on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
     try {
-      // First, ensure we're using the admin client for this operation
-      let query = adminClient
+      const { data: users, error } = await supabase
         .from('users')
-        .select(`
-          id,
-          email_or_phone,
-          role,
-          status,
-          created_at,
-          updated_at,
-          created_by,
-          creator:created_by (
-            id,
-            email_or_phone,
-            role
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      // If showOnlyCreated is true, only show users created by the current user
-      if (showOnlyCreated && user) {
-        query = query.eq('created_by', user.id);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Detailed error:', error);
-        throw error;
-      }
-      
-      if (!data) {
-        console.warn('No data returned from users query');
-        setUsers([]);
-        return;
-      }
-
-      setUsers(data);
+      if (error) throw error;
+      setUsers(users as ExtendedUser[]);
     } catch (error: any) {
-      console.error('Error fetching users:', error);
-      toast.error(error.message || 'Failed to fetch users');
+      toast.error('Error fetching users: ' + error.message);
     }
   };
-
-  // Filtered users
-  const filteredUsers = users.filter(
-    (u) =>
-      u.email_or_phone.toLowerCase().includes(search.toLowerCase()) ||
-      u.role.toLowerCase().includes(search.toLowerCase()) ||
-      (u.creator?.email_or_phone || '').toLowerCase().includes(search.toLowerCase())
-  );
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,269 +66,239 @@ export default function AdminUsers() {
         return;
       }
 
-      // Check if user already exists
-      const { data: existingUser } = await adminClient
-        .from('users')
-        .select('id')
-        .eq('email_or_phone', newUser.email_or_phone)
-        .single();
+      // First create the auth user using the admin client
+      const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+        email: newUser.email || undefined,
+        phone: newUser.phone || undefined,
+        password: newUser.password,
+        email_confirm: true
+      });
 
-      if (existingUser) {
-        toast.error('A user with this email/phone already exists');
-        return;
-      }
+      if (authError) throw authError;
 
-      // Hash the password
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(newUser.password, salt);
-
-      const now = new Date().toISOString();
-      const { data, error } = await adminClient
+      // Then create the user profile using the admin client
+      const { data: profileData, error: profileError } = await adminClient
         .from('users')
         .insert([{
-          email_or_phone: newUser.email_or_phone,
+          auth_id: authData.user.id,
+          first_name: newUser.first_name,
+          last_name: newUser.last_name,
+          email: newUser.email,
+          phone: newUser.phone,
           role: newUser.role,
-          password_hash: passwordHash,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          created_by: user?.id
+          position: newUser.position,
+          status: 'active'
         }])
         .select()
         .single();
 
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('A user with this email/phone already exists');
-        } else {
-          throw error;
-        }
-        return;
+      if (profileError) {
+        // Rollback auth user creation if profile creation fails
+        await adminClient.auth.admin.deleteUser(authData.user.id);
+        throw profileError;
       }
-
-      // Log the user creation
-      await adminClient.from('activity_logs').insert({
-        user_id: user?.id,
-        action: 'create_user',
-        details: {
-          created_user_id: data.id,
-          created_user_role: data.role,
-          created_user_email: data.email_or_phone
-        },
-        created_at: now
-      });
 
       toast.success('User created successfully');
       setShowModal(false);
       setNewUser({
-        email_or_phone: "",
-        role: "data_collector" as UserRole,
-        password: ""
+        email: "",
+        phone: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        role: "data_collector",
+        position: "Ranger"
       });
       
-      // Refresh the users list
       await fetchUsers();
-    } catch (error) {
-      console.error('Error creating user:', error);
-      toast.error('Failed to create user');
+    } catch (error: any) {
+      toast.error('Error creating user: ' + error.message);
     }
   };
 
-  const handleUpdateUser = async (userId: string, updates: any) => {
+  const handleUpdateUser = async (userId: string, updates: Partial<ExtendedUser>) => {
     try {
-      if (!canCreateUserWithRole(updates.role)) {
-        toast.error('You do not have permission to update users with this role');
-        return;
-      }
-
-      const now = new Date().toISOString();
       const { error } = await adminClient
         .from('users')
-        .update({
-          ...updates,
-          updated_at: now
-        })
+        .update(updates)
         .eq('id', userId);
 
       if (error) throw error;
-
       toast.success('User updated successfully');
-      fetchUsers();
-    } catch (error) {
-      console.error('Error updating user:', error);
-      toast.error('Failed to update user');
+      await fetchUsers();
+    } catch (error: any) {
+      toast.error('Error updating user: ' + error.message);
     }
   };
 
+  const filteredUsers = users.filter(user => 
+    (user.first_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    (user.last_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    (user.email?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    (user.phone || '').includes(search)
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
-      <div className="container mx-auto px-4">
-        {/* Breadcrumb */}
-        <nav className="mb-6" aria-label="Breadcrumb">
-          <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <li>
-              <button
-                className="hover:underline text-green-800 font-medium"
-                onClick={() => navigate('/admin')}
+    <div className="container mx-auto py-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>User Management</CardTitle>
+          {canCreateUserWithRole('data_collector') && (
+            <Button onClick={() => setShowModal(true)}>Add User</Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Input
+              placeholder="Search users..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Position</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.first_name} {user.last_name}</TableCell>
+                  <TableCell>{user.email || '-'}</TableCell>
+                  <TableCell>{user.phone || '-'}</TableCell>
+                  <TableCell>{user.position}</TableCell>
+                  <TableCell>{user.role}</TableCell>
+                  <TableCell>{user.status}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditUser(user);
+                        setShowModal(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">{editUser ? "Edit User" : "Add User"}</h2>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <Input 
+                placeholder="First Name"
+                value={editUser?.first_name || newUser.first_name}
+                onChange={(e) => editUser 
+                  ? handleUpdateUser(editUser.id, { first_name: e.target.value })
+                  : setNewUser({ ...newUser, first_name: e.target.value })
+                }
+              />
+              <Input 
+                placeholder="Last Name"
+                value={editUser?.last_name || newUser.last_name}
+                onChange={(e) => editUser
+                  ? handleUpdateUser(editUser.id, { last_name: e.target.value })
+                  : setNewUser({ ...newUser, last_name: e.target.value })
+                }
+              />
+              <Input 
+                type="email"
+                placeholder="Email"
+                value={editUser?.email || newUser.email}
+                onChange={(e) => editUser
+                  ? handleUpdateUser(editUser.id, { email: e.target.value })
+                  : setNewUser({ ...newUser, email: e.target.value })
+                }
+              />
+              <Input 
+                placeholder="Phone"
+                value={editUser?.phone || newUser.phone}
+                onChange={(e) => editUser
+                  ? handleUpdateUser(editUser.id, { phone: e.target.value })
+                  : setNewUser({ ...newUser, phone: e.target.value })
+                }
+              />
+              <Select 
+                value={editUser?.position || newUser.position}
+                onValueChange={(value: "Ranger" | "DFO" | "Officer" | "Guard") => editUser
+                  ? handleUpdateUser(editUser.id, { position: value })
+                  : setNewUser({ ...newUser, position: value })
+                }
               >
-                Admin Panel
-              </button>
-            </li>
-            <li>
-              <span className="mx-1">/</span>
-            </li>
-            <li className="text-gray-600">User Management</li>
-          </ol>
-        </nav>
-        <h1 className="text-3xl font-bold text-green-800 mb-8 text-center">User Management</h1>
-        <div className="bg-white rounded-lg shadow p-8">
-          <Card className="mb-0 border-none shadow-none">
-            <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4">
-              <CardTitle className="text-xl">Users</CardTitle>
-              <div className="flex gap-2 w-full md:w-auto">
-                <Input
-                  placeholder="Search users..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="max-w-xs"
+                <SelectTrigger>
+                  <SelectValue placeholder="Select position" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Ranger">Ranger</SelectItem>
+                  <SelectItem value="DFO">DFO</SelectItem>
+                  <SelectItem value="Officer">Officer</SelectItem>
+                  <SelectItem value="Guard">Guard</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select 
+                value={editUser?.role || newUser.role}
+                onValueChange={(value: UserRole) => editUser
+                  ? handleUpdateUser(editUser.id, { role: value })
+                  : setNewUser({ ...newUser, role: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {user?.role === 'admin' && (
+                    <SelectItem value="admin">Admin</SelectItem>
+                  )}
+                  {user?.role === 'admin' && (
+                    <SelectItem value="manager">Manager</SelectItem>
+                  )}
+                  {(user?.role === 'admin' || user?.role === 'manager') && (
+                    <SelectItem value="data_collector">Data Collector</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {!editUser && (
+                <Input 
+                  type="password"
+                  placeholder="Password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                 />
-                <Button 
-                  variant={showOnlyCreated ? "default" : "outline"}
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => {
-                    setShowOnlyCreated(!showOnlyCreated);
-                    fetchUsers();
+                    setShowModal(false);
+                    setEditUser(null);
                   }}
                 >
-                  {showOnlyCreated ? "Show All Users" : "Show My Users"}
+                  Cancel
                 </Button>
-                <Button onClick={() => { setEditUser(null); setShowModal(true); }}>
-                  Add User
+                <Button type="submit">
+                  {editUser ? "Update" : "Create"}
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email/Phone</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Created By</TableHead>
-                      <TableHead>Created At</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map(user => (
-                      <TableRow key={user.id}>
-                        <TableCell>{user.email_or_phone}</TableCell>
-                        <TableCell>
-                          <Select 
-                            value={user.role} 
-                            onValueChange={(value) => handleUpdateUser(user.id, { role: value })}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {canCreateUserWithRole('admin' as UserRole) && (
-                                <SelectItem value="admin">Admin</SelectItem>
-                              )}
-                              {canCreateUserWithRole('manager' as UserRole) && (
-                                <SelectItem value="manager">Manager</SelectItem>
-                              )}
-                              {canCreateUserWithRole('data_collector' as UserRole) && (
-                                <SelectItem value="data_collector">Data Collector</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          {user.creator ? (
-                            <span className="text-sm text-gray-600">
-                              {user.creator.email_or_phone}
-                              <span className="text-xs text-gray-400 ml-1">
-                                ({user.creator.role})
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-400">System</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="mr-2" 
-                            onClick={() => { setEditUser(user); setShowModal(true); }}
-                          >
-                            Edit
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Modal for Add/Edit User */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">{editUser ? "Edit User" : "Add User"}</h2>
-              <form onSubmit={handleCreateUser} className="space-y-4">
-                <Input 
-                  placeholder="Email or Phone" 
-                  value={newUser.email_or_phone}
-                  onChange={(e) => setNewUser({ ...newUser, email_or_phone: e.target.value })}
-                  disabled={!!editUser} 
-                />
-                <Select 
-                  value={newUser.role}
-                  onValueChange={(value) => setNewUser({ ...newUser, role: value as UserRole })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {user?.role === 'admin' && (
-                      <SelectItem value="admin">Admin</SelectItem>
-                    )}
-                    {user?.role === 'admin' && (
-                      <SelectItem value="manager">Manager</SelectItem>
-                    )}
-                    {(user?.role === 'admin' || user?.role === 'manager') && (
-                      <SelectItem value="data_collector">Data Collector</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                {!editUser && (
-                  <Input 
-                    type="password"
-                    placeholder="Password" 
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  />
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">
-                    {editUser ? "Update" : "Create"}
-                  </Button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 } 
