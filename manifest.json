@@ -1,28 +1,26 @@
 {
-  "name": "Elephant Watch",
+  "name": "Elephant Watch App",
   "short_name": "Elephant Watch",
   "description": "Track and monitor elephant activities",
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "/pwa-192x192.png",
+      "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
+      "sizes": "192x192"
     },
     {
-      "src": "/pwa-512x512.png",
+      "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
+      "sizes": "512x512"
     }
   ],
-  "start_url": "/",
+  "start_url": "/elephant-watch-app/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4f46e5"
+  "theme_color": "#000000"
 }
