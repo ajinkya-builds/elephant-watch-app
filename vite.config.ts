@@ -2,7 +2,46 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs";
+import dotenv from 'dotenv';
+import { loadEnv } from 'vite';
 // import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Commented out
+
+// Load environment variables
+const env = loadEnv('production', process.cwd(), '');
+
+// Debug environment variables
+console.log('=== Vite Environment Variables Debug ===');
+console.log('Environment Variables:', {
+  VITE_SUPABASE_URL: env.VITE_SUPABASE_URL?.substring(0, 10) + '...',
+  VITE_SUPABASE_URL_LENGTH: env.VITE_SUPABASE_URL?.length,
+  VITE_SUPABASE_ANON_KEY_LENGTH: env.VITE_SUPABASE_ANON_KEY?.length,
+  VITE_SUPABASE_ANON_KEY_PARTS: env.VITE_SUPABASE_ANON_KEY?.split('.').length,
+  VITE_SUPABASE_SERVICE_ROLE_KEY_LENGTH: env.VITE_SUPABASE_SERVICE_ROLE_KEY?.length,
+  VITE_SUPABASE_SERVICE_ROLE_KEY_PARTS: env.VITE_SUPABASE_SERVICE_ROLE_KEY?.split('.').length
+});
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'VITE_SUPABASE_URL',
+  'VITE_SUPABASE_ANON_KEY',
+  'VITE_SUPABASE_SERVICE_ROLE_KEY'
+];
+
+const missingEnvVars = requiredEnvVars.filter(
+  varName => !env[varName]
+);
+
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars);
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+}
+
+// Log environment variable status
+console.log('Environment Variables Status:');
+requiredEnvVars.forEach(varName => {
+  const value = env[varName];
+  console.log(`${varName}: ${value ? '✓ Present' : '✗ Missing'} (${value?.length} chars)`);
+});
 
 // Keep your existing devErrorAndNavigationPlugin definition
 export function devErrorAndNavigationPlugin(): Plugin {
@@ -82,6 +121,9 @@ export function devErrorAndNavigationPlugin(): Plugin {
 // };
 
 export default defineConfig(({ mode }) => {
+  // Load environment variables
+  const env = loadEnv(mode, process.cwd(), '');
+  
   const commonConfig = {
     base: mode === 'production' ? '/elephant-watch-app/' : '/',
     server: {
@@ -97,6 +139,13 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
+      sourcemap: true,
+    },
+    envPrefix: 'VITE_',
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL?.trim()),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY?.trim()),
+      'import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY': JSON.stringify(env.VITE_SUPABASE_SERVICE_ROLE_KEY?.trim())
     }
   };
 
@@ -104,6 +153,11 @@ export default defineConfig(({ mode }) => {
 
   if (mode === 'development') {
     console.log("[vite.config.ts] Configuring for development mode.");
+    console.log('Environment Variables loaded:', {
+      VITE_SUPABASE_URL: env.VITE_SUPABASE_URL?.substring(0, 10) + '...',
+      VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY ? '✓ Present' : '❌ Missing',
+      VITE_SUPABASE_SERVICE_ROLE_KEY: env.VITE_SUPABASE_SERVICE_ROLE_KEY ? '✓ Present' : '❌ Missing'
+    });
     return {
       ...commonConfig,
       plugins: [devErrorAndNavigationPlugin(), react()],
