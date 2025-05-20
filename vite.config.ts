@@ -98,6 +98,11 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
     },
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
+      'import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY': JSON.stringify(process.env.VITE_SUPABASE_SERVICE_ROLE_KEY),
+    }
   };
 
   const GITHUB_REPO_NAME = "elephant-watch-app"; 
@@ -115,8 +120,7 @@ export default defineConfig(({ mode }) => {
   console.log("[vite.config.ts] Configuring for production mode.");
   return {
     ...commonConfig,
-    // plugins: [react(), VitePWA(pwaOptions)], // Commented out PWA plugin
-    plugins: [react()], // Only react plugin for production for now
+    plugins: [react()],
     base: `/${GITHUB_REPO_NAME}/`, 
   };
 });
