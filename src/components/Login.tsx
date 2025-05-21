@@ -66,11 +66,13 @@ export default function Login() {
   const { signIn } = useAuth();
 
   useEffect(() => {
+    // Only check connection to show error if connection fails
     const checkConnection = async () => {
       const isConnected = await checkSupabaseConnection();
       if (!isConnected) {
         toast.error("Failed to connect to Supabase. Please check your configuration.");
       }
+      // Success message removed to prevent showing on every refresh
     };
     checkConnection();
   }, []);

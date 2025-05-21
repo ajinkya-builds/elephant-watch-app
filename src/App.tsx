@@ -37,7 +37,15 @@ const App = () => {
         
         if (isConnected) {
           console.log('Supabase connection test passed');
-          toast.success('Connected to Supabase successfully!');
+          
+          // Check if we've already shown the success message in this session
+          const hasShownConnectionSuccess = sessionStorage.getItem('hasShownSupabaseSuccess');
+          
+          if (!hasShownConnectionSuccess) {
+            toast.success('Connected to Supabase successfully!');
+            // Mark that we've shown the message
+            sessionStorage.setItem('hasShownSupabaseSuccess', 'true');
+          }
         } else {
           console.error('Supabase connection test failed');
           toast.error('Failed to connect to Supabase. Please check the console for details.');
