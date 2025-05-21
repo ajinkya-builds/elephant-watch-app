@@ -125,7 +125,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   const commonConfig = {
-    base: mode === 'production' ? '/elephant-watch-app/' : '/',
+    base: '/elephant-watch-app/',
     server: {
       host: "::",
       port: 8080,
@@ -140,6 +140,11 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: true,
+      rollupOptions: {
+        output: {
+          manualChunks: undefined
+        }
+      }
     },
     envPrefix: 'VITE_',
     define: {
@@ -161,7 +166,7 @@ export default defineConfig(({ mode }) => {
     return {
       ...commonConfig,
       plugins: [devErrorAndNavigationPlugin(), react()],
-      base: '/', 
+      base: '/',
     };
   }
   
@@ -170,6 +175,5 @@ export default defineConfig(({ mode }) => {
   return {
     ...commonConfig,
     plugins: [react()],
-    base: `/${GITHUB_REPO_NAME}/`, 
   };
 });
