@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from "react";
 
 import { supabase } from "@/lib/supabaseClient";
 import { StoredReportData, savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils";
+import { findBeatForCoordinates } from '../lib/utils/shapefileImporter';
 
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
@@ -213,57 +214,73 @@ export function ReportForm() {
   async function onSubmit(data: ReportFormValues) {
     setIsSubmitting(true);
 
-    const reportData = { 
-      email: data.email,
-      division_name: data.divisionName,
-      range_name: data.rangeName,
-      land_type: data.landType,
-      beat_name: data.beatName,
-      compartment_no: data.compartmentNo,
-      damage_done: data.damageDone,
-      damage_description: data.damageDescription || null,
-      total_elephants: data.totalElephants,
-      male_elephants: data.maleElephants,
-      female_elephants: data.femaleElephants,
-      unknown_elephants: data.unknownElephants,
-      activity_date: data.activityDate,
-      activity_time: data.activityTime,
-      latitude: parseFloat(data.latitude), 
-      longitude: parseFloat(data.longitude), 
-      heading_towards: data.headingTowards || null,
-      local_name: data.localName || null,
-      identification_marks: data.identificationMarks || null,
-      reporter_name: data.reporterName,
-      reporter_mobile: data.reporterMobile,
-    };
+    try {
+      // Find beat for coordinates
+      const beatInfo = await findBeatForCoordinates(
+        parseFloat(data.latitude),
+        parseFloat(data.longitude)
+      );
 
-    if (isOnline) {
-      const submissionToastId = toast.loading("Submitting report online...");
-      try {
-        const { error } = await supabase.from("activity_reports").insert([reportData]);
-        if (error) {
-          console.error("Supabase submission error:", error);
-          toast.error(`Online submission failed: ${error.message}. Report saved locally.`);
-          savePendingReport(reportData); // Save locally if online submission fails
-        } else {
-          toast.success("Report submitted successfully online!");
-          form.reset();
-        }
-      } catch (error: any) {
-        console.error("Unexpected error during online submission:", error);
-        toast.error(`An unexpected error occurred: ${error.message}. Report saved locally.`);
-        savePendingReport(reportData); // Save locally on unexpected error
-      } finally {
-        toast.dismiss(submissionToastId);
-        setIsSubmitting(false);
+      if (!beatInfo) {
+        throw new Error('Could not determine beat for the given coordinates');
       }
-    } else {
-      // Offline: Save to localStorage
-      savePendingReport(reportData); 
-      toast.success("You are offline. Report saved locally and will be synced when online.");
-      form.reset(); 
+
+      const reportData = { 
+        email: data.email,
+        division_name: beatInfo.division_name,
+        range_name: beatInfo.range_name,
+        land_type: data.landType,
+        beat_name: beatInfo.beat_name,
+        compartment_no: data.compartmentNo,
+        damage_done: data.damageDone,
+        damage_description: data.damageDescription || null,
+        total_elephants: data.totalElephants,
+        male_elephants: data.maleElephants,
+        female_elephants: data.femaleElephants,
+        unknown_elephants: data.unknownElephants,
+        activity_date: data.activityDate,
+        activity_time: data.activityTime,
+        latitude: parseFloat(data.latitude), 
+        longitude: parseFloat(data.longitude), 
+        heading_towards: data.headingTowards || null,
+        local_name: data.localName || null,
+        identification_marks: data.identificationMarks || null,
+        reporter_name: data.reporterName,
+        reporter_mobile: data.reporterMobile,
+      };
+
+      if (isOnline) {
+        const submissionToastId = toast.loading("Submitting report online...");
+        try {
+          const { error } = await supabase.from("activity_reports").insert([reportData]);
+          if (error) {
+            console.error("Supabase submission error:", error);
+            toast.error(`Online submission failed: ${error.message}. Report saved locally.`);
+            savePendingReport(reportData); // Save locally if online submission fails
+          } else {
+            toast.success("Report submitted successfully online!");
+            form.reset();
+          }
+        } catch (error: any) {
+          console.error("Unexpected error during online submission:", error);
+          toast.error(`An unexpected error occurred: ${error.message}. Report saved locally.`);
+          savePendingReport(reportData); // Save locally on unexpected error
+        } finally {
+          toast.dismiss(submissionToastId);
+          setIsSubmitting(false);
+        }
+      } else {
+        // Offline: Save to localStorage
+        savePendingReport(reportData); 
+        toast.success("You are offline. Report saved locally and will be synced when online.");
+        form.reset(); 
+        setIsSubmitting(false);
+        console.log("Current pending reports:", getPendingReports().length);
+      }
+    } catch (error: any) {
+      console.error("Error during onSubmit:", error);
+      toast.error(`An error occurred: ${error.message}`);
       setIsSubmitting(false);
-      console.log("Current pending reports:", getPendingReports().length);
     }
   }
 

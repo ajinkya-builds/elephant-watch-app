@@ -153,4 +153,175 @@ SELECT
   observation_type,
   COUNT(*) as count
 FROM activity_reports
-GROUP BY observation_type; 
+GROUP BY observation_type;
+
+-- Enhanced analytics views
+CREATE OR REPLACE VIEW v_elephant_movement_patterns AS
+SELECT 
+  activity_date,
+  activity_time,
+  latitude,
+  longitude,
+  heading_towards,
+  total_elephants,
+  division_name,
+  range_name,
+  beat_name
+FROM activity_reports
+WHERE observation_type = 'direct'
+ORDER BY activity_date DESC, activity_time DESC;
+
+CREATE OR REPLACE VIEW v_elephant_population_trends AS
+SELECT 
+  DATE_TRUNC('month', activity_date) as month,
+  SUM(total_elephants) as total_elephants,
+  SUM(male_elephants) as male_elephants,
+  SUM(female_elephants) as female_elephants,
+  SUM(unknown_elephants) as unknown_elephants,
+  COUNT(DISTINCT activity_date) as observation_days
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY DATE_TRUNC('month', activity_date)
+ORDER BY month DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_by_time AS
+SELECT 
+  EXTRACT(HOUR FROM activity_time::time) as hour_of_day,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY EXTRACT(HOUR FROM activity_time::time)
+ORDER BY hour_of_day;
+
+CREATE OR REPLACE VIEW v_elephant_activity_by_season AS
+SELECT 
+  EXTRACT(MONTH FROM activity_date) as month,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen,
+  CASE 
+    WHEN EXTRACT(MONTH FROM activity_date) BETWEEN 3 AND 5 THEN 'Summer'
+    WHEN EXTRACT(MONTH FROM activity_date) BETWEEN 6 AND 9 THEN 'Monsoon'
+    WHEN EXTRACT(MONTH FROM activity_date) BETWEEN 10 AND 11 THEN 'Post-Monsoon'
+    ELSE 'Winter'
+  END as season
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY EXTRACT(MONTH FROM activity_date)
+ORDER BY month;
+
+CREATE OR REPLACE VIEW v_elephant_activity_by_land_type AS
+SELECT 
+  land_type,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen,
+  COUNT(DISTINCT activity_date) as days_with_activity
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY land_type
+ORDER BY observation_count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_by_division AS
+SELECT 
+  division_name,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen,
+  COUNT(DISTINCT activity_date) as days_with_activity,
+  COUNT(DISTINCT range_name) as ranges_covered,
+  COUNT(DISTINCT beat_name) as beats_covered
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY division_name
+ORDER BY observation_count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_by_range AS
+SELECT 
+  division_name,
+  range_name,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen,
+  COUNT(DISTINCT activity_date) as days_with_activity,
+  COUNT(DISTINCT beat_name) as beats_covered
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY division_name, range_name
+ORDER BY division_name, observation_count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_by_beat AS
+SELECT 
+  division_name,
+  range_name,
+  beat_name,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen,
+  COUNT(DISTINCT activity_date) as days_with_activity
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY division_name, range_name, beat_name
+ORDER BY division_name, range_name, observation_count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_timeline AS
+SELECT 
+  activity_date,
+  activity_time,
+  division_name,
+  range_name,
+  beat_name,
+  total_elephants,
+  male_elephants,
+  female_elephants,
+  unknown_elephants,
+  land_type,
+  heading_towards,
+  latitude,
+  longitude
+FROM activity_reports
+WHERE observation_type = 'direct'
+ORDER BY activity_date DESC, activity_time DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_heatmap AS
+SELECT 
+  latitude,
+  longitude,
+  COUNT(*) as observation_count,
+  SUM(total_elephants) as total_elephants_seen,
+  MAX(activity_date) as last_observation_date,
+  division_name,
+  range_name,
+  beat_name
+FROM activity_reports
+WHERE observation_type = 'direct'
+GROUP BY latitude, longitude, division_name, range_name, beat_name
+ORDER BY observation_count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_observations_by_type AS
+SELECT 
+  observation_type as type,
+  COUNT(*) as count
+FROM activity_reports
+GROUP BY observation_type
+ORDER BY count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_loss_reports AS
+SELECT 
+  loss_type,
+  COUNT(*) as count
+FROM activity_reports
+WHERE observation_type = 'loss'
+GROUP BY loss_type
+ORDER BY count DESC;
+
+CREATE OR REPLACE VIEW v_elephant_activity_summary AS
+SELECT 
+  DATE_TRUNC('day', activity_date) as date,
+  COUNT(*) as total_observations,
+  COUNT(CASE WHEN observation_type = 'direct' THEN 1 END) as direct_sightings,
+  COUNT(CASE WHEN observation_type = 'indirect' THEN 1 END) as indirect_signs,
+  COUNT(CASE WHEN observation_type = 'loss' THEN 1 END) as loss_reports,
+  COUNT(DISTINCT division_name) as divisions_covered,
+  COUNT(DISTINCT range_name) as ranges_covered,
+  COUNT(DISTINCT beat_name) as beats_covered,
+  COUNT(DISTINCT user_id) as unique_observers
+FROM activity_reports
+GROUP BY DATE_TRUNC('day', activity_date)
+ORDER BY date DESC; 
