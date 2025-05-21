@@ -1,3 +1,5 @@
+# Deploy to GitHub Pages workflow
+# Last updated: 2024-03-19
 name: Deploy to GitHub Pages
 
 # Workflow to build and deploy the application to GitHub Pages
