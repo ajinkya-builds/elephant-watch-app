@@ -4,8 +4,12 @@ import path from "path";
 import { loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
+  console.log('Starting Vite configuration...');
+  console.log('Mode:', mode);
+  
   // Load environment variables
   const env = loadEnv(mode, process.cwd(), '');
+  console.log('Environment variables loaded');
   
   // Validate required environment variables
   const requiredEnvVars = [
@@ -14,12 +18,15 @@ export default defineConfig(({ mode }) => {
     'VITE_SUPABASE_SERVICE_ROLE_KEY'
   ];
 
+  console.log('Checking environment variables...');
   const missingEnvVars = requiredEnvVars.filter(varName => !env[varName]);
   if (missingEnvVars.length > 0) {
+    console.error('Missing environment variables:', missingEnvVars);
     throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
   }
+  console.log('All required environment variables are present');
 
-  return {
+  const config = {
     base: mode === 'development' ? '/' : '/elephant-watch-app/',
     plugins: [react()],
     server: {
@@ -48,4 +55,14 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY': JSON.stringify(env.VITE_SUPABASE_SERVICE_ROLE_KEY)
     }
   };
+
+  console.log('Configuration generated:', {
+    base: config.base,
+    build: {
+      outDir: config.build.outDir,
+      assetsDir: config.build.assetsDir
+    }
+  });
+
+  return config;
 });
