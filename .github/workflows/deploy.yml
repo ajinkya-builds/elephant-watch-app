@@ -33,22 +33,37 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+      - name: Debug Node Environment
+        run: |
+          echo "=== Node Environment ==="
+          node --version
+          npm --version
+          echo "Current directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+
       - name: Install Dependencies
         id: install
         run: |
-          echo "Installing dependencies..."
-          npm ci
+          echo "=== Installing Dependencies ==="
+          npm ci --verbose
           if [ $? -ne 0 ]; then
             echo "::error::Failed to install dependencies"
+            echo "=== npm-debug.log contents ==="
+            cat npm-debug.log || true
             exit 1
           fi
-          echo "Dependencies installed successfully"
+          echo "=== Installed Dependencies ==="
           npm list --depth=0
 
       - name: Debug Environment
         id: debug-env
         run: |
           echo "=== Environment Variables Check ==="
+          echo "VITE_SUPABASE_URL length: ${#VITE_SUPABASE_URL}"
+          echo "VITE_SUPABASE_ANON_KEY length: ${#VITE_SUPABASE_ANON_KEY}"
+          echo "VITE_SUPABASE_SERVICE_ROLE_KEY length: ${#VITE_SUPABASE_SERVICE_ROLE_KEY}"
+          
           if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
             echo "::error::VITE_SUPABASE_URL is missing"
             exit 1
@@ -70,17 +85,28 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "Starting build process..."
-          npm run build
-          if [ $? -ne 0 ]; then
-            echo "::error::Build failed"
+          echo "=== Starting Build Process ==="
+          echo "Current directory: $(pwd)"
+          echo "Directory contents before build:"
+          ls -la
+          
+          echo "Running build command..."
+          npm run build --verbose
+          BUILD_EXIT_CODE=$?
+          
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "::error::Build failed with exit code $BUILD_EXIT_CODE"
+            echo "=== Build Error Log ==="
+            cat npm-debug.log || true
             exit 1
           fi
-          echo "Build completed successfully"
+          
           echo "=== Build Output Contents ==="
           ls -la dist/
           if [ ! -f "dist/index.html" ]; then
             echo "::error::index.html not found in build output"
+            echo "=== dist directory contents ==="
+            ls -la dist/
             exit 1
           fi
           echo "Build artifacts verified"
@@ -96,13 +122,17 @@ jobs:
       - name: Verify Deployment
         id: verify
         run: |
+          echo "=== Verifying Deployment ==="
           echo "Waiting for deployment to complete..."
-          sleep 30  # Give GitHub Pages time to process
+          sleep 30
           echo "Checking deployment status..."
-          curl -s -o /dev/null -w "%{http_code}" https://ajinkya-builds.github.io/elephant-watch-app/ > status.txt
-          STATUS=$(cat status.txt)
+          curl -v https://ajinkya-builds.github.io/elephant-watch-app/ > response.txt 2>&1
+          STATUS=$(grep -o "HTTP/[0-9.]* [0-9]*" response.txt | tail -n1 | cut -d' ' -f2)
+          echo "Response status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "::error::Deployment verification failed. Status code: $STATUS"
+            echo "=== Response Headers ==="
+            cat response.txt
             exit 1
           fi
           echo "Deployment verified successfully" 
