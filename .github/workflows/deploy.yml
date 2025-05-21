@@ -43,25 +43,6 @@ jobs:
             exit 1
           fi
           echo "Dependencies installed successfully"
-          npm list --depth=0
-
-      - name: Debug Environment
-        id: debug-env
-        run: |
-          echo "=== Environment Variables Check ==="
-          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
-            echo "::error::VITE_SUPABASE_URL is missing"
-            exit 1
-          fi
-          if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
-            echo "::error::VITE_SUPABASE_ANON_KEY is missing"
-            exit 1
-          fi
-          if [ -z "${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}" ]; then
-            echo "::error::VITE_SUPABASE_SERVICE_ROLE_KEY is missing"
-            exit 1
-          fi
-          echo "All required environment variables are present"
 
       - name: Build
         id: build
@@ -76,14 +57,12 @@ jobs:
             echo "::error::Build failed"
             exit 1
           fi
-          echo "Build completed successfully"
-          echo "=== Build Output Contents ==="
-          ls -la dist/
+          
           if [ ! -f "dist/index.html" ]; then
             echo "::error::index.html not found in build output"
             exit 1
           fi
-          echo "Build artifacts verified"
+          echo "Build completed successfully"
 
       - name: Deploy
         id: deploy
@@ -91,12 +70,13 @@ jobs:
         with:
           folder: dist
           branch: gh-pages
+          clean: true
 
       - name: Verify Deployment
         id: verify
         run: |
           echo "Waiting for deployment to complete..."
-          sleep 30  # Give GitHub Pages time to process
+          sleep 30
           echo "Checking deployment status..."
           curl -s -o /dev/null -w "%{http_code}" https://ajinkya-builds.github.io/elephant-watch-app/ > status.txt
           STATUS=$(cat status.txt)

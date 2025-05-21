@@ -2,7 +2,6 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs";
-import dotenv from 'dotenv';
 import { loadEnv } from 'vite';
 // import { VitePWA, VitePWAOptions } from "vite-plugin-pwa"; // Commented out
 
@@ -50,7 +49,7 @@ export function devErrorAndNavigationPlugin(): Plugin {
 
   return {
     name: "dev-error-and-navigation-handler",
-    apply: "serve", // This plugin only applies to the dev server
+    apply: "serve",
 
     configResolved() {
       const stackTraceLibPath = path.join(
@@ -62,33 +61,26 @@ export function devErrorAndNavigationPlugin(): Plugin {
       if (stackTraceLibPath) {
         try {
           stacktraceJsContent = fs.readFileSync(stackTraceLibPath, "utf-8");
-          console.log("[devErrorAndNavigationPlugin] Successfully read stacktrace.js");
         } catch (error) {
           console.error(
-            `[devErrorAndNavigationPlugin] Failed to read stacktrace.js from ${stackTraceLibPath}:`,
+            `[devErrorAndNavigationPlugin] Failed to read stacktrace.js:`,
             error
           );
           stacktraceJsContent = null;
         }
-      } else {
-        console.error(`[devErrorAndNavigationPlugin] stacktrace.js not found at expected path: ${stackTraceLibPath}`);
       }
 
-      const dyadShimPath = path.join("dyad-shim.js"); // Relative to project root
+      const dyadShimPath = path.join("dyad-shim.js");
       if (dyadShimPath) {
         try {
           dyadShimContent = fs.readFileSync(dyadShimPath, "utf-8");
-          console.log("[devErrorAndNavigationPlugin] Successfully read dyad-shim.js");
         } catch (error) {
           console.error(
-            `[devErrorAndNavigationPlugin] Failed to read dyad-shim.js from ${dyadShimPath}:`,
+            `[devErrorAndNavigationPlugin] Failed to read dyad-shim.js:`,
             error
           );
           dyadShimContent = null;
         }
-      } else {
-        // This case should not happen if path.join is used correctly with a filename
-        console.error(`[devErrorAndNavigationPlugin] dyad-shim.js path resolution failed.`);
       }
     },
 
@@ -108,9 +100,6 @@ export function devErrorAndNavigationPlugin(): Plugin {
           children: dyadShimContent,
         });
       }
-      if (tags.length > 0) {
-        console.log("[devErrorAndNavigationPlugin] Injecting shims into index.html");
-      }
       return { html, tags };
     },
   };
@@ -121,7 +110,6 @@ export function devErrorAndNavigationPlugin(): Plugin {
 // };
 
 export default defineConfig(({ mode }) => {
-  // Load environment variables
   const env = loadEnv(mode, process.cwd(), '');
   
   const commonConfig = {
@@ -148,9 +136,9 @@ export default defineConfig(({ mode }) => {
     },
     envPrefix: 'VITE_',
     define: {
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL?.trim()),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY?.trim()),
-      'import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY': JSON.stringify(env.VITE_SUPABASE_SERVICE_ROLE_KEY?.trim())
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+      'import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY': JSON.stringify(env.VITE_SUPABASE_SERVICE_ROLE_KEY)
     }
   };
 
