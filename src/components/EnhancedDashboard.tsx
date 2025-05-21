@@ -247,38 +247,355 @@ export const EnhancedDashboard: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Stats Cards */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Total Sightings</h2>
-        <p className="text-3xl font-bold text-green-600">0</p>
-      </div>
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 p-4 bg-white rounded-lg shadow">
+        <div className="relative z-[100]">
+          <Select
+            value={filters.division}
+            onValueChange={(value) => handleFilterChange('division', value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Division" />
+            </SelectTrigger>
+            <SelectContent className="z-[100]">
+              {divisions.map((division) => (
+                <SelectItem key={division.id} value={division.id}>
+                  {division.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Active Regions</h2>
-        <p className="text-3xl font-bold text-green-600">0</p>
-      </div>
+        <div className="relative z-[100]">
+          <Select
+            value={filters.range}
+            onValueChange={(value) => handleFilterChange('range', value)}
+            disabled={!filters.division}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Range" />
+            </SelectTrigger>
+            <SelectContent className="z-[100]">
+              {ranges.map((range) => (
+                <SelectItem key={range.id} value={range.id}>
+                  {range.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Conservation Status</h2>
-        <p className="text-3xl font-bold text-green-600">Active</p>
-      </div>
+        <div className="relative z-[100]">
+          <Select
+            value={filters.beat}
+            onValueChange={(value) => handleFilterChange('beat', value)}
+            disabled={!filters.range}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Beat" />
+            </SelectTrigger>
+            <SelectContent className="z-[100]">
+              {beats.map((beat) => (
+                <SelectItem key={beat.id} value={beat.id}>
+                  {beat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* Map Placeholder */}
-      <div className="bg-white rounded-lg shadow-md p-6 md:col-span-2 lg:col-span-3">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Sightings Map</h2>
-        <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-          <p className="text-gray-500">Map will be displayed here</p>
+        <div className="relative z-[100]">
+          <Select
+            value={filters.timeRange}
+            onValueChange={(value) => handleFilterChange('timeRange', value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select time range" />
+            </SelectTrigger>
+            <SelectContent className="z-[100]">
+              <SelectItem value="1d">Last 24 hours</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="1y">Last year</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-md p-6 md:col-span-2 lg:col-span-3">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          <p className="text-gray-500">No recent activity to display</p>
-        </div>
-      </div>
+      {/* Map View */}
+      <Card className="relative z-0">
+        <CardHeader>
+          <CardTitle>Geographic Distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[600px] w-full">
+            <BeatMap
+              selectedBeat={filters.beat}
+              selectedRange={filters.range}
+              selectedDivision={filters.division}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Dashboard Content */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="population">Population</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="geography">Geography</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Observations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {data.summary?.[0]?.total_observations || 0}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Direct Sightings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {data.summary?.[0]?.direct_sightings || 0}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Indirect Signs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {data.summary?.[0]?.indirect_signs || 0}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Loss Reports</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {data.summary?.[0]?.loss_reports || 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Observations by Type */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Observations by Type</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.observationsByType}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="type" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Observations by Division */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Observations by Division</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.activityByDivision}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="division_name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="observation_count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Most Active Areas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Most Active Division</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {data.activityByDivision?.[0]?.division_name || 'N/A'}
+                </div>
+                <div className="text-sm text-gray-500">
+                  {data.activityByDivision?.[0]?.observation_count || 0} observations
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Most Active Range</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {data.activityByRange?.[0]?.range_name || 'N/A'}
+                </div>
+                <div className="text-sm text-gray-500">
+                  {data.activityByRange?.[0]?.observation_count || 0} observations
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Loss Reports Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Loss Reports Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.lossReports}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="loss_type" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#ff4d4d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="population" className="space-y-4">
+          {/* Population Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Population Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Male', value: data.populationTrends?.[0]?.male_elephants || 0 },
+                        { name: 'Female', value: data.populationTrends?.[0]?.female_elephants || 0 },
+                        { name: 'Unknown', value: data.populationTrends?.[0]?.unknown_elephants || 0 }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={150}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {data.populationTrends?.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-4">
+          {/* Activity by Season */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity by Season</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.activityBySeason}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="season" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="observation_count" fill="#8884d8" />
+                    <Bar dataKey="total_elephants_seen" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Activity by Land Type */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity by Land Type</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.activityByLandType}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="land_type" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="observation_count" fill="#8884d8" />
+                    <Bar dataKey="total_elephants_seen" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="geography" className="space-y-4">
+          {/* Activity by Range */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity by Range</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.activityByRange}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="range_name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="observation_count" fill="#8884d8" />
+                    <Bar dataKey="total_elephants_seen" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }; 
