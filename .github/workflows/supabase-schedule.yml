@@ -1,0 +1,14 @@
+name: Call Supabase Edge Function Every Minute
+
+on:
+  schedule:
+    - cron: '* * * * *'  # every minute
+  workflow_dispatch:
+
+jobs:
+  call-supabase-function:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase Edge Function
+        run: |
+          curl -X POST https://pauafmgoewfdhwnsexzy.supabase.co/functions/v1/process-activity-observations
