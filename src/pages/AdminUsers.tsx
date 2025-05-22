@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { createClient } from '@supabase/supabase-js';
 import { toast } from "sonner";
 import { UserRole, ExtendedUser } from "@/contexts/AuthContext";
+import { Breadcrumb } from "@/components/Breadcrumb";
 
 // Create a service role client for admin operations
 const adminClient = createClient(
@@ -231,7 +232,13 @@ export default function AdminUsers() {
   );
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto px-4 py-8">
+      <Breadcrumb
+        items={[
+          { label: "Admin", href: "/admin" },
+          { label: "User Management" }
+        ]}
+      />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>User Management</CardTitle>
