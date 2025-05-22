@@ -274,7 +274,7 @@ export const EnhancedDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return (
+  return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -413,11 +413,11 @@ export const EnhancedDashboard: React.FC = () => {
             <Card className="bg-white shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">Observations by Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.divisionStats}>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.divisionStats}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                       <XAxis dataKey="division_name" className="text-sm" />
                       <YAxis className="text-sm" />
@@ -429,15 +429,15 @@ export const EnhancedDashboard: React.FC = () => {
                           boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                         }}
                       />
-                      <Legend />
+                    <Legend />
                       <Bar dataKey="total_observations" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Most Active Areas */}
+          {/* Most Active Areas */}
             <Card className="bg-white shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">Most Active Areas</CardTitle>
@@ -448,7 +448,7 @@ export const EnhancedDashboard: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-600">Most Active Division</p>
                       <p className="text-2xl font-bold text-gray-900 mt-1">
-                        {data.divisionStats?.[0]?.division_name || 'N/A'}
+                  {data.divisionStats?.[0]?.division_name || 'N/A'}
                       </p>
                     </div>
                     <div className="text-right">
@@ -456,13 +456,13 @@ export const EnhancedDashboard: React.FC = () => {
                       <p className="text-2xl font-bold text-gray-900 mt-1">
                         {data.divisionStats?.[0]?.total_observations || 0}
                       </p>
-                    </div>
-                  </div>
+                </div>
+                </div>
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Most Active Range</p>
                       <p className="text-2xl font-bold text-gray-900 mt-1">
-                        {data.rangeStats?.[0]?.range_name || 'N/A'}
+                  {data.rangeStats?.[0]?.range_name || 'N/A'}
                       </p>
                     </div>
                     <div className="text-right">
@@ -471,7 +471,7 @@ export const EnhancedDashboard: React.FC = () => {
                         {data.rangeStats?.[0]?.total_observations || 0}
                       </p>
                     </div>
-                  </div>
+                </div>
                 </div>
               </CardContent>
             </Card>

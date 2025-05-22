@@ -43,9 +43,15 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: true,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: undefined
+          manualChunks: {
+            'vendor': ['react', 'react-dom', 'react-router-dom'],
+            'ui': ['@radix-ui/react-icons', '@radix-ui/react-slot', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+            'charts': ['recharts'],
+            'supabase': ['@supabase/supabase-js']
+          }
         }
       }
     },
