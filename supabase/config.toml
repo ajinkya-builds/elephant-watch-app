@@ -12,12 +12,6 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
 
-[auth.phone]
-enable_signup = true
-enable_signin = true
-enable_confirmations = false
-provider = "twilio"
-
 [auth.external.google]
 enabled = true
 client_id = "your-google-client-id"

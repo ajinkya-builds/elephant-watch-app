@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { createActivityObservation } from '@/lib/activity-observation';
 
 interface StepConfig {
   type: FormStep;
@@ -55,78 +56,110 @@ function StepperContent() {
   const currentStepIndex = ['dateTimeLocation', 'observationType', 'compassBearing', 'photo'].indexOf(currentStep);
 
   const handleSubmit = async () => {
+    console.log('handleSubmit called');
+    if (!user) {
+      toast.error("You must be logged in to submit a report");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      if (!isStepValid(currentStep)) {
-        toast.error('Please fill in all required fields');
-        return;
-      }
-
-      setIsSubmitting(true);
-
-      if (!user) {
-        toast.error('You must be logged in to submit a report');
-        return;
-      }
-
-      console.log('Current user:', user);
-
-      // First get all users to debug
-      const { data: allUsers, error: usersError } = await supabase
-        .from('users')
-        .select('*');
-
-      console.log('All users:', allUsers);
+      console.log('About to fetch session');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Session:', session);
+      console.log('Session error:', sessionError);
       
-      if (usersError) {
-        console.error('Error fetching users:', usersError);
-        toast.error('Failed to verify user access');
-        return;
+      if (!session) {
+        alert("You are not logged in! Please log in to submit a report.");
+        throw new Error("No session!");
+      }
+      
+      if (session.user.id !== user.id) {
+        console.warn('Session user ID does not match user object ID:', {
+          sessionUserId: session.user.id,
+          userObjectId: user.id
+        });
       }
 
-      // Now try to find the specific user
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      console.log('Session user:', session.user);
+      console.log('Session user ID:', session.user.id);
 
-      console.log('Found user data:', userData);
-
-      if (userError || !userData) {
-        console.error('User verification error:', userError);
-        toast.error('Failed to verify user. Please try logging in again.');
-        return;
-      }
-
-      // Format the data for submission
-      const submissionData = {
-        ...formData,
-        user_id: userData.id,
-        activity_date: formData.activity_date instanceof Date 
-          ? formData.activity_date.toISOString().split('T')[0]
-          : new Date(formData.activity_date as string).toISOString().split('T')[0],
-        // Remove any undefined values
-        ...Object.fromEntries(
-          Object.entries(formData).filter(([_, value]) => value !== undefined)
-        )
+      // Always use the authenticated user's UUID from the session for user_id
+      const userId = session.user.id; // This is the ONLY correct value for user_id
+      // Build the report data
+      const reportData = {
+        latitude: formData.latitude.toString(),
+        longitude: formData.longitude.toString(),
+        activity_date: formData.activity_date,
+        activity_time: formData.activity_time,
+        observation_type: formData.observation_type,
+        total_elephants: formData.total_elephants || null,
+        male_elephants: formData.male_elephants || null,
+        female_elephants: formData.female_elephants || null,
+        unknown_elephants: formData.unknown_elephants || null,
+        calves: formData.calves || null,
+        indirect_sighting_type: formData.indirect_sighting_type || null,
+        loss_type: formData.loss_type || null,
+        compass_bearing: formData.compass_bearing || null,
+        photo_url: formData.photo_url || null,
+        user_id: userId // Always use the session user id, never from lookup or form
       };
+      console.log('Submitting reportData:', reportData, typeof reportData.user_id);
 
-      console.log('Submitting data:', submissionData);
-
-      const { error } = await supabase
-        .from('activity_reports')
-        .insert([submissionData]);
-
-      if (error) {
-        console.error('Submission error:', error);
-        throw error;
+      // Validate required fields based on observation type
+      if (formData.observation_type === 'direct' && !formData.total_elephants) {
+        throw new Error('Total elephants count is required for direct observations');
+      }
+      if (formData.observation_type === 'indirect' && !formData.indirect_sighting_type) {
+        throw new Error('Indirect sighting type is required for indirect observations');
+      }
+      if (formData.observation_type === 'loss' && !formData.loss_type) {
+        throw new Error('Loss type is required for loss observations');
       }
 
-      toast.success('Report submitted successfully!');
-      navigate('/dashboard');
-    } catch (error: any) {
+      // Insert the report
+      const { data: reportResult, error: reportError } = await supabase
+        .from('activity_reports')
+        .insert([reportData])
+        .select()
+        .single();
+      if (reportError) {
+        console.error('Insert error:', reportError);
+        throw reportError;
+      }
+
+      console.log('Activity report created successfully:', reportResult);
+
+      // Then create the activity observation
+      const observationData = {
+        activity_report_id: reportResult.id,
+        latitude: parseFloat(formData.latitude as string),
+        longitude: parseFloat(formData.longitude as string),
+        activity_date: formData.activity_date,
+        activity_time: formData.activity_time,
+        observation_type: formData.observation_type,
+        total_elephants: formData.total_elephants || null,
+        male_elephants: formData.male_elephants || null,
+        female_elephants: formData.female_elephants || null,
+        unknown_elephants: formData.unknown_elephants || null,
+        calves: formData.calves || null,
+        indirect_sighting_type: formData.indirect_sighting_type || null,
+        loss_type: formData.loss_type || null,
+        compass_bearing: formData.compass_bearing || null,
+        photo_url: formData.photo_url || null,
+        user_id: userId
+      };
+      console.log('Creating activity observation with data:', observationData);
+      console.log('Observation user_id:', observationData.user_id);
+
+      await createActivityObservation(reportResult.id, observationData);
+      console.log('Activity observation created successfully');
+
+      toast.success("Report submitted successfully!");
+      navigate('/reports');
+    } catch (error) {
       console.error('Error submitting report:', error);
-      toast.error(error.message || 'Failed to submit report');
+      toast.error(error instanceof Error ? error.message : "Failed to submit report. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
