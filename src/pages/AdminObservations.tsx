@@ -448,17 +448,15 @@ export default function AdminObservations() {
                               ) : (
                                 <Button
                                   size="sm"
-                                  variant={syncing === obs.id ? "default" : "destructive"}
+                                  variant="destructive"
                                   onClick={() => handleManualSync(obs.id)}
                                   disabled={syncing === obs.id}
-                                  className={`flex items-center gap-1 ${
-                                    syncing === obs.id ? 'bg-green-500 hover:bg-green-600 text-white' : ''
-                                  }`}
+                                  className="flex items-center gap-1"
                                 >
                                   {syncing === obs.id ? (
                                     <>
                                       <CheckCircle2 className="w-4 h-4" />
-                                      Synced
+                                      Syncing...
                                     </>
                                   ) : (
                                     <>
