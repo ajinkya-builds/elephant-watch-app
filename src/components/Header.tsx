@@ -97,34 +97,10 @@ export function Header() {
                   </>
                 )}
 
-                {/* Manager Menu Items */}
-                {user?.role === 'manager' && (
-                  <>
-                    <DropdownMenuItem onClick={() => navigate('/manager/users')}>
-                      User Management
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/manager/observations')}>
-                      Observations
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/manager/statistics')}>
-                      Statistics
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-
-                {/* Data Collector Menu Items */}
-                {user?.role === 'data_collector' && (
-                  <>
-                    <DropdownMenuItem onClick={() => navigate('/report')}>
-                      Report Activity
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-
+                {/* Common Menu Items */}
                 <DropdownMenuItem onClick={handleSignOut}>
-                  Sign Out
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

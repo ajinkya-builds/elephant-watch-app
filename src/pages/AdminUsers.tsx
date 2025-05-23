@@ -24,6 +24,18 @@ const adminClient = createClient(
   }
 );
 
+interface Division {
+  id: string;
+  name: string;
+}
+
+interface Range {
+  id: string;
+  new_id: string;
+  name: string;
+  division_id: string;
+}
+
 // All user_id references in this file must be public.users.id, not the auth UID. If setting user_id, look up by auth_id.
 
 export default function AdminUsers() {
@@ -31,6 +43,10 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<ExtendedUser[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState<ExtendedUser | null>(null);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [ranges, setRanges] = useState<Range[]>([]);
+  const [selectedDivision, setSelectedDivision] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({
     email: "",
     phone: "",
@@ -45,7 +61,64 @@ export default function AdminUsers() {
 
   useEffect(() => {
     fetchUsers();
+    fetchDivisions();
   }, []);
+
+  const fetchDivisions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('divisions')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setDivisions(data || []);
+    } catch (error: any) {
+      toast.error('Error fetching divisions: ' + error.message);
+    }
+  };
+
+  const fetchRanges = async (divisionId: string) => {
+    try {
+      console.log('Fetching ranges for division:', divisionId); // Debug log
+      
+      // Now fetch the ranges
+      const { data, error } = await supabase
+        .from('ranges')
+        .select('id, new_id, name, division_id')
+        .eq('division_id', divisionId)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching ranges:', error);
+        throw error;
+      }
+      
+      console.log('Fetched ranges:', data); // Debug log
+      setRanges(data || []);
+    } catch (error: any) {
+      console.error('Error in fetchRanges:', error);
+      toast.error('Error fetching ranges: ' + error.message);
+    }
+  };
+
+  const handleDivisionChange = async (value: string) => {
+    console.log('Division changed to:', value); // Debug log
+    setSelectedDivision(value === 'none' ? null : value);
+    setSelectedRange(null);
+    if (value && value !== 'none') {
+      await fetchRanges(value);
+    } else {
+      setRanges([]);
+    }
+  };
+
+  const handleRangeChange = (value: string) => {
+    console.log('Range selected:', value); // Debug log
+    const newValue = value === 'none' ? null : value;
+    console.log('Setting selectedRange to:', newValue); // Debug log
+    setSelectedRange(newValue);
+  };
 
   const fetchUsers = async () => {
     try {
@@ -69,6 +142,16 @@ export default function AdminUsers() {
         return;
       }
 
+      // Validate region assignments based on position
+      if (newUser.position === 'Ranger' && (!selectedDivision || !selectedRange)) {
+        toast.error('Rangers must be assigned to both a division and a range');
+        return;
+      }
+      if (newUser.position === 'DFO' && !selectedDivision) {
+        toast.error('DFOs must be assigned to a division');
+        return;
+      }
+
       // First create the auth user using the admin client
       const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
         email: newUser.email || undefined,
@@ -83,6 +166,7 @@ export default function AdminUsers() {
       const { data: profileData, error: profileError } = await adminClient
         .from('users')
         .insert([{
+          id: authData.user.id,
           auth_id: authData.user.id,
           first_name: newUser.first_name,
           last_name: newUser.last_name,
@@ -102,6 +186,62 @@ export default function AdminUsers() {
         throw profileError;
       }
 
+      if (!profileData || !profileData.id) {
+        throw new Error('Failed to create user profile - no ID returned');
+      }
+
+      // Create region assignment if needed
+      if (selectedDivision) {
+        // Find the selected range object to verify we have the correct ID
+        console.log('Available ranges:', ranges); // Debug log
+        console.log('Selected range value:', selectedRange); // Debug log
+        
+        const selectedRangeObj = ranges.find(r => r.new_id === selectedRange);
+        console.log('Found range object:', selectedRangeObj); // Debug log
+
+        if (newUser.position === 'Ranger' && !selectedRangeObj) {
+          throw new Error(`Invalid range ID: ${selectedRange}. Available ranges: ${ranges.map(r => `${r.name} (${r.new_id})`).join(', ')}`);
+        }
+
+        console.log('Creating region assignment with:', {
+          user_id: profileData.id,
+          division_id: selectedDivision,
+          range_id: newUser.position === 'Ranger' ? selectedRangeObj?.new_id : null,
+          selectedRange,
+          selectedRangeObj
+        });
+
+        try {
+          const { data: regionData, error: regionError } = await adminClient
+            .from('user_region_assignments')
+            .insert({
+              user_id: profileData.id,
+              division_id: selectedDivision,
+              range_id: newUser.position === 'Ranger' ? selectedRangeObj?.new_id : null,
+              start_date: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+          if (regionError) {
+            console.error('Error creating region assignment:', regionError);
+            // If the error is due to validation, show a more specific message
+            if (regionError.message?.includes('must be assigned')) {
+              toast.error(`Region assignment failed: ${regionError.message}`);
+            } else {
+              toast.warning('User created but region assignment failed');
+            }
+          } else {
+            console.log('Region assignment created successfully:', regionData);
+          }
+        } catch (error: any) {
+          console.error('Exception creating region assignment:', error);
+          toast.warning('User created but region assignment failed');
+        }
+      } else {
+        console.log('No division selected, skipping region assignment');
+      }
+
       toast.success('User created successfully');
       setShowModal(false);
       setNewUser({
@@ -113,6 +253,8 @@ export default function AdminUsers() {
         role: "data_collector",
         position: "Ranger"
       });
+      setSelectedDivision(null);
+      setSelectedRange(null);
       
       await fetchUsers();
     } catch (error: any) {
@@ -126,23 +268,46 @@ export default function AdminUsers() {
     }
 
     try {
-      // Try to delete from Auth
-      const { error: authError } = await adminClient.auth.admin.deleteUser(user.auth_id);
+      // First delete the region assignments
+      const { error: regionError } = await adminClient
+        .from('user_region_assignments')
+        .delete()
+        .eq('user_id', user.id);
 
-      // If the error is not a 404 (user not found) or 500 (internal error), throw it
-      if (authError && !authError.message?.includes('User not found') && !authError.message?.includes('500')) throw authError;
+      if (regionError) {
+        console.error('Error deleting region assignments:', regionError);
+        toast.error('Error deleting region assignments: ' + regionError.message);
+        return;
+      }
 
-      // Always try to delete from the users table
+      // Then delete from the users table
       const { error: profileError } = await adminClient
         .from('users')
         .delete()
         .eq('id', user.id);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Error deleting user profile:', profileError);
+        toast.error('Error deleting user profile: ' + profileError.message);
+        return;
+      }
 
-      toast.success('User deleted successfully');
+      // Finally try to delete from Auth
+      try {
+        const { error: authError } = await adminClient.auth.admin.deleteUser(user.auth_id);
+        if (authError) {
+          console.warn('Warning: Could not delete auth user:', authError);
+          // Don't throw here, as the user is already deleted from the database
+        }
+      } catch (authError: any) {
+        console.warn('Warning: Exception deleting auth user:', authError);
+        // Don't throw here, as the user is already deleted from the database
+      }
+
+      toast.success('User and associated data deleted successfully');
       await fetchUsers();
     } catch (error: any) {
+      console.error('Error in delete process:', error);
       toast.error('Error deleting user: ' + error.message);
     }
   };
@@ -350,45 +515,109 @@ export default function AdminUsers() {
                   : setNewUser({ ...newUser, phone: e.target.value })
                 }
               />
-              <Select 
-                value={editUser?.position || newUser.position}
-                onValueChange={(value: "Ranger" | "DFO" | "Officer" | "Guard") => editUser
-                  ? setEditUser({ ...editUser, position: value })
-                  : setNewUser({ ...newUser, position: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select position" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Ranger">Ranger</SelectItem>
-                  <SelectItem value="DFO">DFO</SelectItem>
-                  <SelectItem value="Officer">Officer</SelectItem>
-                  <SelectItem value="Guard">Guard</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select 
-                value={editUser?.role || newUser.role}
-                onValueChange={(value: UserRole) => editUser
-                  ? setEditUser({ ...editUser, role: value })
-                  : setNewUser({ ...newUser, role: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Position</label>
+                <select
+                  className="w-full p-2 border rounded-md"
+                  value={editUser?.position || newUser.position}
+                  onChange={(e) => {
+                    const value = e.target.value as "Ranger" | "DFO" | "Officer" | "Guard";
+                    if (editUser) {
+                      setEditUser({ ...editUser, position: value });
+                    } else {
+                      setNewUser({ ...newUser, position: value });
+                      // Reset region selections when position changes
+                      setSelectedDivision(null);
+                      setSelectedRange(null);
+                    }
+                  }}
+                >
+                  <option value="Ranger">Ranger</option>
+                  <option value="DFO">DFO</option>
+                  <option value="Officer">Officer</option>
+                  <option value="Guard">Guard</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Role</label>
+                <select
+                  className="w-full p-2 border rounded-md"
+                  value={editUser?.role || newUser.role}
+                  onChange={(e) => {
+                    const value = e.target.value as UserRole;
+                    if (editUser) {
+                      setEditUser({ ...editUser, role: value });
+                    } else {
+                      setNewUser({ ...newUser, role: value });
+                    }
+                  }}
+                >
                   {user?.role === 'admin' && (
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <option value="admin">Admin</option>
                   )}
                   {user?.role === 'admin' && (
-                    <SelectItem value="manager">Manager</SelectItem>
+                    <option value="manager">Manager</option>
                   )}
                   {(user?.role === 'admin' || user?.role === 'manager') && (
-                    <SelectItem value="data_collector">Data Collector</SelectItem>
+                    <option value="data_collector">Data Collector</option>
                   )}
-                </SelectContent>
-              </Select>
+                </select>
+              </div>
+
+              {/* Region Assignment Section */}
+              {(newUser.position === 'Ranger' || newUser.position === 'DFO') && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Division</label>
+                    <div className="relative">
+                      <select
+                        className="w-full p-2 border rounded-md"
+                        value={selectedDivision || "none"}
+                        onChange={(e) => {
+                          console.log('Division selected:', e.target.value);
+                          handleDivisionChange(e.target.value);
+                        }}
+                      >
+                        <option value="none">Select a division</option>
+                        {divisions.map((division) => {
+                          console.log('Division option:', division);
+                          return (
+                            <option key={division.id} value={division.id}>
+                              {division.name}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  {newUser.position === 'Ranger' && selectedDivision && selectedDivision !== 'none' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Range</label>
+                      <div className="relative">
+                        <select
+                          className="w-full p-2 border rounded-md"
+                          value={selectedRange || "none"}
+                          onChange={(e) => {
+                            const selectedRangeId = e.target.value;
+                            console.log('Range selected:', selectedRangeId);
+                            handleRangeChange(selectedRangeId);
+                          }}
+                        >
+                          <option value="none">Select a range</option>
+                          {ranges.map((range) => (
+                            <option key={range.new_id} value={range.new_id}>
+                              {range.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {!editUser && (
                 <Input 
                   type="password"

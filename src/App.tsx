@@ -30,32 +30,13 @@ const LazyPwaReloader = import.meta.env.PROD
 
 const App = () => {
   useEffect(() => {
-    const testConnection = async () => {
-      try {
-        console.log('Testing Supabase connection...');
-        const isConnected = await checkSupabaseConnection();
-        
-        if (isConnected) {
-          console.log('Supabase connection test passed');
-          
-          // Check if we've already shown the success message in this session
-          const hasShownConnectionSuccess = sessionStorage.getItem('hasShownSupabaseSuccess');
-          
-          if (!hasShownConnectionSuccess) {
-            toast.success('Connected to Supabase successfully!');
-            // Mark that we've shown the message
-            sessionStorage.setItem('hasShownSupabaseSuccess', 'true');
-          }
-        } else {
-          console.error('Supabase connection test failed');
-          toast.error('Failed to connect to Supabase. Please check the console for details.');
-        }
-      } catch (error) {
-        console.error('Error during connection test:', error);
-        toast.error('Failed to connect to Supabase. Please check your credentials and network connection.');
+    const checkConnection = async () => {
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        toast.error("Database connection error. Please try again later.");
       }
     };
-    testConnection();
+    checkConnection();
   }, []);
 
   return (
