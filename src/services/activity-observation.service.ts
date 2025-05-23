@@ -3,9 +3,25 @@ import { ActivityObservation, ActivityObservationCreate } from '../types/activit
 
 export class ActivityObservationService {
     static async create(observation: ActivityObservationCreate): Promise<ActivityObservation> {
+        // Get the public user ID from auth.uid()
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('auth_id', observation.user_id)
+            .single();
+
+        if (userError) throw userError;
+        if (!userData) throw new Error('User not found');
+
+        // Update the user_id to use the public user ID
+        const observationWithPublicUserId = {
+            ...observation,
+            user_id: userData.id
+        };
+
         const { data, error } = await supabase
             .from('activity_observation')
-            .insert(observation)
+            .insert(observationWithPublicUserId)
             .select()
             .single();
 
@@ -60,7 +76,7 @@ export class ActivityObservationService {
         const { data, error } = await supabase
             .from('activity_observation')
             .select()
-            .eq('associated_range_id', rangeId);
+            .eq('range_id', rangeId);
 
         if (error) throw error;
         return data;
@@ -77,6 +93,20 @@ export class ActivityObservationService {
     }
 
     static async update(id: string, observation: Partial<ActivityObservation>): Promise<ActivityObservation> {
+        // If user_id is being updated, ensure it's the public user ID
+        if (observation.user_id) {
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('id')
+                .eq('auth_id', observation.user_id)
+                .single();
+
+            if (userError) throw userError;
+            if (!userData) throw new Error('User not found');
+
+            observation.user_id = userData.id;
+        }
+
         const { data, error } = await supabase
             .from('activity_observation')
             .update(observation)

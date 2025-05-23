@@ -9,7 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabaseClient";
 import { ActivityReport } from "@/lib/observations";
 import { toast } from "sonner";
-import { Loader2, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Download, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+
+// All user_id references in this file must be public.users.id, not the auth UID. If setting user_id, look up by auth_id.
 
 export default function AdminObservations() {
   const [observations, setObservations] = useState<ActivityReport[]>([]);
@@ -17,10 +20,9 @@ export default function AdminObservations() {
   const [editObs, setEditObs] = useState<ActivityReport | null>(null);
   const [selectedReports, setSelectedReports] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({
-    division: "all",
-    dateRange: "",
-    search: "",
-    email: ""
+    reporterName: "",
+    dateRange: null as Date | null,
+    showUnsyncedOnly: false
   });
   const [sortConfig, setSortConfig] = useState<{ key: keyof ActivityReport; direction: 'asc' | 'desc' } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +30,7 @@ export default function AdminObservations() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [syncing, setSyncing] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,20 +41,26 @@ export default function AdminObservations() {
     try {
       setIsLoading(true);
       
-      // First, get total count
-      const { count, error: countError } = await supabase
-        .from('activity_reports')
-        .select('*', { count: 'exact', head: true });
-
-      if (countError) throw countError;
-      setTotalRecords(count || 0);
-      setTotalPages(Math.ceil((count || 0) / pageSize));
-
-      // Then fetch paginated data
       let query = supabase
         .from('activity_reports')
-        .select('*')
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+        .select(`
+          *,
+          users (
+            first_name,
+            last_name
+          ),
+          activity_observation (
+            id
+          )
+        `, { count: 'exact' });
+
+      // Apply filters
+      if (filters.reporterName) {
+        query = query.or(`users.first_name.ilike.%${filters.reporterName}%,users.last_name.ilike.%${filters.reporterName}%`);
+      }
+      if (filters.dateRange) {
+        query = query.gte('created_at', filters.dateRange.toISOString());
+      }
 
       // Apply sorting
       if (sortConfig) {
@@ -60,10 +69,34 @@ export default function AdminObservations() {
         query = query.order('created_at', { ascending: false });
       }
 
-      const { data, error } = await query;
+      // Apply pagination
+      query = query.range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
-      if (error) throw error;
-      setObservations(data || []);
+      const { data: reports, error: reportsError, count } = await query;
+
+      if (reportsError) {
+        console.error('Query error:', reportsError);
+        throw reportsError;
+      }
+
+      // If we need to check for unsynced reports, fetch the observations separately
+      if (filters.showUnsyncedOnly && reports) {
+        const { data: observations } = await supabase
+          .from('activity_observation')
+          .select('activity_report_id')
+          .in('activity_report_id', reports.map(r => r.id));
+
+        const syncedReportIds = new Set(observations?.map(o => o.activity_report_id) || []);
+        const filteredReports = reports.filter(r => !syncedReportIds.has(r.id));
+        
+        setObservations(filteredReports);
+        setTotalRecords(filteredReports.length);
+        setTotalPages(Math.ceil(filteredReports.length / pageSize));
+      } else {
+        setObservations(reports || []);
+        setTotalRecords(count || 0);
+        setTotalPages(Math.ceil((count || 0) / pageSize));
+      }
     } catch (error) {
       console.error('Error fetching observations:', error);
       toast.error('Failed to fetch observations');
@@ -103,7 +136,7 @@ export default function AdminObservations() {
           obs.beat_name,
           obs.total_elephants,
           obs.damage_done,
-          obs.reporter_name,
+          obs.users?.full_name,
           obs.email,
           obs.reporter_mobile
         ].join(','))
@@ -191,24 +224,74 @@ export default function AdminObservations() {
     }
   };
 
-  const filteredAndSortedObservations = observations
-    .filter(obs => {
-      const matchesDivision = filters.division === "all" || obs.division_name === filters.division;
-      const matchesSearch = !filters.search || 
-        Object.values(obs).some(value => 
-          String(value).toLowerCase().includes(filters.search.toLowerCase())
-        );
-      const matchesEmail = !filters.email || 
-        obs.email.toLowerCase().includes(filters.email.toLowerCase());
-      return matchesDivision && matchesSearch && matchesEmail;
-    })
-    .sort((a, b) => {
-      if (!sortConfig) return 0;
-      const { key, direction } = sortConfig;
-      if (a[key] < b[key]) return direction === 'asc' ? -1 : 1;
-      if (a[key] > b[key]) return direction === 'asc' ? 1 : -1;
-      return 0;
-    });
+  const handleManualSync = async (reportId: string) => {
+    try {
+      setSyncing(reportId);
+      
+      // First check if observation already exists
+      const { data: existingObs, error: checkError } = await supabase
+        .from('activity_observation')
+        .select('*')
+        .eq('activity_report_id', reportId);
+
+      if (checkError) {
+        console.error('Error checking existing observation:', checkError);
+        throw checkError;
+      }
+
+      if (existingObs && existingObs.length > 0) {
+        toast.success('Report already synced');
+        await fetchObservations();
+        return;
+      }
+
+      // Process the report
+      const { data: result, error: processError } = await supabase.rpc('process_new_activity_reports', { 
+        p_report_id: reportId 
+      });
+
+      if (processError) {
+        console.error('Error processing report:', processError);
+        throw processError;
+      }
+
+      if (!result) {
+        throw new Error('No response from server');
+      }
+
+      if (result.status === 'error') {
+        console.error('Processing error:', result.error, result.detail);
+        throw new Error(result.error || result.message || 'Failed to process report');
+      }
+
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Unexpected response from server');
+      }
+
+      // Verify the observation was created
+      const { data: newObs, error: verifyError } = await supabase
+        .from('activity_observation')
+        .select('*')
+        .eq('activity_report_id', reportId);
+
+      if (verifyError) {
+        console.error('Error verifying observation:', verifyError);
+        throw verifyError;
+      }
+
+      if (!newObs || newObs.length === 0) {
+        throw new Error('Failed to verify observation creation');
+      }
+
+      toast.success(result.message || 'Report synced successfully');
+      await fetchObservations();
+    } catch (error: any) {
+      console.error('Error syncing report:', error);
+      toast.error(error.message || 'Failed to sync report');
+    } finally {
+      setSyncing(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">
@@ -239,6 +322,13 @@ export default function AdminObservations() {
               <div className="flex gap-2">
                 <Button 
                   variant="outline"
+                  onClick={() => setFilters(prev => ({ ...prev, showUnsyncedOnly: !prev.showUnsyncedOnly }))}
+                  className={filters.showUnsyncedOnly ? "bg-red-100" : ""}
+                >
+                  {filters.showUnsyncedOnly ? "Show All" : "Show Unsynced Only"}
+                </Button>
+                <Button 
+                  variant="outline"
                   onClick={handleExport}
                   className="flex items-center gap-2"
                 >
@@ -256,31 +346,17 @@ export default function AdminObservations() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
-                placeholder="Search reports..."
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                placeholder="Search by reporter name..."
+                value={filters.reporterName}
+                onChange={(e) => setFilters(prev => ({ ...prev, reporterName: e.target.value }))}
               />
-              <Input
-                placeholder="Filter by email..."
-                value={filters.email}
-                onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
+              <DatePicker
+                selected={filters.dateRange}
+                onChange={(date) => setFilters(prev => ({ ...prev, dateRange: date }))}
+                placeholderText="Filter by date..."
               />
-              <Select
-                value={filters.division}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, division: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by Division" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Divisions</SelectItem>
-                  {Array.from(new Set(observations.map(obs => obs.division_name))).map(division => (
-                    <SelectItem key={division} value={division}>{division}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select
                 value={pageSize.toString()}
                 onValueChange={(value) => setPageSize(Number(value))}
@@ -310,10 +386,10 @@ export default function AdminObservations() {
                     <TableRow>
                       <TableHead className="w-[50px]">
                         <Checkbox
-                          checked={selectedReports.size === filteredAndSortedObservations.length}
+                          checked={selectedReports.size === observations.length}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedReports(new Set(filteredAndSortedObservations.map(obs => obs.id)));
+                              setSelectedReports(new Set(observations.map(obs => obs.id)));
                             } else {
                               setSelectedReports(new Set());
                             }
@@ -326,68 +402,90 @@ export default function AdminObservations() {
                       >
                         Date/Time {sortConfig?.key === 'created_at' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                       </TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => handleSort('division_name')}
-                      >
-                        Division {sortConfig?.key === 'division_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => handleSort('email')}
-                      >
-                        Email {sortConfig?.key === 'email' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                      </TableHead>
                       <TableHead>Reporter</TableHead>
                       <TableHead>Details</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAndSortedObservations.map(obs => (
-                      <TableRow key={obs.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedReports.has(obs.id)}
-                            onCheckedChange={(checked) => {
-                              const newSelected = new Set(selectedReports);
-                              if (checked) {
-                                newSelected.add(obs.id);
-                              } else {
-                                newSelected.delete(obs.id);
-                              }
-                              setSelectedReports(newSelected);
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>{new Date(obs.created_at).toLocaleString()}</TableCell>
-                        <TableCell>{obs.division_name}</TableCell>
-                        <TableCell>{obs.email}</TableCell>
-                        <TableCell>{obs.reporter_name}</TableCell>
-                        <TableCell>
-                          {obs.total_elephants > 0 ? 
-                            `${obs.total_elephants} elephants` : 
-                            obs.damage_description || 'No details'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setViewObs(obs)}>
-                              View
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setEditObs(obs)}>
-                              Edit
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
-                              onClick={() => handleDelete(obs.id)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {observations.map(obs => {
+                      const isSynced = obs.activity_observation && obs.activity_observation.length > 0;
+                      return (
+                        <TableRow key={obs.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedReports.has(obs.id)}
+                              onCheckedChange={(checked) => {
+                                const newSelected = new Set(selectedReports);
+                                if (checked) {
+                                  newSelected.add(obs.id);
+                                } else {
+                                  newSelected.delete(obs.id);
+                                }
+                                setSelectedReports(newSelected);
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>{new Date(obs.created_at).toLocaleString()}</TableCell>
+                          <TableCell>{`${obs.users?.first_name || ''} ${obs.users?.last_name || ''}`.trim() || 'Unknown'}</TableCell>
+                          <TableCell>
+                            {obs.total_elephants > 0 ? 
+                              `${obs.total_elephants} elephants` : 
+                              obs.damage_description || 'No details'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {isSynced ? (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white"
+                                  disabled
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  Synced
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant={syncing === obs.id ? "default" : "destructive"}
+                                  onClick={() => handleManualSync(obs.id)}
+                                  disabled={syncing === obs.id}
+                                  className={`flex items-center gap-1 ${
+                                    syncing === obs.id ? 'bg-green-500 hover:bg-green-600 text-white' : ''
+                                  }`}
+                                >
+                                  {syncing === obs.id ? (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      Synced
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="w-4 h-4" />
+                                      Sync Now
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              <Button size="sm" variant="outline" onClick={() => setViewObs(obs)}>
+                                View
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setEditObs(obs)}>
+                                Edit
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => handleDelete(obs.id)}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -431,16 +529,51 @@ export default function AdminObservations() {
                 <div>
                   <p><strong>Date:</strong> {new Date(viewObs.created_at).toLocaleDateString()}</p>
                   <p><strong>Time:</strong> {new Date(viewObs.created_at).toLocaleTimeString()}</p>
-                  <p><strong>Division:</strong> {viewObs.division_name}</p>
-                  <p><strong>Range:</strong> {viewObs.range_name}</p>
-                  <p><strong>Beat:</strong> {viewObs.beat_name}</p>
+                  <p><strong>Reporter:</strong> {`${viewObs.users?.first_name || ''} ${viewObs.users?.last_name || ''}`.trim() || 'Unknown'}</p>
+                  {viewObs.reporter_mobile && <p><strong>Contact:</strong> {viewObs.reporter_mobile}</p>}
+                  {viewObs.email && <p><strong>Email:</strong> {viewObs.email}</p>}
+                  {viewObs.associated_division && <p><strong>Division:</strong> {viewObs.associated_division}</p>}
+                  {viewObs.associated_range && <p><strong>Range:</strong> {viewObs.associated_range}</p>}
+                  {viewObs.associated_beat && <p><strong>Beat:</strong> {viewObs.associated_beat}</p>}
                 </div>
                 <div>
-                  <p><strong>Reporter:</strong> {viewObs.reporter_name}</p>
-                  <p><strong>Contact:</strong> {viewObs.reporter_mobile}</p>
-                  <p><strong>Total Elephants:</strong> {viewObs.total_elephants}</p>
-                  <p><strong>Damage:</strong> {viewObs.damage_done}</p>
-                  <p><strong>Description:</strong> {viewObs.damage_description}</p>
+                  {viewObs.total_elephants > 0 && <p><strong>Total Elephants:</strong> {viewObs.total_elephants}</p>}
+                  {viewObs.damage_done && <p><strong>Damage:</strong> {viewObs.damage_done}</p>}
+                  {viewObs.damage_description && <p><strong>Description:</strong> {viewObs.damage_description}</p>}
+                  {viewObs.latitude && <p><strong>Latitude:</strong> {viewObs.latitude}</p>}
+                  {viewObs.longitude && <p><strong>Longitude:</strong> {viewObs.longitude}</p>}
+                  {viewObs.activity_observation?.[0] && (
+                    <>
+                      <p className="mt-4 font-semibold text-green-800">Observation Details:</p>
+                      {viewObs.activity_observation[0].total_elephants > 0 && (
+                        <p><strong>Observed Elephants:</strong> {viewObs.activity_observation[0].total_elephants}</p>
+                      )}
+                      {viewObs.activity_observation[0].adult_male_count > 0 && (
+                        <p><strong>Adult Males:</strong> {viewObs.activity_observation[0].adult_male_count}</p>
+                      )}
+                      {viewObs.activity_observation[0].adult_female_count > 0 && (
+                        <p><strong>Adult Females:</strong> {viewObs.activity_observation[0].adult_female_count}</p>
+                      )}
+                      {viewObs.activity_observation[0].sub_adult_male_count > 0 && (
+                        <p><strong>Sub-adult Males:</strong> {viewObs.activity_observation[0].sub_adult_male_count}</p>
+                      )}
+                      {viewObs.activity_observation[0].sub_adult_female_count > 0 && (
+                        <p><strong>Sub-adult Females:</strong> {viewObs.activity_observation[0].sub_adult_female_count}</p>
+                      )}
+                      {viewObs.activity_observation[0].calf_count > 0 && (
+                        <p><strong>Calves:</strong> {viewObs.activity_observation[0].calf_count}</p>
+                      )}
+                      {viewObs.activity_observation[0].damage_done && (
+                        <p><strong>Observed Damage:</strong> {viewObs.activity_observation[0].damage_done}</p>
+                      )}
+                      {viewObs.activity_observation[0].damage_description && (
+                        <p><strong>Damage Description:</strong> {viewObs.activity_observation[0].damage_description}</p>
+                      )}
+                      {viewObs.activity_observation[0].created_at && (
+                        <p><strong>Observation Date:</strong> {new Date(viewObs.activity_observation[0].created_at).toLocaleString()}</p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
               <div className="mt-4 flex justify-end">
@@ -461,9 +594,6 @@ export default function AdminObservations() {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
                   handleEdit(editObs.id, {
-                    division_name: formData.get('division_name') as string,
-                    range_name: formData.get('range_name') as string,
-                    beat_name: formData.get('beat_name') as string,
                     total_elephants: parseInt(formData.get('total_elephants') as string),
                     damage_done: formData.get('damage_done') as string,
                     damage_description: formData.get('damage_description') as string,
@@ -472,18 +602,6 @@ export default function AdminObservations() {
               >
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Division</label>
-                    <Input name="division_name" defaultValue={editObs.division_name} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Range</label>
-                    <Input name="range_name" defaultValue={editObs.range_name} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Beat</label>
-                    <Input name="beat_name" defaultValue={editObs.beat_name} />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium mb-1">Total Elephants</label>
                     <Input name="total_elephants" type="number" defaultValue={editObs.total_elephants} />
                   </div>
@@ -491,7 +609,7 @@ export default function AdminObservations() {
                     <label className="block text-sm font-medium mb-1">Damage Done</label>
                     <Input name="damage_done" defaultValue={editObs.damage_done} />
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <label className="block text-sm font-medium mb-1">Description</label>
                     <Input name="damage_description" defaultValue={editObs.damage_description || ''} />
                   </div>

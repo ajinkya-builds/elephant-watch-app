@@ -170,55 +170,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Function to fetch user profile with retry
-  const fetchUserProfile = async (userId: string, retryCount = 0): Promise<ExtendedUser | null> => {
+  const fetchUserProfile = async (authId: string, retryCount = 0): Promise<ExtendedUser | null> => {
     try {
-      console.log(`Fetching user profile for ID: ${userId}`);
-      
-      // DEBUGGING: Log all users in the table to find the one we need
-      try {
-        console.log('Querying ALL users to find matching ID...');
-        const { data: allUsers, error: allUsersError } = await supabase
-          .from('users')
-          .select('*')
-          .limit(10);
-          
-        if (allUsersError) {
-          console.error('Error fetching all users:', allUsersError);
-        } else if (allUsers && allUsers.length > 0) {
-          console.log(`Found ${allUsers.length} users:`, allUsers);
-          console.log('Field names in user table:', Object.keys(allUsers[0]));
-          
-          // Find any user that matches our ID
-          const matchingUser = allUsers.find(u => 
-            (u.id === userId) || 
-            (u.auth_id === userId) || 
-            (u.user_id === userId)
-          );
-          
-          if (matchingUser) {
-            console.log('FOUND MATCHING USER:', matchingUser);
-            return matchingUser as ExtendedUser;
-          } else {
-            console.log('No matching user found by ID in the users table');
-          }
-        } else {
-          console.log('No users found in the database');
-        }
-      } catch (e) {
-        console.error('Error in debug query:', e);
-      }
-      
-      // If nothing found in debug query, try the original approach
+      // Always look up the user by auth_id
       let { data: profile, error } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', userId)
+        .eq('auth_id', authId)
         .single();
-      
       if (error || !profile) {
         return null;
       }
-
       return profile as ExtendedUser;
     } catch (error: any) {
       console.error('Error fetching user profile:', error);
@@ -230,18 +192,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Try to get session from state or localStorage
       const effectiveSession = state.session || localSession;
-      
       if (!effectiveSession?.user?.id) {
-        console.log('No session or user ID available for refreshUser');
         setState(prev => ({ ...prev, loading: false, initialized: true }));
         return;
       }
-
-      console.log(`Refreshing user profile for ID: ${effectiveSession.user.id}`);
+      // Always use auth_id to look up the user
       const profile = await fetchUserProfile(effectiveSession.user.id);
-      
       if (profile) {
-        console.log('Updated user profile:', profile);
         setState(prev => ({
           ...prev,
           user: profile,
@@ -251,36 +208,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           initialized: true
         }));
       } else {
-        // If we couldn't find a proper user, create a minimal user from auth data
-        console.warn('Failed to fetch user profile during refresh, creating minimal user from auth data');
-        
-        if (effectiveSession.user) {
-          const minimalUser = {
-            id: effectiveSession.user.id,
-            auth_id: effectiveSession.user.id,
-            email: effectiveSession.user.email,
-            phone: effectiveSession.user.phone,
-            role: 'admin' as UserRole, // Assume admin for auth fallback
-            first_name: 'User',
-            last_name: 'Unknown',
-            position: 'Officer' as 'Officer',
-            status: 'active' as 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          
-          setState(prev => ({
-            ...prev,
-            user: minimalUser,
-            session: effectiveSession,
-            loading: false,
-            error: null,
-            initialized: true
-          }));
-          
-          return;
-        }
-        
         setState(prev => ({
           ...prev,
           loading: false,
@@ -289,7 +216,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
       }
     } catch (error: any) {
-      console.error('Error in refreshUser:', error);
       setState(prev => ({
         ...prev,
         loading: false,

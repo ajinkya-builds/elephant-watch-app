@@ -57,9 +57,9 @@ export function Dashboard() {
         .select(`
           id,
           name,
-          division_id
+          associated_division_id
         `)
-        .eq('division_id', selectedDivision)
+        .eq('associated_division_id', selectedDivision)
         .order('name');
       
       if (error) {
@@ -104,11 +104,11 @@ export function Dashboard() {
         .select(`
           id,
           name,
-          range_id,
-          division_id
+          associated_range_id,
+          associated_division_id
         `)
-        .eq('range_id', selectedRange)
-        .eq('division_id', selectedDivision)
+        .eq('associated_range_id', selectedRange)
+        .eq('associated_division_id', selectedDivision)
         .order('name');
       
       if (error) {

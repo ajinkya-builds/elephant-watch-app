@@ -106,9 +106,9 @@ export const EnhancedDashboard: React.FC = () => {
         .select(`
           id,
           name,
-          division_id
+          associated_division_id
         `)
-        .eq('division_id', filters.division)
+        .eq('associated_division_id', filters.division)
         .order('name');
       
       if (error) {
@@ -138,11 +138,11 @@ export const EnhancedDashboard: React.FC = () => {
         .select(`
           id,
           name,
-          range_id,
-          division_id
+          associated_range_id,
+          associated_division_id
         `)
-        .eq('range_id', filters.range)
-        .eq('division_id', filters.division)
+        .eq('associated_range_id', filters.range)
+        .eq('associated_division_id', filters.division)
         .order('name');
       
       if (error) {

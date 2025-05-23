@@ -20,7 +20,7 @@ CREATE TABLE public.activity_observation (
     loss_type TEXT CHECK (loss_type IN ('No loss', 'crop', 'livestock', 'property', 'fencing', 'solar panels', 'FD establishment', 'Other')),
     compass_bearing INTEGER CHECK (compass_bearing >= 0 AND compass_bearing <= 360),
     photo_url TEXT,
-    user_id UUID NOT NULL REFERENCES auth.users(id),
+    user_id UUID NOT NULL REFERENCES public.users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT valid_latitude CHECK (latitude >= -90 AND latitude <= 90),
@@ -114,9 +114,12 @@ BEGIN
         b.name AS beat_name,
         b.id AS beat_id
     FROM point p
-    LEFT JOIN public.divisions d ON ST_Contains(d.geom, p.geom)
-    LEFT JOIN public.ranges r ON ST_Contains(r.geom, p.geom)
-    LEFT JOIN public.beats b ON ST_Contains(b.geom, p.geom)
+    LEFT JOIN public.division_polygons dp ON ST_Contains(dp.polygon, p.geom)
+    LEFT JOIN public.divisions d ON dp.new_division_id = d.id
+    LEFT JOIN public.range_polygons rp ON ST_Contains(rp.polygon, p.geom)
+    LEFT JOIN public.ranges r ON rp.range_id = r.id AND r.division_id = d.id
+    LEFT JOIN public.beat_polygons bp ON ST_Contains(bp.geometry, p.geom)
+    LEFT JOIN public.beats b ON bp.associated_beat_id = b.id AND b.range_id = r.id
     LIMIT 1;
 END;
 $$ LANGUAGE plpgsql;

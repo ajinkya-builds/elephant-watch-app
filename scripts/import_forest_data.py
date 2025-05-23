@@ -67,57 +67,57 @@ def get_existing_records(table: str, id_field: str) -> List[str]:
 
 def import_divisions(divisions_gdf: gpd.GeoDataFrame) -> None:
     """Import only missing divisions data using upsert."""
-    existing_ids = get_existing_records('divisions', 'division_id')
+    existing_ids = get_existing_records('divisions', 'associated_division_id')
     for _, row in divisions_gdf.iterrows():
         division_id = str(row['DID'])
         if division_id not in existing_ids:
             try:
                 data = {
-                    'division_id': division_id,
+                    'associated_division_id': division_id,
                     'name': str(row['Division']),
                     'state': str(row['State']),
                     'district': None
                 }
-                result = supabase.table('divisions').upsert(data, on_conflict=['division_id']).execute()
+                result = supabase.table('divisions').upsert(data, on_conflict=['associated_division_id']).execute()
                 logger.info(f"Upserted division: {data['name']}")
             except Exception as e:
                 logger.error(f"Error upserting division {row['Division']}: {str(e)}")
 
 def import_ranges(ranges_gdf: gpd.GeoDataFrame) -> None:
     """Import only missing ranges data using upsert."""
-    existing_ids = get_existing_records('ranges', 'range_id')
+    existing_ids = get_existing_records('ranges', 'associated_range_id')
     for _, row in ranges_gdf.iterrows():
         range_id = str(row['RID'])
         if range_id not in existing_ids:
             try:
                 data = {
-                    'range_id': range_id,
-                    'division_id': str(row['DID']),
+                    'associated_range_id': range_id,
+                    'associated_division_id': str(row['DID']),
                     'name': str(row['Range']),
                     'state': str(row['State']),
                     'district': None
                 }
-                result = supabase.table('ranges').upsert(data, on_conflict=['range_id']).execute()
+                result = supabase.table('ranges').upsert(data, on_conflict=['associated_range_id']).execute()
                 logger.info(f"Upserted range: {data['name']}")
             except Exception as e:
                 logger.error(f"Error upserting range {row['Range']}: {str(e)}")
 
 def import_beats(beats_gdf: gpd.GeoDataFrame) -> None:
     """Import only missing beats data using upsert."""
-    existing_ids = get_existing_records('beats', 'beat_id')
+    existing_ids = get_existing_records('beats', 'associated_beat_id')
     for _, row in beats_gdf.iterrows():
         beat_id = str(row['BID'])
         if beat_id not in existing_ids:
             try:
                 data = {
-                    'beat_id': beat_id,
-                    'range_id': str(row['RID']),
+                    'associated_beat_id': beat_id,
+                    'associated_range_id': str(row['RID']),
                     'name': str(row['Beat']),
                     'forest_type': None,
                     'state': str(row['State']),
                     'district': None
                 }
-                result = supabase.table('beats').upsert(data, on_conflict=['beat_id']).execute()
+                result = supabase.table('beats').upsert(data, on_conflict=['associated_beat_id']).execute()
                 logger.info(f"Upserted beat: {data['name']}")
             except Exception as e:
                 logger.error(f"Error upserting beat {row['Beat']}: {str(e)}")
@@ -140,11 +140,11 @@ def import_beat_polygons(beats_gdf: gpd.GeoDataFrame) -> None:
                 geometry = convert_to_polygon(row.geometry)
                 geometry_dict = mapping(geometry)
                 data = {
-                    'beat_id': str(row['BID']),
+                    'associated_beat_id': str(row['BID']),
                     'polygon': json.dumps(geometry_dict),
                     'forest_type': None
                 }
-                result = supabase.table('beat_polygons').upsert(data, on_conflict=['beat_id']).execute()
+                result = supabase.table('beat_polygons').upsert(data, on_conflict=['associated_beat_id']).execute()
                 logger.info(f"Successfully upserted polygon for beat: {beat_name}")
             except Exception as e:
                 logger.error(f"Error upserting polygon for beat {beat_name}: {str(e)}")
@@ -163,11 +163,11 @@ def reimport_single_beat_polygon(beat_id: str):
             geometry = max(geometry.geoms, key=lambda p: p.area)
         geometry_dict = mapping(geometry)
         data = {
-            'beat_id': str(row['BID']),
+            'associated_beat_id': str(row['BID']),
             'polygon': json.dumps(geometry_dict),
             'forest_type': None
         }
-        result = supabase.table('beat_polygons').upsert(data, on_conflict=['beat_id']).execute()
+        result = supabase.table('beat_polygons').upsert(data, on_conflict=['associated_beat_id']).execute()
         logger.info(f"Successfully reimported polygon for beat: {row['Beat']} (ID: {beat_id})")
     except Exception as e:
         logger.error(f"Error reimporting polygon for beat {beat_id}: {str(e)}")

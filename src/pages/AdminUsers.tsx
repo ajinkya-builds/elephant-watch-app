@@ -24,6 +24,8 @@ const adminClient = createClient(
   }
 );
 
+// All user_id references in this file must be public.users.id, not the auth UID. If setting user_id, look up by auth_id.
+
 export default function AdminUsers() {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<ExtendedUser[]>([]);

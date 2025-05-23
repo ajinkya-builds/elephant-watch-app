@@ -31,9 +31,11 @@ const ReportActivityPage = () => {
       setIsLoading(true);
       
       // Prepare form data
+      const { data: userRow } = await supabase.from('users').select('id').eq('auth_id', user.id).single();
+      const user_id = userRow?.id;
       const formData = {
         ...data,
-        user_id: user.id,
+        user_id: user_id,
         created_at: new Date().toISOString()
       };
 

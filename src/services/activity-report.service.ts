@@ -15,6 +15,7 @@ export class ActivityReportService {
     }
 
     async create(report: ActivityReportCreate): Promise<ActivityReport> {
+        // user_id must be public.users.id, not the auth UID
         const { data, error } = await supabase
             .from(this.table)
             .insert(report)
