@@ -113,8 +113,17 @@ export const EnhancedDashboard: React.FC = () => {
         setMapLoading(true);
       const { data, error } = await supabase
         .from('ranges')
+<<<<<<< HEAD
           .select('id, name')
           .eq('division_id', selectedDivision)
+=======
+        .select(`
+          id,
+          name,
+          associated_division_id
+        `)
+        .eq('associated_division_id', filters.division)
+>>>>>>> 2f6bd8fcab214df0f722880eaa8ca399a693b837
         .order('name');
       
         if (error) throw error;
@@ -139,8 +148,19 @@ export const EnhancedDashboard: React.FC = () => {
         setMapLoading(true);
       const { data, error } = await supabase
         .from('beats')
+<<<<<<< HEAD
           .select('id, name')
           .eq('range_id', selectedRange)
+=======
+        .select(`
+          id,
+          name,
+          associated_range_id,
+          associated_division_id
+        `)
+        .eq('associated_range_id', filters.range)
+        .eq('associated_division_id', filters.division)
+>>>>>>> 2f6bd8fcab214df0f722880eaa8ca399a693b837
         .order('name');
       
         if (error) throw error;

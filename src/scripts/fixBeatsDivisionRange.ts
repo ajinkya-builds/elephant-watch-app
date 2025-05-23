@@ -34,16 +34,16 @@ async function fixBeatsDivisionId() {
       continue;
     }
 
-    // Update beat's division_id
+    // Update beat's associated_division_id
     const { error: updateError } = await supabase
       .from('beats')
-      .update({ division_id: division.id })
+      .update({ associated_division_id: division.id })
       .eq('id', beat.id);
     if (updateError) {
       console.error(`Failed to update beat ${beat.id}:`, updateError);
     } else {
       updated++;
-      console.log(`Updated beat ${beat.id}: division_id=${division.id}`);
+      console.log(`Updated beat ${beat.id}: associated_division_id=${division.id}`);
     }
   }
   console.log(`\nDone. Updated ${updated} beats.`);

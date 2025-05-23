@@ -79,10 +79,10 @@ def import_divisions():
         division_id = meta_row["division_id"]
         did_to_id[row["DID"]] = division_id
         poly = {
-            "division_id": division_id,
+            "associated_division_id": division_id,
             "geometry": mapping(ensure_multipolygon(row.geometry))
         }
-        upsert_row("division_polygons", poly, "division_id")
+        upsert_row("division_polygons", poly, "associated_division_id")
     return did_to_id
 
 def import_ranges(did_to_id):
@@ -91,7 +91,7 @@ def import_ranges(did_to_id):
     for _, row in gdf.iterrows():
         meta = {
             "rid": str(row["RID"]),
-            "division_id": did_to_id.get(row["DID"]),
+            "associated_division_id": did_to_id.get(row["DID"]),
             "name": str(row["Range"])
         }
         meta_row = upsert_row("ranges", meta, "rid")
@@ -99,10 +99,10 @@ def import_ranges(did_to_id):
         range_id = meta_row["range_id"]
         rid_to_id[row["RID"]] = range_id
         poly = {
-            "range_id": range_id,
+            "associated_range_id": range_id,
             "geometry": mapping(ensure_multipolygon(row.geometry))
         }
-        upsert_row("range_polygons", poly, "range_id")
+        upsert_row("range_polygons", poly, "associated_range_id")
     return rid_to_id
 
 def import_beats(rid_to_id, did_to_id):
@@ -112,18 +112,18 @@ def import_beats(rid_to_id, did_to_id):
         meta = {
             "bid": bid,
             "name": str(row["Beat"]),
-            "range_id": rid_to_id.get(row["RID"]),
-            "division_id": did_to_id.get(row["DID"]),
+            "associated_range_id": rid_to_id.get(row["RID"]),
+            "associated_division_id": did_to_id.get(row["DID"]),
             "area": float(row["Beat_Ar"]) if row["Beat_Ar"] is not None else None
         }
         meta_row = upsert_row("beats", meta, "bid")
         if not meta_row: continue
         beat_id = meta_row["beat_id"]
         poly = {
-            "beat_id": beat_id,
+            "associated_beat_id": beat_id,
             "geometry": mapping(ensure_multipolygon(row.geometry))
         }
-        upsert_row("beat_polygons", poly, "beat_id")
+        upsert_row("beat_polygons", poly, "associated_beat_id")
 
 def main():
     print("Importing divisions...")

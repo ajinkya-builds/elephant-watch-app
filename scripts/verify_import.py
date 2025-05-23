@@ -54,9 +54,9 @@ def verify_divisions(divisions_gdf: gpd.GeoDataFrame) -> bool:
     supabase_divisions = get_supabase_records('divisions')
     
     # Check for duplicates
-    division_ids = [str(d['division_id']) for d in supabase_divisions]
+    division_ids = [str(d['associated_division_id']) for d in supabase_divisions]
     if len(division_ids) != len(set(division_ids)):
-        logger.error("Duplicate division_ids found in Supabase!")
+        logger.error("Duplicate associated_division_ids found in Supabase!")
         return False
     
     # Check if all shapefile divisions are in Supabase
@@ -77,9 +77,9 @@ def verify_ranges(ranges_gdf: gpd.GeoDataFrame) -> bool:
     supabase_ranges = get_supabase_records('ranges')
     
     # Check for duplicates
-    range_ids = [str(r['range_id']) for r in supabase_ranges]
+    range_ids = [str(r['associated_range_id']) for r in supabase_ranges]
     if len(range_ids) != len(set(range_ids)):
-        logger.error("Duplicate range_ids found in Supabase!")
+        logger.error("Duplicate associated_range_ids found in Supabase!")
         return False
     
     # Check if all shapefile ranges are in Supabase
@@ -92,8 +92,8 @@ def verify_ranges(ranges_gdf: gpd.GeoDataFrame) -> bool:
         return False
     
     # Verify division relationships
-    supabase_divisions = set(str(d['division_id']) for d in get_supabase_records('divisions'))
-    invalid_divisions = set(str(r['division_id']) for r in supabase_ranges) - supabase_divisions
+    supabase_divisions = set(str(d['associated_division_id']) for d in get_supabase_records('divisions'))
+    invalid_divisions = set(str(r['associated_division_id']) for r in supabase_ranges) - supabase_divisions
     if invalid_divisions:
         logger.error(f"Ranges with invalid division references: {invalid_divisions}")
         return False
@@ -107,9 +107,9 @@ def verify_beats(beats_gdf: gpd.GeoDataFrame) -> bool:
     supabase_beats = get_supabase_records('beats')
     
     # Check for duplicates
-    beat_ids = [str(b['beat_id']) for b in supabase_beats]
+    beat_ids = [str(b['associated_beat_id']) for b in supabase_beats]
     if len(beat_ids) != len(set(beat_ids)):
-        logger.error("Duplicate beat_ids found in Supabase!")
+        logger.error("Duplicate associated_beat_ids found in Supabase!")
         return False
     
     # Check if all shapefile beats are in Supabase
@@ -122,8 +122,8 @@ def verify_beats(beats_gdf: gpd.GeoDataFrame) -> bool:
         return False
     
     # Verify range relationships
-    supabase_ranges = set(str(r['range_id']) for r in get_supabase_records('ranges'))
-    invalid_ranges = set(str(b['range_id']) for b in supabase_beats) - supabase_ranges
+    supabase_ranges = set(str(r['associated_range_id']) for r in get_supabase_records('ranges'))
+    invalid_ranges = set(str(b['associated_range_id']) for b in supabase_beats) - supabase_ranges
     if invalid_ranges:
         logger.error(f"Beats with invalid range references: {invalid_ranges}")
         return False
@@ -137,13 +137,13 @@ def verify_beat_polygons(beats_gdf: gpd.GeoDataFrame) -> bool:
     supabase_polygons = get_supabase_records('beat_polygons')
     
     # Check for duplicates
-    beat_ids = [str(p['beat_id']) for p in supabase_polygons]
+    beat_ids = [str(p['associated_beat_id']) for p in supabase_polygons]
     if len(beat_ids) != len(set(beat_ids)):
-        logger.error("Duplicate beat_ids found in beat_polygons!")
+        logger.error("Duplicate associated_beat_ids found in beat_polygons!")
         return False
     
     # Check if all beats have polygons
-    supabase_beats = set(str(b['beat_id']) for b in get_supabase_records('beats'))
+    supabase_beats = set(str(b['associated_beat_id']) for b in get_supabase_records('beats'))
     missing_polygons = supabase_beats - set(beat_ids)
     if missing_polygons:
         logger.error(f"Beats missing polygons: {missing_polygons}")

@@ -24,9 +24,12 @@ BEGIN
         b.name AS beat_name,
         b.id AS beat_id
     FROM point p
-    LEFT JOIN public.divisions d ON ST_Contains(d.geom, p.geom)
-    LEFT JOIN public.ranges r ON ST_Contains(r.geom, p.geom)
-    LEFT JOIN public.beats b ON ST_Contains(b.geom, p.geom)
+    LEFT JOIN public.division_polygons dp ON ST_Contains(dp.polygon, p.geom)
+    LEFT JOIN public.divisions d ON dp.new_division_id = d.id
+    LEFT JOIN public.range_polygons rp ON ST_Contains(rp.polygon, p.geom)
+    LEFT JOIN public.ranges r ON rp.range_id = r.id AND r.division_id = d.id
+    LEFT JOIN public.beat_polygons bp ON ST_Contains(bp.geometry, p.geom)
+    LEFT JOIN public.beats b ON bp.associated_beat_id = b.id AND b.range_id = r.id
     LIMIT 1;
 END;
 $$ LANGUAGE plpgsql;
@@ -60,5 +63,5 @@ CREATE TRIGGER set_activity_report_boundaries_trigger
     EXECUTE FUNCTION public.set_activity_report_boundaries();
 
 -- Add helpful comments
-COMMENT ON FUNCTION public.identify_geographical_boundaries IS 'Identifies the division, range, and beat for given coordinates';
-COMMENT ON FUNCTION public.set_activity_report_boundaries IS 'Trigger function to automatically set geographical boundaries for new activity reports'; 
+COMMENT ON FUNCTION public.identify_geographical_boundaries(DECIMAL, DECIMAL) IS 'Identifies geographical boundaries (division, range, beat) based on latitude and longitude coordinates';
+COMMENT ON FUNCTION public.set_activity_report_boundaries() IS 'Trigger function to automatically set geographical boundaries for new activity reports'; 

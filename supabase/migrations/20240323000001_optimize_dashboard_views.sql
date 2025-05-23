@@ -30,11 +30,11 @@ SELECT
     COALESCE(b.name, 'Unknown Beat') as beat_name
 FROM activity_reports ar
 LEFT JOIN division_polygons dp ON is_point_in_polygon(ar.latitude::float, ar.longitude::float, dp.polygon::text)
-LEFT JOIN divisions d ON dp.division_id = d.id
+LEFT JOIN divisions d ON dp.new_division_id = d.id
 LEFT JOIN range_polygons rp ON is_point_in_polygon(ar.latitude::float, ar.longitude::float, rp.polygon::text)
 LEFT JOIN ranges r ON rp.range_id = r.id AND r.division_id = d.id
 LEFT JOIN beat_polygons bp ON is_point_in_polygon(ar.latitude::float, ar.longitude::float, bp.polygon::text)
-LEFT JOIN beats b ON bp.beat_id = b.id AND b.range_id = r.id;
+LEFT JOIN beats b ON bp.associated_beat_id = b.id AND b.range_id = r.id;
 
 -- Create indexes on the materialized view
 CREATE INDEX IF NOT EXISTS idx_mv_activity_reports_date ON mv_activity_reports_with_divisions(activity_date);

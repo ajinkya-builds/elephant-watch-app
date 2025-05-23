@@ -54,7 +54,7 @@ WITH matched_divisions AS (
         ar.longitude::float,
         dp.polygon::text
     )
-    AND dp.division_id = d.id
+    AND dp.associated_division_id = d.id
     AND is_point_in_polygon(
         ar.latitude::float,
         ar.longitude::float,
@@ -67,7 +67,7 @@ WITH matched_divisions AS (
         ar.longitude::float,
         bp.polygon::text
     )
-    AND bp.beat_id = b.id
+    AND bp.associated_beat_id = b.id
     AND b.range_id = r.id
 )
 SELECT DISTINCT ON (id) * FROM matched_divisions;

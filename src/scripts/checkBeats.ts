@@ -26,7 +26,7 @@ async function checkBeats() {
       .from('ranges')
       .select('id, name')
       .eq('name', 'Mauganj')
-      .eq('division_id', divisionData.id)
+      .eq('associated_division_id', divisionData.id)
       .single();
 
     if (rangeError) {
@@ -39,7 +39,7 @@ async function checkBeats() {
     // Check all beats in the database
     const { data: allBeats, error: allBeatsError } = await supabase
       .from('beats')
-      .select('id, name, range_id, division_id')
+      .select('id, name, associated_range_id, associated_division_id')
       .order('name');
 
     if (allBeatsError) {
@@ -51,15 +51,15 @@ async function checkBeats() {
     console.log('Total beats:', allBeats.length);
     console.log('Beat List:');
     allBeats.forEach((beat, index) => {
-      console.log(`${index + 1}. ${beat.name} (Range ID: ${beat.range_id}, Division ID: ${beat.division_id})`);
+      console.log(`${index + 1}. ${beat.name} (Range ID: ${beat.associated_range_id}, Division ID: ${beat.associated_division_id})`);
     });
 
     // Check beats specifically under Mauganj range
     const { data: mauganjBeats, error: mauganjBeatsError } = await supabase
       .from('beats')
-      .select('id, name, range_id, division_id')
-      .eq('range_id', rangeData.id)
-      .eq('division_id', divisionData.id)
+      .select('id, name, associated_range_id, associated_division_id')
+      .eq('associated_range_id', rangeData.id)
+      .eq('associated_division_id', divisionData.id)
       .order('name');
 
     if (mauganjBeatsError) {

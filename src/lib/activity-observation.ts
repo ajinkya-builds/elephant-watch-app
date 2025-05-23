@@ -25,26 +25,36 @@ export async function createActivityObservation(
         console.log('Creating activity observation with report ID:', activityReportId);
         console.log('Form data:', formData);
 
+        // Ensure activityReportId is a valid UUID
+        if (!activityReportId || typeof activityReportId !== 'string') {
+            throw new Error('Invalid activity report ID');
+        }
+
+        // Format the data for the database
+        const observationData = {
+            activity_report_id: activityReportId,
+            latitude: formData.latitude,
+            longitude: formData.longitude,
+            activity_date: formData.activity_date.toISOString().split('T')[0], // Convert to YYYY-MM-DD
+            activity_time: formData.activity_time,
+            observation_type: formData.observation_type,
+            total_elephants: formData.total_elephants || null,
+            male_elephants: formData.male_elephants || null,
+            female_elephants: formData.female_elephants || null,
+            unknown_elephants: formData.unknown_elephants || null,
+            calves: formData.calves || null,
+            indirect_sighting_type: formData.indirect_sighting_type || null,
+            loss_type: formData.loss_type || null,
+            compass_bearing: formData.compass_bearing || null,
+            photo_url: formData.photo_url || null,
+            user_id: formData.user_id,
+        };
+
+        console.log('Formatted observation data:', observationData);
+
         const { error } = await supabase
             .from('activity_observation')
-            .insert({
-                activity_report_id: activityReportId,
-                latitude: formData.latitude,
-                longitude: formData.longitude,
-                activity_date: formData.activity_date,
-                activity_time: formData.activity_time,
-                observation_type: formData.observation_type,
-                total_elephants: formData.total_elephants,
-                male_elephants: formData.male_elephants,
-                female_elephants: formData.female_elephants,
-                unknown_elephants: formData.unknown_elephants,
-                calves: formData.calves,
-                indirect_sighting_type: formData.indirect_sighting_type,
-                loss_type: formData.loss_type,
-                compass_bearing: formData.compass_bearing,
-                photo_url: formData.photo_url,
-                user_id: formData.user_id
-            });
+            .insert(observationData);
 
         if (error) {
             console.error('Error creating activity observation:', error);

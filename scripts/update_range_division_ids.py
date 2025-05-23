@@ -31,10 +31,10 @@ def update_ranges(mapping):
     for (range_name, rid), new_div_id in mapping.items():
         logger.info(f"Updating range '{range_name}' (rid {rid}) to division_id {new_div_id}")
         try:
-            response = supabase.table('ranges').select('rid, name, division_id').eq('name', range_name).eq('rid', rid).execute()
+            response = supabase.table('ranges').select('rid, name, associated_division_id').eq('name', range_name).eq('rid', rid).execute()
             for record in response.data:
                 range_rid = record['rid']
-                supabase.table('ranges').update({'division_id': new_div_id}).eq('rid', range_rid).execute()
+                supabase.table('ranges').update({'associated_division_id': new_div_id}).eq('rid', range_rid).execute()
                 logger.info(f"Updated range rid {range_rid}: division_id set to {new_div_id}")
         except Exception as e:
             logger.error(f"Error updating range '{range_name}' (rid {rid}): {e}")

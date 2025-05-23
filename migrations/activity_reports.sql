@@ -19,8 +19,8 @@ CREATE TABLE activity_reports (
   -- Step 1: Date/Time and Location
   activity_date DATE NOT NULL,
   activity_time TIME NOT NULL,
-  latitude TEXT NOT NULL,
-  longitude TEXT NOT NULL,
+  latitude DECIMAL(10, 8) NOT NULL,
+  longitude DECIMAL(11, 8) NOT NULL,
   
   -- Step 2: Type of Observation
   observation_type TEXT CHECK (observation_type IN ('direct', 'indirect', 'loss')),

@@ -128,7 +128,7 @@ def import_ranges():
                     'division_name': str(row['Division']),
                     'name': str(row['Range']),
                     'code': code,
-                    'division_id': division_id
+                    'associated_division_id': division_id
                 }
                 
                 # Insert range

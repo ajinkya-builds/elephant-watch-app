@@ -56,6 +56,7 @@ export function Dashboard() {
       setLoading(true);
       console.log('Fetching ranges for division:', selectedDivision);
       
+<<<<<<< HEAD
       try {
         const { data, error } = await supabase
           .from('ranges')
@@ -87,6 +88,21 @@ export function Dashboard() {
         console.error('Unexpected error in fetchRanges:', err);
       } finally {
         setLoading(false);
+=======
+      const { data, error } = await supabase
+        .from('ranges')
+        .select(`
+          id,
+          name,
+          associated_division_id
+        `)
+        .eq('associated_division_id', selectedDivision)
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching ranges:', error);
+        return;
+>>>>>>> 2f6bd8fcab214df0f722880eaa8ca399a693b837
       }
     }
     
@@ -105,6 +121,7 @@ export function Dashboard() {
       setLoading(true);
       console.log('Fetching beats for range:', selectedRange);
       
+<<<<<<< HEAD
       try {
         const { data, error } = await supabase
           .from('beats')
@@ -134,6 +151,32 @@ export function Dashboard() {
         console.error('Unexpected error in fetchBeats:', err);
       } finally {
         setLoading(false);
+=======
+      // First, let's check if we can get any beats at all
+      const { data: allBeats, error: allBeatsError } = await supabase
+        .from('beats')
+        .select('*')
+        .limit(5);
+      
+      console.log('Sample of all beats:', allBeats);
+
+      // Now fetch beats for the selected range and division
+      const { data, error } = await supabase
+        .from('beats')
+        .select(`
+          id,
+          name,
+          associated_range_id,
+          associated_division_id
+        `)
+        .eq('associated_range_id', selectedRange)
+        .eq('associated_division_id', selectedDivision)
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching beats:', error);
+        return;
+>>>>>>> 2f6bd8fcab214df0f722880eaa8ca399a693b837
       }
     }
     
