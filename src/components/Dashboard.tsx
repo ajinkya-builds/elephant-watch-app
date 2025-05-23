@@ -22,7 +22,7 @@ export function Dashboard() {
       setLoading(true);
       const { data, error } = await supabase
         .from('divisions')
-        .select('id, name')
+        .select('did, name')
         .order('name');
       
       if (error) {
@@ -31,7 +31,11 @@ export function Dashboard() {
       }
       
       console.log('Fetched divisions:', data);
-      setDivisions(data || []);
+      const transformedData = data?.map(division => ({
+        id: division.did,
+        name: division.name
+      })) || [];
+      setDivisions(transformedData);
       setLoading(false);
     }
     
@@ -52,27 +56,38 @@ export function Dashboard() {
       setLoading(true);
       console.log('Fetching ranges for division:', selectedDivision);
       
-      const { data, error } = await supabase
-        .from('ranges')
-        .select(`
-          id,
-          name,
-          division_id
-        `)
-        .eq('division_id', selectedDivision)
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching ranges:', error);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('ranges')
+          .select('did, name')
+          .eq('did', selectedDivision)
+          .order('name');
+        
+        if (error) {
+          console.error('Error fetching ranges:', error);
+          console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          });
+          return;
+        }
+        
+        console.log('Raw ranges data:', data);
+        const transformedData = data?.map(range => ({
+          id: range.did,
+          name: range.name
+        })) || [];
+        setRanges(transformedData);
+        setBeats([]);
+        setSelectedRange('');
+        setSelectedBeat('');
+      } catch (err) {
+        console.error('Unexpected error in fetchRanges:', err);
+      } finally {
+        setLoading(false);
       }
-      
-      console.log('Fetched ranges for division:', selectedDivision, data);
-      setRanges(data || []);
-      setBeats([]);
-      setSelectedRange('');
-      setSelectedBeat('');
-      setLoading(false);
     }
     
     fetchRanges();
@@ -88,38 +103,38 @@ export function Dashboard() {
       }
 
       setLoading(true);
-      console.log('Fetching beats for range:', selectedRange, 'and division:', selectedDivision);
+      console.log('Fetching beats for range:', selectedRange);
       
-      // First, let's check if we can get any beats at all
-      const { data: allBeats, error: allBeatsError } = await supabase
-        .from('beats')
-        .select('*')
-        .limit(5);
-      
-      console.log('Sample of all beats:', allBeats);
-
-      // Now fetch beats for the selected range and division
-      const { data, error } = await supabase
-        .from('beats')
-        .select(`
-          id,
-          name,
-          range_id,
-          division_id
-        `)
-        .eq('range_id', selectedRange)
-        .eq('division_id', selectedDivision)
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching beats:', error);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('beats')
+          .select('new_id, name')
+          .eq('new_range_id', selectedRange)
+          .order('name');
+        
+        if (error) {
+          console.error('Error fetching beats:', error);
+          console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          });
+          return;
+        }
+        
+        console.log('Raw beats data:', data);
+        const transformedData = data?.map(beat => ({
+          id: beat.new_id,
+          name: beat.name
+        })) || [];
+        setBeats(transformedData);
+        setSelectedBeat('');
+      } catch (err) {
+        console.error('Unexpected error in fetchBeats:', err);
+      } finally {
+        setLoading(false);
       }
-      
-      console.log('Fetched beats for range:', selectedRange, 'and division:', selectedDivision, data);
-      setBeats(data || []);
-      setSelectedBeat('');
-      setLoading(false);
     }
     
     fetchBeats();
@@ -210,6 +225,7 @@ export function Dashboard() {
           <h3 className="font-bold mb-2">Debug Information:</h3>
           <p>Selected Division: {selectedDivision}</p>
           <p>Selected Range: {selectedRange}</p>
+          <p>Number of Ranges: {ranges.length}</p>
           <p>Number of Beats: {beats.length}</p>
           <p>Loading: {loading ? 'Yes' : 'No'}</p>
         </div>

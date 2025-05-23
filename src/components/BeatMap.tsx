@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap, LayersControl, ZoomControl, ScaleControl, LayerGroup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/lib/supabaseClient';
-import { ewkbHexToGeoJSON } from '@/lib/utils/geometryUtils';
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Polygon as GeoJSONPolygon } from 'geojson';
 
 // Fix for default marker icons in Leaflet
@@ -14,67 +15,84 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-interface BeatPolygonData {
-  id: string;
+// Custom elephant marker icon
+const elephantIcon = new L.Icon({
+  iconUrl: '/icons/elephant-marker.png',  // You'll need to add this icon to your public folder
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32]
+});
+
+interface DivisionPolygon {
+  division_id: string;
+  division_name: string;
+  geometry: GeoJSONPolygon;
+  observation_count: number;
+  direct_sightings: number;
+  indirect_sightings: number;
+}
+
+interface RangePolygon {
+  range_id: string;
+  range_name: string;
+  division_id: string;
+  division_name: string;
+  geometry: GeoJSONPolygon;
+  observation_count: number;
+  direct_sightings: number;
+  indirect_sightings: number;
+}
+
+interface BeatPolygon {
   beat_id: string;
-  name: string;
-  polygon: GeoJSONPolygon; // GeoJSON polygon after conversion
+  beat_name: string;
   range_id: string;
+  range_name: string;
   division_id: string;
-  range_name?: string;
-  division_name?: string;
+  division_name: string;
+  geometry: GeoJSONPolygon;
+  observation_count: number;
+  direct_sightings: number;
+  indirect_sightings: number;
 }
 
-interface RangePolygonData {
-  id: string;
-  range_id: string;
-  name: string;
-  polygon: GeoJSONPolygon; // GeoJSON polygon after conversion
-  division_id: string;
-  division_name?: string;
-}
-
-interface DivisionPolygonData {
-  id: string;
-  division_id: string;
-  name: string;
-  polygon: GeoJSONPolygon; // GeoJSON polygon after conversion
-}
-
-interface BeatData {
+interface BoundaryPolygon {
   id: string;
   name: string;
-  range_id: string;
-  division_id: string;
-  beat_polygons: {
-    polygon: any;
-  }[];
-  range?: {
-    name: string;
-    division?: {
-      name: string;
-    };
+  polygon: GeoJSONPolygon;
+  parent_id?: string;
+  parent_name?: string;
+  stats?: {
+    total: number;
+    direct: number;
+    indirect: number;
   };
 }
 
-interface RangeData {
+interface ElephantSighting {
   id: string;
-  name: string;
-  division_id: string;
-  range_polygons: {
-    polygon: any;
-  }[];
-  division?: {
-    name: string;
-  };
+  latitude: number;
+  longitude: number;
+  activity_date: string;
+  activity_time: string;
+  observation_type: string;
+  total_elephants?: number;
+  male_elephants?: number;
+  female_elephants?: number;
+  unknown_elephants?: number;
+  calves?: number;
+  indirect_sighting_type?: string;
+  loss_type?: string;
+  photo_url?: string;
+  associated_beat?: string;
+  associated_range?: string;
+  associated_division?: string;
 }
 
-interface DivisionData {
-  id: string;
-  name: string;
-  division_polygons: {
-    polygon: any;
-  }[];
+interface BeatMapProps {
+  selectedBeat?: string;
+  selectedRange?: string;
+  selectedDivision?: string;
 }
 
 // Component to handle map zoom level changes
@@ -95,19 +113,64 @@ function MapZoomHandler({ onZoomChange }: { onZoomChange: (zoom: number) => void
   return null;
 }
 
-interface BeatMapProps {
-  selectedBeat?: string;
-  selectedRange?: string;
-  selectedDivision?: string;
-}
-
 export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatMapProps) {
-  const [beatPolygon, setBeatPolygon] = useState<BeatPolygonData | null>(null);
-  const [rangePolygon, setRangePolygon] = useState<RangePolygonData | null>(null);
-  const [divisionPolygon, setDivisionPolygon] = useState<DivisionPolygonData | null>(null);
+  const [beatPolygon, setBeatPolygon] = useState<BoundaryPolygon | null>(null);
+  const [rangePolygon, setRangePolygon] = useState<BoundaryPolygon | null>(null);
+  const [divisionPolygon, setDivisionPolygon] = useState<BoundaryPolygon | null>(null);
+  const [elephantSightings, setElephantSightings] = useState<ElephantSighting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(13);
+  const [showSightings, setShowSightings] = useState(true);
+
+  useEffect(() => {
+    async function fetchSightings() {
+      try {
+        let query = supabase
+          .from('activity_observation')
+          .select(`
+            id,
+            latitude,
+            longitude,
+            activity_date,
+            activity_time,
+            observation_type,
+            total_elephants,
+            male_elephants,
+            female_elephants,
+            unknown_elephants,
+            calves,
+            indirect_sighting_type,
+            loss_type,
+            photo_url,
+            associated_beat,
+            associated_range,
+            associated_division
+          `);
+        
+        if (selectedBeat) {
+          query = query.eq('associated_beat_id', selectedBeat);
+        } else if (selectedRange) {
+          query = query.eq('associated_range_id', selectedRange);
+        } else if (selectedDivision) {
+          query = query.eq('associated_division_id', selectedDivision);
+        }
+
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('Activity observation query error:', error);
+          return;
+        }
+
+        setElephantSightings(data || []);
+      } catch (err) {
+        console.error('Error fetching activity observations:', err);
+      }
+    }
+
+    fetchSightings();
+  }, [selectedBeat, selectedRange, selectedDivision]);
 
   useEffect(() => {
     async function fetchPolygons() {
@@ -115,249 +178,156 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
         setLoading(true);
         setError(null);
 
-        // Fetch beat polygon if selected
-        if (selectedBeat) {
-          console.log('Fetching beat data for ID:', selectedBeat);
+        // Fetch division polygon if selected
+        if (selectedDivision) {
+          console.log('Fetching division polygon for:', selectedDivision);
           
-          // First, let's check if the beat exists and get its basic info
-          const { data: beatInfo, error: beatInfoError } = await supabase
-            .from('beats')
-            .select('id, name, range_id, division_id')
-            .eq('id', selectedBeat)
+          // First get division info
+          const { data: divisionData, error: divisionError } = await supabase
+            .from('divisions')
+            .select('id, name')
+            .eq('id', selectedDivision)
             .single();
 
-          if (beatInfoError) {
-            console.error('Error fetching beat info:', beatInfoError);
-            throw new Error(`Failed to fetch beat info: ${beatInfoError.message}`);
+          if (divisionError) {
+            console.error('Division query error:', divisionError);
+            throw new Error(`Failed to fetch division: ${divisionError.message}`);
           }
 
-          if (!beatInfo) {
-            console.error('No beat found with ID:', selectedBeat);
-            throw new Error(`No beat found with ID: ${selectedBeat}`);
-          }
-
-          console.log('Beat info:', beatInfo);
-
-          // Let's check the beat_polygons table directly
+          // Then get the polygon
           const { data: polygonData, error: polygonError } = await supabase
-            .from('beat_polygons')
-            .select('*')
-            .eq('beat_id', selectedBeat)
+            .from('division_polygons')
+            .select('polygon')
+            .eq('new_division_id', selectedDivision)
             .single();
 
           if (polygonError) {
-            console.error('Error fetching polygon:', polygonError);
-            throw new Error(`Failed to fetch polygon: ${polygonError.message}`);
+            console.error('Division polygon query error:', polygonError);
+            throw new Error(`Failed to fetch division polygon: ${polygonError.message}`);
           }
 
-          if (!polygonData) {
-            console.error('No polygon found for beat:', selectedBeat);
-            throw new Error('No polygon found for this beat');
+          if (!divisionData || !polygonData) {
+            console.error('No division data found for ID:', selectedDivision);
+            throw new Error('Division not found');
           }
 
-          console.log('Raw polygon data:', polygonData);
-          console.log('Polygon data type:', typeof polygonData.polygon);
-          console.log('Polygon data structure:', JSON.stringify(polygonData.polygon, null, 2));
-
-          // Get the range and division info
-          const { data: rangeData, error: rangeError } = await supabase
-            .from('ranges')
-            .select(`
-              name,
-              division:division_id (
-                name
-              )
-            `)
-            .eq('id', beatInfo.range_id)
-            .single();
-
-          if (rangeError) {
-            console.error('Error fetching range info:', rangeError);
-            throw new Error(`Failed to fetch range info: ${rangeError.message}`);
-          }
-
-          // Parse the polygon data
-          let polygon;
-          try {
-            if (typeof polygonData.polygon === 'string') {
-              // If it's a WKT string, convert it to GeoJSON
-              if (polygonData.polygon.startsWith('SRID=4326;')) {
-                console.log('Processing WKT polygon');
-                const wkt = polygonData.polygon.replace('SRID=4326;', '');
-                console.log('WKT after removing SRID:', wkt);
-                
-                // Extract coordinates from WKT
-                const coordString = wkt
-                  .replace('POLYGON((', '')
-                  .replace('))', '');
-                console.log('Coordinate string:', coordString);
-                
-                const coordinates = coordString
-                  .split(',')
-                  .map(coord => {
-                    const [lng, lat] = coord.trim().split(' ').map(Number);
-                    console.log('Parsed coordinate:', [lng, lat]);
-                    return [lng, lat];
-                  });
-                
-                console.log('Parsed coordinates:', coordinates);
-                
-                polygon = {
-                  type: 'Polygon',
-                  coordinates: [coordinates]
-                };
-              } else {
-                console.log('Processing JSON string polygon');
-                polygon = JSON.parse(polygonData.polygon);
-              }
-            } else {
-              console.log('Processing object polygon');
-              polygon = polygonData.polygon;
+          setDivisionPolygon({
+            id: divisionData.id,
+            name: divisionData.name,
+            polygon: polygonData.polygon,
+            stats: {
+              total: 0,
+              direct: 0,
+              indirect: 0
             }
-            console.log('Processed polygon:', polygon);
-          } catch (e) {
-            console.error('Error processing polygon data:', e);
-            throw new Error(`Invalid polygon data format: ${e.message}`);
-          }
-
-          // Validate polygon structure
-          if (!polygon || !polygon.coordinates || !Array.isArray(polygon.coordinates[0])) {
-            console.error('Invalid polygon structure:', polygon);
-            throw new Error('Invalid polygon structure');
-          }
-
-          // Ensure coordinates are in the correct format for Leaflet
-          const leafletCoordinates = polygon.coordinates[0].map((coord: [number, number]) => {
-            const [lng, lat] = coord;
-            if (isNaN(lat) || isNaN(lng)) {
-              console.warn('Invalid coordinate:', coord);
-              return null;
-            }
-            // Validate coordinate ranges
-            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-              console.warn('Coordinate out of valid range:', coord);
-              return null;
-            }
-            return [lat, lng] as [number, number];
-          }).filter((coord): coord is [number, number] => coord !== null);
-
-          if (leafletCoordinates.length === 0) {
-            throw new Error('No valid coordinates found in polygon');
-          }
-
-          console.log('Leaflet coordinates:', leafletCoordinates);
-
-          // Calculate the center of the polygon for the map view
-          const center = calculateCentroid(leafletCoordinates);
-          console.log('Calculated center:', center);
-
-          setBeatPolygon({
-            id: beatInfo.id,
-            beat_id: beatInfo.id,
-            name: beatInfo.name,
-            polygon: {
-              type: 'Polygon',
-              coordinates: [leafletCoordinates.map(([lat, lng]) => [lng, lat])]
-            },
-            range_id: beatInfo.range_id,
-            division_id: beatInfo.division_id,
-            range_name: rangeData?.name,
-            division_name: rangeData?.division?.name
           });
         } else {
-          setBeatPolygon(null);
+          setDivisionPolygon(null);
         }
 
         // Fetch range polygon if selected
         if (selectedRange) {
+          console.log('Fetching range polygon for:', selectedRange);
+          
+          // First get range info
           const { data: rangeData, error: rangeError } = await supabase
             .from('ranges')
-            .select(`
-              id,
-              name,
-              division_id,
-              range_polygons!inner (
-                polygon
-              ),
-              division:division_id (
-                name
-              )
-            `)
-            .eq('id', selectedRange)
-            .single() as { data: RangeData | null, error: any };
+            .select('new_id, name, new_division_id, division_name')
+            .eq('new_id', selectedRange)
+            .single();
 
-          if (!rangeError && rangeData) {
-            console.log('Range data:', rangeData);
-
-            // Parse the polygon data
-            let polygonData;
-            try {
-              if (typeof rangeData.range_polygons[0].polygon === 'string') {
-                polygonData = JSON.parse(rangeData.range_polygons[0].polygon);
-              } else {
-                polygonData = rangeData.range_polygons[0].polygon;
-              }
-            } catch (e) {
-              console.error('Error parsing range polygon data:', e);
-              throw new Error('Invalid range polygon data format');
-            }
-
-            setRangePolygon({
-              id: rangeData.id,
-              range_id: rangeData.id,
-              name: rangeData.name,
-              polygon: polygonData,
-              division_id: rangeData.division_id,
-              division_name: rangeData.division?.name
-            });
-          } else {
-            setRangePolygon(null);
+          if (rangeError) {
+            console.error('Range query error:', rangeError);
+            throw new Error(`Failed to fetch range: ${rangeError.message}`);
           }
+
+          // Then get the polygon
+          const { data: polygonData, error: polygonError } = await supabase
+            .from('range_polygons')
+            .select('polygon')
+            .eq('new_range_id', selectedRange)
+            .single();
+
+          if (polygonError) {
+            console.error('Range polygon query error:', polygonError);
+            throw new Error(`Failed to fetch range polygon: ${polygonError.message}`);
+          }
+
+          if (!rangeData || !polygonData) {
+            console.error('No range data found for ID:', selectedRange);
+            throw new Error('Range not found');
+          }
+
+          setRangePolygon({
+            id: rangeData.new_id,
+            name: rangeData.name,
+            polygon: polygonData.polygon,
+            parent_id: rangeData.new_division_id,
+            parent_name: rangeData.division_name,
+            stats: {
+              total: 0,
+              direct: 0,
+              indirect: 0
+            }
+          });
         } else {
           setRangePolygon(null);
         }
 
-        // Fetch division polygon if selected
-        if (selectedDivision) {
-          const { data: divisionData, error: divisionError } = await supabase
-            .from('divisions')
-            .select(`
-              id,
-              name,
-              division_polygons!inner (
-                polygon
-              )
-            `)
-            .eq('id', selectedDivision)
-            .single() as { data: DivisionData | null, error: any };
+        // Fetch beat polygon if selected
+        if (selectedBeat) {
+          console.log('Fetching beat polygon for:', selectedBeat);
+          
+          // First get beat info
+          const { data: beatData, error: beatError } = await supabase
+            .from('beats')
+            .select('id, name, new_range_id')
+            .eq('id', selectedBeat)
+            .single();
 
-          if (!divisionError && divisionData) {
-            console.log('Division data:', divisionData);
-
-            // Parse the polygon data
-            let polygonData;
-            try {
-              if (typeof divisionData.division_polygons[0].polygon === 'string') {
-                polygonData = JSON.parse(divisionData.division_polygons[0].polygon);
-              } else {
-                polygonData = divisionData.division_polygons[0].polygon;
-              }
-            } catch (e) {
-              console.error('Error parsing division polygon data:', e);
-              throw new Error('Invalid division polygon data format');
-            }
-
-            setDivisionPolygon({
-              id: divisionData.id,
-              division_id: divisionData.id,
-              name: divisionData.name,
-              polygon: polygonData
-            });
-          } else {
-            setDivisionPolygon(null);
+          if (beatError) {
+            console.error('Beat query error:', beatError);
+            throw new Error(`Failed to fetch beat: ${beatError.message}`);
           }
+
+          // Then get the polygon
+          const { data: polygonData, error: polygonError } = await supabase
+            .from('beat_polygons')
+            .select('polygon')
+            .eq('new_beat_id', selectedBeat)
+            .single();
+
+          if (polygonError) {
+            console.error('Beat polygon query error:', polygonError);
+            throw new Error(`Failed to fetch beat polygon: ${polygonError.message}`);
+          }
+
+          if (!beatData || !polygonData) {
+            console.error('No beat data found for ID:', selectedBeat);
+            throw new Error('Beat not found');
+          }
+
+          // Get range name
+          const { data: rangeData } = await supabase
+            .from('ranges')
+            .select('name')
+            .eq('new_id', beatData.new_range_id)
+            .single();
+
+          setBeatPolygon({
+            id: beatData.id,
+            name: beatData.name,
+            polygon: polygonData.polygon,
+            parent_id: beatData.new_range_id,
+            parent_name: rangeData?.name || '',
+            stats: {
+              total: 0,
+              direct: 0,
+              indirect: 0
+            }
+          });
         } else {
-          setDivisionPolygon(null);
+          setBeatPolygon(null);
         }
 
       } catch (err) {
@@ -371,82 +341,88 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
     fetchPolygons();
   }, [selectedBeat, selectedRange, selectedDivision]);
 
-  if (loading) return <div>Loading polygon data...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!beatPolygon && !rangePolygon && !divisionPolygon) {
-    return <div>Select a beat, range, or division to view the map</div>;
+  if (loading) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-center h-[600px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3">Loading map data...</span>
+        </div>
+      </Card>
+    );
   }
 
-  // Calculate the center based on available polygons
+  if (error) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-center h-[600px] text-destructive">
+          <span>Error: {error}</span>
+        </div>
+      </Card>
+    );
+  }
+
+  // Calculate map center and bounds
   let center: [number, number] = [20.5937, 78.9629]; // Default to central India
-  let positions: [number, number][] = [];
+  let bounds: L.LatLngBounds | null = null;
 
-  if (beatPolygon?.polygon?.coordinates?.[0]) {
-    positions = beatPolygon.polygon.coordinates[0]
-      .map((coord: [number, number]) => {
-        const [lng, lat] = coord;
-        // Validate coordinates
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn('Invalid beat coordinates:', coord);
-          return null;
-        }
-        return [lat, lng] as [number, number];
-      })
-      .filter((coord): coord is [number, number] => coord !== null);
-  } else if (rangePolygon?.polygon?.coordinates?.[0]) {
-    positions = rangePolygon.polygon.coordinates[0]
-      .map((coord: [number, number]) => {
-        const [lng, lat] = coord;
-        // Validate coordinates
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn('Invalid range coordinates:', coord);
-          return null;
-        }
-        return [lat, lng] as [number, number];
-      })
-      .filter((coord): coord is [number, number] => coord !== null);
-  } else if (divisionPolygon?.polygon?.coordinates?.[0]) {
-    positions = divisionPolygon.polygon.coordinates[0]
-      .map((coord: [number, number]) => {
-        const [lng, lat] = coord;
-        // Validate coordinates
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn('Invalid division coordinates:', coord);
-          return null;
-        }
-        return [lat, lng] as [number, number];
-      })
-      .filter((coord): coord is [number, number] => coord !== null);
+  const getPolygonBounds = (polygon: GeoJSONPolygon): L.LatLngBounds => {
+    const coordinates = polygon.coordinates[0];
+    const latLngs = coordinates.map(([lng, lat]) => L.latLng(lat, lng));
+    return L.latLngBounds(latLngs);
+  };
+
+  // Set bounds based on visible polygons
+  if (beatPolygon?.polygon) {
+    bounds = getPolygonBounds(beatPolygon.polygon);
+  } else if (rangePolygon?.polygon) {
+    bounds = getPolygonBounds(rangePolygon.polygon);
+  } else if (divisionPolygon?.polygon) {
+    bounds = getPolygonBounds(divisionPolygon.polygon);
   }
 
-  if (positions.length > 0) {
-    center = calculateCentroid(positions);
+  // If bounds are set, calculate center
+  if (bounds) {
+    center = [bounds.getCenter().lat, bounds.getCenter().lng];
   }
-
-  // Determine which boundaries to show based on zoom level
-  const showDivision = zoomLevel <= 10 && divisionPolygon;
-  const showRange = zoomLevel <= 11 && rangePolygon;
-  const showBeat = zoomLevel >= 11 && beatPolygon;
 
   return (
-    <div className="h-full w-full">
+    <div className="h-[600px] w-full rounded-lg overflow-hidden border">
       <MapContainer
         center={center}
         zoom={13}
         style={{ height: "100%", width: "100%" }}
+        zoomControl={false}
       >
+        <ZoomControl position="topright" />
+        <ScaleControl position="bottomleft" />
+        
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="OpenStreetMap">
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        <MapZoomHandler onZoomChange={setZoomLevel} />
-        
-        {showDivision && divisionPolygon && (
+          </LayersControl.BaseLayer>
+          
+          <LayersControl.BaseLayer name="Satellite">
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='&copy; <a href="https://www.esri.com">Esri</a>'
+            />
+          </LayersControl.BaseLayer>
+
+          <LayersControl.BaseLayer name="Terrain">
+            <TileLayer
+              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+              attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+            />
+          </LayersControl.BaseLayer>
+
+          {divisionPolygon && (
+            <LayersControl.Overlay checked name="Division Boundary">
           <Polygon
-            positions={divisionPolygon.polygon.coordinates[0].map((coord: [number, number]) => {
-              const [lng, lat] = coord;
-              return [lat, lng] as [number, number];
-            })}
+                positions={divisionPolygon.polygon.coordinates[0].map(([lng, lat]) => [lat, lng])}
             pathOptions={{ 
               color: '#2563eb',
               fillColor: '#2563eb',
@@ -455,20 +431,26 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             }}
           >
             <Popup>
-              <div>
+                  <div className="space-y-2">
                 <h3 className="font-bold">Division</h3>
                 <p>{divisionPolygon.name}</p>
+                {divisionPolygon.stats && (
+                  <div className="space-y-1">
+                    <Badge variant="secondary">Total: {divisionPolygon.stats.total}</Badge>
+                    <Badge variant="secondary">Direct: {divisionPolygon.stats.direct}</Badge>
+                    <Badge variant="secondary">Indirect: {divisionPolygon.stats.indirect}</Badge>
+                  </div>
+                )}
               </div>
             </Popup>
           </Polygon>
+            </LayersControl.Overlay>
         )}
 
-        {showRange && rangePolygon && (
+          {rangePolygon && (
+            <LayersControl.Overlay checked name="Range Boundary">
           <Polygon
-            positions={rangePolygon.polygon.coordinates[0].map((coord: [number, number]) => {
-              const [lng, lat] = coord;
-              return [lat, lng] as [number, number];
-            })}
+                positions={rangePolygon.polygon.coordinates[0].map(([lng, lat]) => [lat, lng])}
             pathOptions={{ 
               color: '#16a34a',
               fillColor: '#16a34a',
@@ -477,24 +459,22 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             }}
           >
             <Popup>
-              <div>
+                  <div className="space-y-2">
                 <h3 className="font-bold">Range</h3>
                 <p>{rangePolygon.name}</p>
-                {rangePolygon.division_name && (
-                  <p>Division: {rangePolygon.division_name}</p>
+                    {rangePolygon.parent_name && (
+                      <Badge variant="outline">Division: {rangePolygon.parent_name}</Badge>
                 )}
               </div>
             </Popup>
           </Polygon>
+            </LayersControl.Overlay>
         )}
 
-        {showBeat && beatPolygon && (
+          {beatPolygon && (
+            <LayersControl.Overlay checked name="Beat Boundary">
           <Polygon
-            positions={beatPolygon.polygon.coordinates[0].map((coord: [number, number]) => {
-              const [lng, lat] = coord;
-              console.log('Rendering beat coordinate:', [lat, lng]);
-              return [lat, lng] as [number, number];
-            })}
+                positions={beatPolygon.polygon.coordinates[0].map(([lng, lat]) => [lat, lng])}
             pathOptions={{ 
               color: '#dc2626',
               fillColor: '#dc2626',
@@ -503,50 +483,71 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             }}
           >
             <Popup>
-              <div>
+                  <div className="space-y-2">
                 <h3 className="font-bold">Beat</h3>
                 <p>{beatPolygon.name}</p>
-                {beatPolygon.range_name && (
-                  <p>Range: {beatPolygon.range_name}</p>
-                )}
-                {beatPolygon.division_name && (
-                  <p>Division: {beatPolygon.division_name}</p>
+                    {beatPolygon.parent_name && (
+                      <Badge variant="outline">Range: {beatPolygon.parent_name}</Badge>
                 )}
               </div>
             </Popup>
           </Polygon>
+            </LayersControl.Overlay>
         )}
+
+          <LayersControl.Overlay checked={showSightings} name="Elephant Sightings">
+            <LayerGroup>
+              {elephantSightings.map((sighting) => (
+                <Marker
+                  key={sighting.id}
+                  position={[Number(sighting.latitude), Number(sighting.longitude)]}
+                  icon={elephantIcon}
+                >
+                  <Popup>
+                    <div className="space-y-2">
+                      <h3 className="font-bold">Elephant Observation</h3>
+                      <p>Date: {new Date(sighting.activity_date).toLocaleDateString()}</p>
+                      <p>Time: {sighting.activity_time}</p>
+                      <Badge variant={sighting.observation_type === 'direct' ? 'default' : 'secondary'}>
+                        {sighting.observation_type === 'direct' ? 'Direct Observation' : 'Indirect Observation'}
+                      </Badge>
+                      {sighting.total_elephants > 0 && (
+                        <div className="space-y-1">
+                          <p>Total Elephants: {sighting.total_elephants}</p>
+                          {sighting.male_elephants > 0 && <p>Males: {sighting.male_elephants}</p>}
+                          {sighting.female_elephants > 0 && <p>Females: {sighting.female_elephants}</p>}
+                          {sighting.unknown_elephants > 0 && <p>Unknown: {sighting.unknown_elephants}</p>}
+                          {sighting.calves > 0 && <p>Calves: {sighting.calves}</p>}
+                        </div>
+                      )}
+                      {sighting.indirect_sighting_type && (
+                        <p>Type: {sighting.indirect_sighting_type}</p>
+                      )}
+                      {sighting.loss_type && (
+                        <p>Loss Type: {sighting.loss_type}</p>
+                      )}
+                      {sighting.photo_url && (
+                        <img 
+                          src={sighting.photo_url} 
+                          alt="Observation photo" 
+                          className="w-full h-32 object-cover rounded-md"
+                        />
+                      )}
+                      <div className="text-sm text-muted-foreground">
+                        <p>Beat: {sighting.associated_beat}</p>
+                        <p>Range: {sighting.associated_range}</p>
+                        <p>Division: {sighting.associated_division}</p>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </LayerGroup>
+          </LayersControl.Overlay>
+        </LayersControl>
+
+        <MapZoomHandler onZoomChange={setZoomLevel} />
       </MapContainer>
     </div>
   );
-}
-
-// Helper function to calculate the centroid of a polygon
-function calculateCentroid(points: [number, number][]): [number, number] {
-  if (!points || points.length === 0) {
-    // Default to a central location in India if no points are available
-    return [20.5937, 78.9629];
-  }
-
-  let x = 0;
-  let y = 0;
-  const len = points.length;
-
-  for (let i = 0; i < len; i++) {
-    const [lat, lng] = points[i];
-    // Validate coordinates
-    if (isNaN(lat) || isNaN(lng)) {
-      console.warn('Invalid coordinates found:', points[i]);
-      continue;
-    }
-    x += lat;
-    y += lng;
-  }
-
-  // If all coordinates were invalid, return default
-  if (x === 0 && y === 0) {
-    return [20.5937, 78.9629];
-  }
-
-  return [x / len, y / len];
 } 

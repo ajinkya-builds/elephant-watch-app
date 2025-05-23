@@ -20,6 +20,7 @@ import AdminLogs from "./pages/AdminLogs";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { checkSupabaseConnection } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { EnhancedDashboard } from '@/components/EnhancedDashboard';
 
 const queryClient = new QueryClient();
 
@@ -91,7 +92,7 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <Header />
-                    <Dashboard />
+                    <EnhancedDashboard />
                   </ProtectedRoute>
                 }
               />
