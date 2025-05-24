@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BeatMap } from './BeatMap';
-import { RefreshCw, AlertCircle, MapPin, Activity, Calendar, Eye, Footprints, AlertTriangle } from 'lucide-react';
+import { 
+  RefreshCw, 
+  AlertCircle, 
+  MapPin, 
+  Activity, 
+  Calendar, 
+  Eye, 
+  Footprints, 
+  AlertTriangle,
+  ChevronRight,
+  Loader2,
+  Info
+} from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -34,12 +46,16 @@ import type {
 } from '@/lib/dashboardService';
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabaseClient';
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "react-hot-toast";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 interface FilterOption {
   id: string;
   name: string;
+  new_id?: string;
 }
 
 export const EnhancedDashboard: React.FC = () => {
@@ -57,10 +73,12 @@ export const EnhancedDashboard: React.FC = () => {
   const [selectedRange, setSelectedRange] = useState('');
   const [selectedBeat, setSelectedBeat] = useState('');
   const [mapLoading, setMapLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filteredStats, setFilteredStats] = useState<DashboardKPIs | null>(null);
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      setRefreshing(true);
       setError(null);
       const [kpiData, trendsData, statsData, observationsData] = await Promise.all([
         fetchDashboardKPIs(),
@@ -77,6 +95,65 @@ export const EnhancedDashboard: React.FC = () => {
       console.error('Dashboard data fetch error:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchFilteredStats = async () => {
+    try {
+      setMapLoading(true);
+      let query = supabase
+        .from('activity_observation')
+        .select('*');
+
+      if (selectedBeat) {
+        query = query.eq('associated_beat_id', selectedBeat);
+      } else if (selectedRange) {
+        query = query.eq('associated_range_id', selectedRange);
+      } else if (selectedDivision) {
+        query = query.eq('associated_division_id', selectedDivision);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching filtered stats:', error);
+        return;
+      }
+
+      if (!data) {
+        console.log('No data returned from query');
+        return;
+      }
+
+      console.log('Filtered data:', data); // Debug log
+
+      const stats: DashboardKPIs = {
+        total_observations: data.length,
+        direct_sightings: data.filter(obs => obs.observation_type === 'Direct Sighting').length,
+        indirect_sightings: data.filter(obs => obs.observation_type === 'Indirect Signs').length,
+        total_loss: data.filter(obs => obs.observation_type === 'Loss Report').length,
+        today_observations: data.filter(obs => new Date(obs.activity_date).toDateString() === new Date().toDateString()).length,
+        today_direct_sightings: data.filter(obs => 
+          obs.observation_type === 'Direct Sighting' && 
+          new Date(obs.activity_date).toDateString() === new Date().toDateString()
+        ).length,
+        today_indirect_sightings: data.filter(obs => 
+          obs.observation_type === 'Indirect Signs' && 
+          new Date(obs.activity_date).toDateString() === new Date().toDateString()
+        ).length,
+        today_loss: data.filter(obs => 
+          obs.observation_type === 'Loss Report' && 
+          new Date(obs.activity_date).toDateString() === new Date().toDateString()
+        ).length
+      };
+
+      console.log('Calculated stats:', stats); // Debug log
+      setFilteredStats(stats);
+    } catch (err) {
+      console.error('Error in fetchFilteredStats:', err);
+    } finally {
+      setMapLoading(false);
     }
   };
 
@@ -88,11 +165,11 @@ export const EnhancedDashboard: React.FC = () => {
   useEffect(() => {
     async function fetchDivisions() {
       try {
-      const { data, error } = await supabase
-        .from('divisions')
-        .select('id, name')
-        .order('name');
-      
+        const { data, error } = await supabase
+          .from('divisions')
+          .select('id, name')
+          .order('name');
+        
         if (error) throw error;
         setDivisions(data || []);
       } catch (err) {
@@ -100,7 +177,10 @@ export const EnhancedDashboard: React.FC = () => {
       }
     }
     fetchDivisions();
-  }, []);
+    if (selectedDivision) {
+      fetchFilteredStats();
+    }
+  }, [selectedDivision]);
 
   // Fetch ranges when division is selected
   useEffect(() => {
@@ -111,14 +191,19 @@ export const EnhancedDashboard: React.FC = () => {
       }
       try {
         setMapLoading(true);
-      const { data, error } = await supabase
-        .from('ranges')
-        .select('id, name')
-        .eq('did', selectedDivision)
-        .order('name');
+        console.log('Fetching ranges for division:', selectedDivision);
+        const { data: ranges, error: rangesError } = await supabase
+          .from('ranges')
+          .select('new_id, name')
+          .eq('new_division_id', selectedDivision)
+          .order('name', { ascending: true });
       
-        if (error) throw error;
-        setRanges(data || []);
+        if (rangesError) {
+          console.error('Error fetching ranges:', rangesError);
+          throw rangesError;
+        }
+        console.log('Fetched ranges:', ranges);
+        setRanges(ranges || []);
       } catch (err) {
         console.error('Error fetching ranges:', err);
       } finally {
@@ -126,6 +211,9 @@ export const EnhancedDashboard: React.FC = () => {
       }
     }
     fetchRanges();
+    if (selectedRange) {
+      fetchFilteredStats();
+    }
   }, [selectedDivision]);
 
   // Fetch beats when range is selected
@@ -137,13 +225,18 @@ export const EnhancedDashboard: React.FC = () => {
       }
       try {
         setMapLoading(true);
-      const { data, error } = await supabase
-        .from('beats')
-        .select('id, name')
-        .eq('range_id', selectedRange)
-        .order('name');
+        console.log('Fetching beats for range:', selectedRange);
+        const { data, error } = await supabase
+          .from('beats')
+          .select('new_id, name')
+          .eq('new_range_id', selectedRange)
+          .order('name');
       
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching beats:', error);
+          throw error;
+        }
+        console.log('Fetched beats:', data);
         setBeats(data || []);
       } catch (err) {
         console.error('Error fetching beats:', err);
@@ -152,6 +245,9 @@ export const EnhancedDashboard: React.FC = () => {
       }
     }
     fetchBeats();
+    if (selectedBeat) {
+      fetchFilteredStats();
+    }
   }, [selectedRange]);
 
   const handleDivisionChange = (value: string) => {
@@ -166,20 +262,69 @@ export const EnhancedDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center min-h-[400px]">Loading dashboard data...</div>;
+    return (
+      <div className="space-y-6 p-6 max-w-[1400px] mx-auto">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <Skeleton className="h-10 w-24" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-4 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-[400px] text-red-500">
-        {error}
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <AlertCircle className="h-12 w-12 text-destructive" />
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-destructive mb-2">Error Loading Dashboard</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchDashboardData} variant="outline" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Tabs Navigation */}
+    <div className="space-y-6 p-6 max-w-[1400px] mx-auto">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Monitor elephant activities and observations</p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={fetchDashboardData} 
+          className="gap-2"
+          disabled={refreshing}
+        >
+          {refreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          Refresh Data
+        </Button>
+      </div>
+
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -191,67 +336,116 @@ export const EnhancedDashboard: React.FC = () => {
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Total Observations</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total number of elephant observations recorded</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardHeader>
+              <CardContent>
                 <div className="text-2xl font-bold">{kpis?.total_observations || 0}</div>
-                <p className="text-xs text-muted-foreground">
-                  {kpis?.today_observations || 0} today
-                </p>
-          </CardContent>
-        </Card>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {kpis?.today_observations || 0} today
+                  </Badge>
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Direct Sightings</CardTitle>
-                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Number of direct elephant sightings</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardHeader>
+              <CardContent>
                 <div className="text-2xl font-bold">{kpis?.direct_sightings || 0}</div>
-                <p className="text-xs text-muted-foreground">
-                  {kpis?.today_direct_sightings || 0} today
-                </p>
-          </CardContent>
-        </Card>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {kpis?.today_direct_sightings || 0} today
+                  </Badge>
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Indirect Sightings</CardTitle>
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Indirect Signs</CardTitle>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Number of indirect elephant signs observed</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardHeader>
+              <CardContent>
                 <div className="text-2xl font-bold">{kpis?.indirect_sightings || 0}</div>
-                <p className="text-xs text-muted-foreground">
-                  {kpis?.today_indirect_sightings || 0} today
-                </p>
-          </CardContent>
-        </Card>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {kpis?.today_indirect_sightings || 0} today
+                  </Badge>
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Total Loss</CardTitle>
-                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total number of loss reports due to elephant activity</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardHeader>
+              <CardContent>
                 <div className="text-2xl font-bold">{kpis?.total_loss || 0}</div>
-                <p className="text-xs text-muted-foreground">
-                  {kpis?.today_loss || 0} today
-                </p>
-          </CardContent>
-        </Card>
-      </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {kpis?.today_loss || 0} today
+                  </Badge>
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">Monthly Activity Trends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <CardDescription>Track elephant activity patterns over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={monthlyTrends}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="month" className="text-muted-foreground text-xs" />
@@ -263,7 +457,7 @@ export const EnhancedDashboard: React.FC = () => {
                           borderRadius: 'var(--radius)'
                         }}
                       />
-                    <Legend />
+                      <Legend />
                       <Line 
                         type="monotone" 
                         dataKey="total_observations" 
@@ -282,7 +476,7 @@ export const EnhancedDashboard: React.FC = () => {
                         type="monotone" 
                         dataKey="indirect_sightings" 
                         stroke="hsl(var(--accent))" 
-                        name="Indirect Sightings"
+                        name="Indirect Signs"
                         strokeWidth={2}
                       />
                       <Line 
@@ -293,18 +487,19 @@ export const EnhancedDashboard: React.FC = () => {
                         strokeWidth={2}
                       />
                     </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">Division-wise Sightings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <CardDescription>Distribution of elephant activities across divisions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={divisionStats}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis 
@@ -315,14 +510,14 @@ export const EnhancedDashboard: React.FC = () => {
                         height={60}
                       />
                       <YAxis className="text-muted-foreground text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
+                      <Tooltip 
+                        contentStyle={{ 
                           backgroundColor: 'hsl(var(--card))',
                           borderColor: 'hsl(var(--border))',
                           borderRadius: 'var(--radius)'
-                      }}
-                    />
-                    <Legend />
+                        }}
+                      />
+                      <Legend />
                       <Bar 
                         dataKey="direct_sightings" 
                         name="Direct Sightings" 
@@ -331,7 +526,7 @@ export const EnhancedDashboard: React.FC = () => {
                       />
                       <Bar 
                         dataKey="indirect_sightings" 
-                        name="Indirect Sightings" 
+                        name="Indirect Signs" 
                         fill={COLORS[1]}
                         stackId="stack"
                       />
@@ -341,11 +536,11 @@ export const EnhancedDashboard: React.FC = () => {
                         fill={COLORS[2]}
                         stackId="stack"
                       />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -371,31 +566,31 @@ export const EnhancedDashboard: React.FC = () => {
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Direct Sightings Today</CardTitle>
                 <Eye className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+              </CardHeader>
+              <CardContent>
                 <div className="text-2xl font-bold">{kpis?.today_direct_sightings || 0}</div>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">
                     {((kpis?.today_direct_sightings || 0) / (kpis?.today_observations || 1) * 100).toFixed(0)}% of total
                   </Badge>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Indirect Signs Today</CardTitle>
                 <Footprints className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+              </CardHeader>
+              <CardContent>
                 <div className="text-2xl font-bold">{kpis?.today_indirect_sightings || 0}</div>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">
                     {((kpis?.today_indirect_sightings || 0) / (kpis?.today_observations || 1) * 100).toFixed(0)}% of total
                   </Badge>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -418,12 +613,22 @@ export const EnhancedDashboard: React.FC = () => {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-semibold">Recent Observations</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
+                <CardDescription>
                   Showing last {recentObservations.length} observations across all divisions
-                </p>
+                </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={fetchDashboardData} className="gap-2">
-                <RefreshCw className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchDashboardData} 
+                className="gap-2"
+                disabled={refreshing}
+              >
+                {refreshing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
                 Refresh
               </Button>
             </CardHeader>
@@ -440,7 +645,7 @@ export const EnhancedDashboard: React.FC = () => {
                   </thead>
                   <tbody>
                     {recentObservations.map((observation, index) => (
-                      <tr key={index} className="border-b hover:bg-muted/50">
+                      <tr key={index} className="border-b hover:bg-muted/50 transition-colors">
                         <td className="p-3">
                           <div className="font-medium">{observation.associated_division}</div>
                           <div className="text-sm text-muted-foreground">
@@ -477,59 +682,132 @@ export const EnhancedDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg font-semibold">Area Selection</CardTitle>
+              <CardDescription>Select a division, range, or beat to view on the map</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Division</label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  <Select
                     value={selectedDivision}
-                    onChange={(e) => handleDivisionChange(e.target.value)}
+                    onValueChange={handleDivisionChange}
                     disabled={mapLoading}
                   >
-                    <option value="">Select Division</option>
-                    {divisions.map((division) => (
-                      <option key={division.id} value={division.id}>
-                        {division.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Division" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {divisions.map((division) => (
+                        <SelectItem key={division.id} value={division.id}>
+                          {division.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Range</label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  <Select
                     value={selectedRange}
-                    onChange={(e) => handleRangeChange(e.target.value)}
+                    onValueChange={handleRangeChange}
                     disabled={!selectedDivision || mapLoading}
                   >
-                    <option value="">Select Range</option>
-                    {ranges.map((range) => (
-                      <option key={range.id} value={range.id}>
-                        {range.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ranges.map((range) => (
+                        <SelectItem key={range.new_id} value={range.new_id}>
+                          {range.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Beat</label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  <Select
                     value={selectedBeat}
-                    onChange={(e) => setSelectedBeat(e.target.value)}
+                    onValueChange={setSelectedBeat}
                     disabled={!selectedRange || mapLoading}
                   >
-                    <option value="">Select Beat</option>
-                    {beats.map((beat) => (
-                      <option key={beat.id} value={beat.id}>
-                        {beat.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Beat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {beats.map((beat) => (
+                        <SelectItem key={beat.new_id} value={beat.new_id}>
+                          {beat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+              </div>
+
+              {/* Filtered KPIs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Total Observations</CardTitle>
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{filteredStats?.total_observations || 0}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="text-xs">
+                        {filteredStats?.today_observations || 0} today
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Direct Sightings</CardTitle>
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{filteredStats?.direct_sightings || 0}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="text-xs">
+                        {filteredStats?.today_direct_sightings || 0} today
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Indirect Signs</CardTitle>
+                    <Footprints className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{filteredStats?.indirect_sightings || 0}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="text-xs">
+                        {filteredStats?.today_indirect_sightings || 0} today
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Loss Reports</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{filteredStats?.total_loss || 0}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="text-xs">
+                        {filteredStats?.today_loss || 0} today
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               <div className="h-[600px] w-full rounded-lg border">

@@ -85,8 +85,8 @@ export default function AdminUsers() {
       // Now fetch the ranges
       const { data, error } = await supabase
         .from('ranges')
-        .select('id, new_id, name, division_id')
-        .eq('division_id', divisionId)
+        .select('new_id, name, new_division_id')
+        .eq('new_division_id', divisionId)
         .order('name');
 
       if (error) {

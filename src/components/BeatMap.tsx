@@ -143,9 +143,9 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             indirect_sighting_type,
             loss_type,
             photo_url,
-            associated_beat,
-            associated_range,
-            associated_division
+            associated_beat_id,
+            associated_range_id,
+            associated_division_id
           `);
         
         if (selectedBeat) {
@@ -232,7 +232,7 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           // First get range info
           const { data: rangeData, error: rangeError } = await supabase
             .from('ranges')
-            .select('new_id, name, new_division_id, division_name')
+            .select('new_id, name, division_id, division_name')
             .eq('new_id', selectedRange)
             .single();
 
@@ -262,7 +262,7 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             id: rangeData.new_id,
             name: rangeData.name,
             polygon: polygonData.polygon,
-            parent_id: rangeData.new_division_id,
+            parent_id: rangeData.division_id,
             parent_name: rangeData.division_name,
             stats: {
               total: 0,
@@ -281,8 +281,8 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           // First get beat info
           const { data: beatData, error: beatError } = await supabase
             .from('beats')
-            .select('id, name, new_range_id')
-            .eq('id', selectedBeat)
+            .select('new_id, name, new_range_id')
+            .eq('new_id', selectedBeat)
             .single();
 
           if (beatError) {
@@ -315,7 +315,7 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             .single();
 
           setBeatPolygon({
-            id: beatData.id,
+            id: beatData.new_id,
             name: beatData.name,
             polygon: polygonData.polygon,
             parent_id: beatData.new_range_id,
