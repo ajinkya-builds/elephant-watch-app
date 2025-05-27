@@ -180,7 +180,7 @@ export const EnhancedDashboard: React.FC = () => {
 
       // Fetch division statistics
       const { data: divisionStats, error: divisionError } = await supabase
-        .from('v_division_statistics')
+        .from('v_dashboard_division_stats')
         .select('*');
 
       if (divisionError) {
@@ -188,34 +188,29 @@ export const EnhancedDashboard: React.FC = () => {
         throw divisionError;
       }
 
-      // Fetch range statistics
-      const { data: rangeStats, error: rangeError } = await supabase
-        .from('v_range_statistics')
-        .select('*');
-
-      if (rangeError) {
-        console.error('Error fetching range stats:', rangeError);
-        throw rangeError;
-      }
-
-      // Fetch beat statistics
-      const { data: beatStats, error: beatError } = await supabase
-        .from('v_beat_statistics')
-        .select('*');
-
-      if (beatError) {
-        console.error('Error fetching beat stats:', beatError);
-        throw beatError;
-      }
-
-      // Fetch activity heatmap
-      const { data: heatmap, error: heatmapError } = await supabase
-        .from('v_activity_heatmap')
-        .select('*');
-
-      if (heatmapError) {
-        console.error('Error fetching heatmap:', heatmapError);
-        throw heatmapError;
+      // Filter divisionStats to get rangeStats and beatStats
+      let rangeStats = [];
+      let beatStats = [];
+      if (divisionStats && Array.isArray(divisionStats)) {
+        // Group by range_name
+        const rangeMap = new Map();
+        const beatMap = new Map();
+        for (const stat of divisionStats) {
+          if (stat.range_name) {
+            if (!rangeMap.has(stat.range_name)) {
+              rangeMap.set(stat.range_name, { ...stat, total_observations: 0 });
+            }
+            rangeMap.get(stat.range_name).total_observations += stat.total_observations || 0;
+          }
+          if (stat.beat_name) {
+            if (!beatMap.has(stat.beat_name)) {
+              beatMap.set(stat.beat_name, { ...stat, total_observations: 0 });
+            }
+            beatMap.get(stat.beat_name).total_observations += stat.total_observations || 0;
+          }
+        }
+        rangeStats = Array.from(rangeMap.values());
+        beatStats = Array.from(beatMap.values());
       }
 
       // Process the data
@@ -236,7 +231,7 @@ export const EnhancedDashboard: React.FC = () => {
         divisionStats: divisionStats || [],
         rangeStats: rangeStats || [],
         beatStats: beatStats || [],
-        heatmap: heatmap || []
+        heatmap: []
       };
       
       // Check if we have any real data

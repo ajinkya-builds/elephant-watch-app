@@ -195,8 +195,8 @@ export async function getDashboardStats(filters?: DashboardFilters): Promise<Das
     const { data: calveData, error: calveError } = await query;
     if (calveError) throw calveError;
 
-    // Fetch division statistics from v_division_statistics (only division filter)
-    query = supabase.from('v_division_statistics').select('*');
+    // Fetch division statistics from v_dashboard_division_stats (only division filter)
+    query = supabase.from('v_dashboard_division_stats').select('*');
     query = buildDivisionQuery(query);
     const { data: divisionData, error: divisionError } = await query;
     if (divisionError) throw divisionError;
