@@ -49,23 +49,11 @@ export const EnhancedDashboard: React.FC = () => {
   const [ranges, setRanges] = useState<FilterOption[]>([]);
   const [beats, setBeats] = useState<FilterOption[]>([]);
   const [data, setData] = useState<DashboardData>({
-    kpiSummary: {
-      total_activities: 0,
-      total_users: 0,
-      total_days: 0,
-      total_elephants_sighted: 0,
-      today_activities: 0,
-      today_active_users: 0,
-      weekly_activities: 0,
-      weekly_active_users: 0,
-      total_divisions: 0,
-      total_ranges: 0,
-      total_beats: 0
-    },
     divisionStats: [],
     rangeStats: [],
     beatStats: [],
-    heatmap: []
+    heatmap: [],
+    observationTypes: []
   });
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
@@ -104,19 +92,20 @@ export const EnhancedDashboard: React.FC = () => {
       const { data, error } = await supabase
         .from('ranges')
         .select(`
-          id,
+          new_id,
           name,
-          associated_division_id
+          new_division_id
         `)
-        .eq('associated_division_id', filters.division)
+        .eq('new_division_id', filters.division)
         .order('name');
       
       if (error) {
         console.error('Error fetching ranges:', error);
         return;
       }
-      
-      setRanges(data || []);
+      // Map to FilterOption
+      const mappedRanges = (data || []).map((range: any) => ({ id: range.new_id, name: range.name }));
+      setRanges(mappedRanges);
       setBeats([]);
       setLoading(false);
     }
@@ -136,124 +125,105 @@ export const EnhancedDashboard: React.FC = () => {
       const { data, error } = await supabase
         .from('beats')
         .select(`
-          id,
+          new_id,
           name,
-          associated_range_id,
-          associated_division_id
+          new_range_id,
+          new_division_id
         `)
-        .eq('associated_range_id', filters.range)
-        .eq('associated_division_id', filters.division)
+        .eq('new_range_id', filters.range)
+        .eq('new_division_id', filters.division)
         .order('name');
       
       if (error) {
         console.error('Error fetching beats:', error);
         return;
       }
-      
-      setBeats(data || []);
+      // Map to FilterOption
+      const mappedBeats = (data || []).map((beat: any) => ({ id: beat.new_id, name: beat.name }));
+      setBeats(mappedBeats);
       setLoading(false);
     }
     
     fetchBeats();
   }, [filters.range, filters.division]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [filters]);
-
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    setError(null);
     try {
-      console.log('Fetching dashboard data...');
-      
       // Fetch KPI summary
       const { data: kpiSummary, error: kpiError } = await supabase
         .from('v_dashboard_kpi_summary')
         .select('*')
         .single();
 
-      if (kpiError) {
-        console.error('Error fetching KPI summary:', kpiError);
-        throw kpiError;
-      }
+      if (kpiError) throw kpiError;
 
-      // Fetch division statistics
+      // Fetch division stats
       const { data: divisionStats, error: divisionError } = await supabase
         .from('v_dashboard_division_stats')
         .select('*');
 
-      if (divisionError) {
-        console.error('Error fetching division stats:', divisionError);
-        throw divisionError;
-      }
+      if (divisionError) throw divisionError;
 
-      // Filter divisionStats to get rangeStats and beatStats
-      let rangeStats = [];
-      let beatStats = [];
-      if (divisionStats && Array.isArray(divisionStats)) {
-        // Group by range_name
-        const rangeMap = new Map();
-        const beatMap = new Map();
-        for (const stat of divisionStats) {
-          if (stat.range_name) {
-            if (!rangeMap.has(stat.range_name)) {
-              rangeMap.set(stat.range_name, { ...stat, total_observations: 0 });
-            }
-            rangeMap.get(stat.range_name).total_observations += stat.total_observations || 0;
-          }
-          if (stat.beat_name) {
-            if (!beatMap.has(stat.beat_name)) {
-              beatMap.set(stat.beat_name, { ...stat, total_observations: 0 });
-            }
-            beatMap.get(stat.beat_name).total_observations += stat.total_observations || 0;
-          }
-        }
-        rangeStats = Array.from(rangeMap.values());
-        beatStats = Array.from(beatMap.values());
-      }
+      // Fetch range stats
+      const { data: rangeStats, error: rangeError } = await supabase
+        .from('v_dashboard_range_stats')
+        .select('*');
 
-      // Process the data
-      const newData = {
-        kpiSummary: kpiSummary || {
-          total_activities: 0,
-          total_users: 0,
-          total_days: 0,
-          total_elephants_sighted: 0,
-          today_activities: 0,
-          today_active_users: 0,
-          weekly_activities: 0,
-          weekly_active_users: 0,
-          total_divisions: 0,
-          total_ranges: 0,
-          total_beats: 0
-        },
+      if (rangeError) throw rangeError;
+
+      // Fetch beat stats
+      const { data: beatStats, error: beatError } = await supabase
+        .from('v_dashboard_beat_stats')
+        .select('*');
+
+      if (beatError) throw beatError;
+
+      // Fetch observations by type
+      const { data: observationTypes, error: observationTypesError } = await supabase
+        .from('v_dashboard_observations_by_type')
+        .select('*');
+
+      if (observationTypesError) throw observationTypesError;
+
+      // Fetch loss data
+      const { data: lossData, error: lossError } = await supabase
+        .from('v_elephant_activity_observations_by_type')
+        .select('*');
+
+      if (lossError) throw lossError;
+
+      const total_loss_reports = lossData?.reduce((sum, item) => sum + (item.count || 0), 0) || 0;
+
+      // Update kpiSummary
+      const updatedKpiSummary = {
+        ...kpiSummary,
+        total_loss_reports,
+        loss_types: lossData || []
+      };
+
+      const newData: DashboardData = {
+        kpiSummary: updatedKpiSummary,
         divisionStats: divisionStats || [],
         rangeStats: rangeStats || [],
         beatStats: beatStats || [],
-        heatmap: []
+        heatmap: [],
+        observationTypes: observationTypes || []
       };
       
-      // Check if we have any real data
-      const hasRealData = (
-        newData.kpiSummary.total_activities > 0 ||
-        newData.divisionStats.length > 0 ||
-        newData.rangeStats.length > 0 ||
-        newData.beatStats.length > 0 ||
-        newData.heatmap.length > 0
-      );
-      
-      setHasData(hasRealData);
       setData(newData);
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch dashboard data');
-      setHasData(false);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleFilterChange = (key: keyof DashboardFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -262,7 +232,7 @@ export const EnhancedDashboard: React.FC = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetchDashboardData();
+      await fetchData();
     } finally {
       setRefreshing(false);
     }
@@ -295,22 +265,22 @@ export const EnhancedDashboard: React.FC = () => {
 
   // Always render the dashboard UI, even if there is no data
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-6">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Elephant Watch Dashboard</h1>
-          <p className="text-gray-600 mt-1">Monitor and analyze elephant activities across divisions</p>
+          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Elephant Watch Dashboard</h1>
+          <p className="text-gray-500 mt-2 text-lg">Monitor and analyze elephant activities across divisions</p>
         </div>
-        <div className="flex items-center gap-4 mt-4 md:mt-0">
+        <div className="flex items-center gap-4 mt-6 md:mt-0">
           <Select
             value={filters.timeRange}
             onValueChange={(value) => handleFilterChange('timeRange', value)}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] shadow-md rounded-lg">
               <SelectValue placeholder="Select time range" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[100]">
               <SelectItem value="1d">Last 24 hours</SelectItem>
               <SelectItem value="7d">Last 7 days</SelectItem>
               <SelectItem value="30d">Last 30 days</SelectItem>
@@ -323,98 +293,185 @@ export const EnhancedDashboard: React.FC = () => {
             size="icon"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="h-10 w-10"
+            className="h-12 w-12 bg-white shadow-md hover:bg-blue-50 border-blue-200"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-5 w-5 text-blue-600 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+        <Card className="bg-gradient-to-br from-blue-100 to-blue-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Activities</CardTitle>
-            <Activity className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-base font-semibold text-blue-700">Total Activities</CardTitle>
+            <div className="bg-blue-200 p-2 rounded-full">
+              <Activity className="h-5 w-5 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{data.kpiSummary.total_activities || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">Across all divisions</p>
+            <div className="text-3xl font-extrabold text-blue-900">{data.kpiSummary?.total_activities || 0}</div>
+            <p className="text-xs text-blue-600 mt-1">Across all divisions</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+        <Card className="bg-gradient-to-br from-green-100 to-green-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Active Users</CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-base font-semibold text-green-700">Active Users</CardTitle>
+            <div className="bg-green-200 p-2 rounded-full">
+              <Users className="h-5 w-5 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{data.kpiSummary.total_users || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">Total registered users</p>
+            <div className="text-3xl font-extrabold text-green-900">{data.kpiSummary?.total_users || 0}</div>
+            <p className="text-xs text-green-600 mt-1">Total registered users</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+        <Card className="bg-gradient-to-br from-red-100 to-red-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Elephants Sighted</CardTitle>
-            <MapPin className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-base font-semibold text-red-700">Total Loss</CardTitle>
+            <div className="bg-red-200 p-2 rounded-full">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{data.kpiSummary.total_elephants_sighted || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">Total sightings recorded</p>
+            <div className="text-3xl font-extrabold text-red-900">{data.kpiSummary?.total_loss_reports || 0}</div>
+            <p className="text-xs text-red-600 mt-1">Total loss reports</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+        <Card className="bg-gradient-to-br from-purple-100 to-purple-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Today's Activities</CardTitle>
-            <Calendar className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-base font-semibold text-purple-700">Today's Activities</CardTitle>
+            <div className="bg-purple-200 p-2 rounded-full">
+              <Calendar className="h-5 w-5 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{data.kpiSummary.today_activities || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">Activities in last 24 hours</p>
+            <div className="text-3xl font-extrabold text-purple-900">{data.kpiSummary?.today_activities || 0}</div>
+            <p className="text-xs text-purple-600 mt-1">Activities in last 24 hours</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Map View */}
-      <Card className="mb-8 bg-white shadow-sm">
+      {/* Map View & Filters */}
+      <Card className="mb-10 bg-white shadow-lg rounded-2xl border-2 border-blue-100">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Geographic Distribution</CardTitle>
+          <CardTitle className="text-xl font-bold text-blue-900 flex items-center gap-2">
+            <MapPin className="h-6 w-6 text-blue-500" /> Geographic Distribution
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[500px] w-full rounded-lg overflow-hidden">
+          {/* Area Filters (moved here) */}
+          <div className="mb-8 p-4 bg-blue-50 rounded-xl shadow-inner relative z-20">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Division Filter */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-blue-700 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-400" /> Division</label>
+                <Select
+                  value={filters.division || ''}
+                  onValueChange={value => {
+                    setFilters(f => ({ ...f, division: value, range: undefined, beat: undefined }));
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-white border-blue-200 shadow-sm rounded-lg">
+                    <SelectValue placeholder="Select Division" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[100]">
+                    {divisions.map((division) => (
+                      <SelectItem key={division.id} value={division.id}>{division.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Range Filter */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-blue-700 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-400" /> Range</label>
+                <Select
+                  value={filters.range || ''}
+                  onValueChange={value => {
+                    setFilters(f => ({ ...f, range: value, beat: undefined }));
+                  }}
+                  disabled={!filters.division}
+                >
+                  <SelectTrigger className="w-full bg-white border-blue-200 shadow-sm rounded-lg">
+                    <SelectValue placeholder="Select Range" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[100]">
+                    {ranges.map((range) => (
+                      <SelectItem key={range.id} value={range.id}>{range.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Beat Filter */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-blue-700 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-400" /> Beat</label>
+                <Select
+                  value={filters.beat || ''}
+                  onValueChange={value => {
+                    setFilters(f => ({ ...f, beat: value }));
+                  }}
+                  disabled={!filters.range}
+                >
+                  <SelectTrigger className="w-full bg-white border-blue-200 shadow-sm rounded-lg">
+                    <SelectValue placeholder="Select Beat" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[100]">
+                    {beats.map((beat) => (
+                      <SelectItem key={beat.id} value={beat.id}>{beat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <div className="h-[500px] w-full rounded-xl overflow-hidden border-2 border-blue-200 shadow-lg">
             <BeatMap
               selectedBeat={filters.beat}
               selectedRange={filters.range}
               selectedDivision={filters.division}
             />
           </div>
+          {/* Map Legend */}
+          <div className="mt-6 flex items-center space-x-6 text-sm text-gray-700">
+            <div className="flex items-center">
+              <span className="inline-block w-4 h-4 bg-[#2563eb] bg-opacity-10 border border-[#2563eb] rounded mr-2"></span>
+              <span className="font-semibold">Division</span>
+            </div>
+            <div className="flex items-center">
+              <span className="inline-block w-4 h-4 bg-[#f59e42] bg-opacity-20 border border-[#f59e42] rounded mr-2"></span>
+              <span className="font-semibold">Range</span>
+            </div>
+            <div className="flex items-center">
+              <span className="inline-block w-4 h-4 bg-[#dc2626] bg-opacity-30 border border-[#dc2626] rounded mr-2"></span>
+              <span className="font-semibold">Beat</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       {/* Main Dashboard Content */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="bg-white p-1 rounded-lg shadow-sm">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-gray-100">Overview</TabsTrigger>
-          <TabsTrigger value="population" className="data-[state=active]:bg-gray-100">Population</TabsTrigger>
-          <TabsTrigger value="activity" className="data-[state=active]:bg-gray-100">Activity</TabsTrigger>
-          <TabsTrigger value="geography" className="data-[state=active]:bg-gray-100">Geography</TabsTrigger>
+      <Tabs defaultValue="overview" className="space-y-8">
+        <TabsList className="bg-white p-2 rounded-xl shadow-md flex gap-4">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 font-semibold px-6 py-2 rounded-lg transition">Overview</TabsTrigger>
+          <TabsTrigger value="activity" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 font-semibold px-6 py-2 rounded-lg transition">Activity</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TabsContent value="overview" className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Observations by Type */}
-            <Card className="bg-white shadow-sm">
+            <Card className="bg-white shadow-md rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Observations by Type</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.divisionStats}>
+                <CardTitle className="text-lg font-bold text-blue-900">Observations by Type</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.observationTypes} barCategoryGap={24}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
-                      <XAxis dataKey="division_name" className="text-sm" />
+                      <XAxis dataKey="observation_type" className="text-sm" />
                       <YAxis className="text-sm" />
                       <Tooltip 
                         contentStyle={{ 
@@ -424,63 +481,63 @@ export const EnhancedDashboard: React.FC = () => {
                           boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                         }}
                       />
-                    <Legend />
-                      <Bar dataKey="total_observations" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+                      <Legend />
+                      <Bar dataKey="count" fill="#4f46e5" radius={[8, 8, 0, 0]} isAnimationActive />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Most Active Areas */}
-            <Card className="bg-white shadow-sm">
+            {/* Most Active Areas */}
+            <Card className="bg-white shadow-md rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Most Active Areas</CardTitle>
+                <CardTitle className="text-lg font-bold text-blue-900">Most Active Areas</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Most Active Division</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {data.divisionStats?.[0]?.division_name || 'N/A'}
+                      <p className="text-sm font-medium text-blue-700">Most Active Division</p>
+                      <p className="text-2xl font-extrabold text-blue-900 mt-1">
+                        {data.divisionStats?.[0]?.division_name || 'N/A'}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">Observations</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">
+                      <p className="text-sm text-blue-700">Observations</p>
+                      <p className="text-2xl font-extrabold text-blue-900 mt-1">
                         {data.divisionStats?.[0]?.total_observations || 0}
                       </p>
-                </div>
-                </div>
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Most Active Range</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {data.rangeStats?.[0]?.range_name || 'N/A'}
+                      <p className="text-sm font-medium text-blue-700">Most Active Range</p>
+                      <p className="text-2xl font-extrabold text-blue-900 mt-1">
+                        {data.rangeStats?.[0]?.range_name || 'N/A'}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">Observations</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">
+                      <p className="text-sm text-blue-700">Observations</p>
+                      <p className="text-2xl font-extrabold text-blue-900 mt-1">
                         {data.rangeStats?.[0]?.total_observations || 0}
                       </p>
                     </div>
-                </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Loss Reports Summary */}
-          <Card className="bg-white shadow-sm">
+          <Card className="bg-white shadow-md rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Loss Reports Summary</CardTitle>
+              <CardTitle className="text-lg font-bold text-red-700">Loss Reports Summary</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.divisionStats}>
+                  <BarChart data={data.divisionStats} barCategoryGap={24}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                     <XAxis dataKey="division_name" className="text-sm" />
                     <YAxis className="text-sm" />
@@ -493,7 +550,7 @@ export const EnhancedDashboard: React.FC = () => {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="total_observations" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="loss_reports" fill="#ef4444" radius={[8, 8, 0, 0]} isAnimationActive />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -501,49 +558,16 @@ export const EnhancedDashboard: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="population" className="space-y-6">
-          {/* Population Distribution */}
-          <Card className="bg-white shadow-sm">
+        <TabsContent value="activity" className="space-y-8">
+          {/* Activity by Division */}
+          <Card className="bg-white shadow-md rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Population Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Total Elephants', value: data.divisionStats?.[0]?.total_elephants || 0 }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={150}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      <Cell key={`cell-0`} fill={COLORS[0]} />
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activity" className="space-y-6">
-          {/* Activity by Season */}
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Activity by Season</CardTitle>
+              <CardTitle className="text-lg font-bold text-blue-900">Activity by Division</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.divisionStats}>
+                  <BarChart data={data.divisionStats} barCategoryGap={24}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                     <XAxis dataKey="division_name" className="text-sm" />
                     <YAxis className="text-sm" />
@@ -556,52 +580,22 @@ export const EnhancedDashboard: React.FC = () => {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="total_observations" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total_observations" fill="#4f46e5" radius={[8, 8, 0, 0]} isAnimationActive />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
-          {/* Activity by Land Type */}
-          <Card className="bg-white shadow-sm">
+          {/* Activity by Range (moved from Geography tab) */}
+          <Card className="bg-white shadow-md rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Activity by Land Type</CardTitle>
+              <CardTitle className="text-lg font-bold text-blue-900">Activity by Range</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.divisionStats}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
-                    <XAxis dataKey="division_name" className="text-sm" />
-                    <YAxis className="text-sm" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="total_observations" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="geography" className="space-y-6">
-          {/* Activity by Range */}
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Activity by Range</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.rangeStats}>
+                  <BarChart data={data.rangeStats} barCategoryGap={24}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                     <XAxis dataKey="range_name" className="text-sm" />
                     <YAxis className="text-sm" />
@@ -614,7 +608,35 @@ export const EnhancedDashboard: React.FC = () => {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="total_observations" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total_observations" fill="#4f46e5" radius={[8, 8, 0, 0]} isAnimationActive />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Loss Type Bar Chart */}
+          <Card className="bg-white shadow-md rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-red-700">Loss Reports by Type</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.kpiSummary?.loss_types || []} barCategoryGap={24}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                    <XAxis dataKey="type" className="text-sm" />
+                    <YAxis className="text-sm" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="count" fill="#ef4444" radius={[8, 8, 0, 0]} isAnimationActive />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

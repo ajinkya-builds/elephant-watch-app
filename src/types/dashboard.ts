@@ -10,6 +10,8 @@ export interface KPISummary {
   total_divisions: number;
   total_ranges: number;
   total_beats: number;
+  total_loss_reports?: number;
+  loss_types?: { loss_type: string; count: number }[];
 }
 
 export interface DivisionStat {
@@ -69,9 +71,13 @@ export interface HeatmapPoint {
 }
 
 export interface DashboardData {
-  kpiSummary: KPISummary;
+  kpiSummary?: KPISummary;
   divisionStats: DivisionStat[];
   rangeStats: RangeStat[];
   beatStats: BeatStat[];
   heatmap: HeatmapPoint[];
+  observationTypes: {
+    observation_type: string;
+    count: number;
+  }[];
 } 

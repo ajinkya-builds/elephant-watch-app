@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/lib/supabaseClient';
 import { ewkbHexToGeoJSON } from '@/lib/utils/geometryUtils';
 import { Polygon as GeoJSONPolygon } from 'geojson';
+import { ActivityObservation } from '@/types/activity-observation';
 
 // Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -108,6 +109,7 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(13);
+  const [observations, setObservations] = useState<ActivityObservation[]>([]);
 
   useEffect(() => {
     async function fetchPolygons() {
@@ -122,8 +124,8 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           // First, let's check if the beat exists and get its basic info
           const { data: beatInfo, error: beatInfoError } = await supabase
             .from('beats')
-            .select('id, name, range_id, division_id')
-            .eq('id', selectedBeat)
+            .select('new_id, name, new_range_id, new_division_id')
+            .eq('new_id', selectedBeat)
             .single();
 
           if (beatInfoError) {
@@ -142,7 +144,7 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           const { data: polygonData, error: polygonError } = await supabase
             .from('beat_polygons')
             .select('*')
-            .eq('beat_id', selectedBeat)
+            .eq('new_beat_id', selectedBeat)
             .single();
 
           if (polygonError) {
@@ -164,11 +166,11 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             .from('ranges')
             .select(`
               name,
-              division:division_id (
+              division:new_division_id (
                 name
               )
             `)
-            .eq('id', beatInfo.range_id)
+            .eq('new_id', beatInfo.new_range_id)
             .single();
 
           if (rangeError) {
@@ -252,15 +254,15 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           console.log('Calculated center:', center);
 
           setBeatPolygon({
-            id: beatInfo.id,
-            beat_id: beatInfo.id,
+            id: beatInfo.new_id,
+            beat_id: beatInfo.new_id,
             name: beatInfo.name,
             polygon: {
               type: 'Polygon',
               coordinates: [leafletCoordinates.map(([lat, lng]) => [lng, lat])]
             },
-            range_id: beatInfo.range_id,
-            division_id: beatInfo.division_id,
+            range_id: beatInfo.new_range_id,
+            division_id: beatInfo.new_division_id,
             range_name: rangeData?.name,
             division_name: rangeData?.division?.name
           });
@@ -273,17 +275,14 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           const { data: rangeData, error: rangeError } = await supabase
             .from('ranges')
             .select(`
-              id,
+              new_id,
               name,
-              division_id,
+              new_division_id,
               range_polygons!inner (
                 polygon
-              ),
-              division:division_id (
-                name
               )
             `)
-            .eq('id', selectedRange)
+            .eq('new_id', selectedRange)
             .single() as { data: RangeData | null, error: any };
 
           if (!rangeError && rangeData) {
@@ -303,12 +302,12 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             }
 
             setRangePolygon({
-              id: rangeData.id,
-              range_id: rangeData.id,
+              id: rangeData.new_id,
+              range_id: rangeData.new_id,
               name: rangeData.name,
               polygon: polygonData,
-              division_id: rangeData.division_id,
-              division_name: rangeData.division?.name
+              division_id: rangeData.new_division_id,
+              division_name: undefined // update if you fetch division name
             });
           } else {
             setRangePolygon(null);
@@ -370,6 +369,21 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
 
     fetchPolygons();
   }, [selectedBeat, selectedRange, selectedDivision]);
+
+  useEffect(() => {
+    async function fetchObservations() {
+      try {
+        const { data, error } = await supabase
+          .from('activity_observation')
+          .select('*');
+        if (error) throw error;
+        setObservations(data || []);
+      } catch (err) {
+        console.error('Error fetching observations:', err);
+      }
+    }
+    fetchObservations();
+  }, []);
 
   if (loading) return <div>Loading polygon data...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -470,8 +484,8 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
               return [lat, lng] as [number, number];
             })}
             pathOptions={{ 
-              color: '#16a34a',
-              fillColor: '#16a34a',
+              color: '#f59e42',
+              fillColor: '#f59e42',
               fillOpacity: 0.2,
               weight: 2
             }}
@@ -516,6 +530,21 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
             </Popup>
           </Polygon>
         )}
+
+        {/* Render observation markers */}
+        {observations.map(obs => (
+          <Marker key={obs.id} position={[obs.latitude, obs.longitude]}>
+            <Popup>
+              <div>
+                <div className="font-bold">{obs.observation_type}</div>
+                <div>Date: {obs.activity_date?.toString?.()}</div>
+                <div>Time: {obs.activity_time}</div>
+                {obs.loss_type && <div>Loss: {obs.loss_type}</div>}
+                {obs.total_elephants !== undefined && <div>Total Elephants: {obs.total_elephants}</div>}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
     </div>
   );
