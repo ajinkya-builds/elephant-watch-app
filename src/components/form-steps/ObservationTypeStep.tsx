@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useActivityForm } from '@/contexts/ActivityFormContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,11 +6,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import debounce from 'lodash/debounce';
+import { CrossPlatformSelect } from "@/components/ui/CrossPlatformSelect";
+import { StepperSelect, OptionType } from "@/components/ui/StepperSelect";
 
 export function ObservationTypeStep() {
   const { formData, setFormData } = useActivityForm();
 
-  const handleObservationTypeChange = (type: 'direct' | 'indirect' | 'loss') => {
+  const handleObservationTypeChange = useCallback((type: 'direct' | 'indirect' | 'loss') => {
     setFormData({
       ...formData,
       observation_type: type,
@@ -23,7 +26,26 @@ export function ObservationTypeStep() {
       indirect_sighting_type: undefined,
       loss_type: undefined,
     });
-  };
+  }, [formData, setFormData]);
+
+  // Debounced handlers for number inputs
+  const debouncedSetFormData = useMemo(
+    () => debounce((updates: Partial<typeof formData>) => {
+      setFormData(updates);
+    }, 300),
+    [setFormData]
+  );
+
+  const handleNumberChange = useCallback((field: string, value: string) => {
+    const num = parseInt(value);
+    if (!isNaN(num) && num >= 0) {
+      debouncedSetFormData({ [field]: num });
+    }
+  }, [debouncedSetFormData]);
+
+  const handleSelectChange = useCallback((field: string, value: string) => {
+    setFormData({ [field]: value });
+  }, [setFormData]);
 
   return (
     <div className="space-y-6">
@@ -74,7 +96,7 @@ export function ObservationTypeStep() {
                   id="total_elephants"
                   min="0"
                   value={formData.total_elephants || ''}
-                  onChange={(e) => setFormData({ total_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('total_elephants', e.target.value)}
                 />
               </div>
 
@@ -85,7 +107,7 @@ export function ObservationTypeStep() {
                   id="male_elephants"
                   min="0"
                   value={formData.male_elephants || ''}
-                  onChange={(e) => setFormData({ male_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('male_elephants', e.target.value)}
                 />
               </div>
 
@@ -96,18 +118,18 @@ export function ObservationTypeStep() {
                   id="female_elephants"
                   min="0"
                   value={formData.female_elephants || ''}
-                  onChange={(e) => setFormData({ female_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('female_elephants', e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="unknown_elephants">Unknown Gender</Label>
+                <Label htmlFor="unknown_elephants">Unknown Elephants</Label>
                 <Input
                   type="number"
                   id="unknown_elephants"
                   min="0"
                   value={formData.unknown_elephants || ''}
-                  onChange={(e) => setFormData({ unknown_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('unknown_elephants', e.target.value)}
                 />
               </div>
 
@@ -118,7 +140,7 @@ export function ObservationTypeStep() {
                   id="calves"
                   min="0"
                   value={formData.calves || ''}
-                  onChange={(e) => setFormData({ calves: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('calves', e.target.value)}
                 />
               </div>
             </div>
@@ -131,21 +153,19 @@ export function ObservationTypeStep() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <Label htmlFor="indirect_sighting_type">Type of Indirect Sighting</Label>
-              <Select
+              <StepperSelect
                 value={formData.indirect_sighting_type}
-                onValueChange={(value) => setFormData({ indirect_sighting_type: value as any })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type of indirect sighting" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pugmark">Pugmark</SelectItem>
-                  <SelectItem value="Dung">Dung</SelectItem>
-                  <SelectItem value="Broken Branches">Broken Branches</SelectItem>
-                  <SelectItem value="Sound">Sound</SelectItem>
-                  <SelectItem value="Eyewitness">Eyewitness</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={value => handleSelectChange('indirect_sighting_type', value)}
+                options={[
+                  { value: "Pugmark", label: "Pugmark" },
+                  { value: "Dung", label: "Dung" },
+                  { value: "Broken Branches", label: "Broken Branches" },
+                  { value: "Sound", label: "Sound" },
+                  { value: "Eyewitness", label: "Eyewitness" },
+                ]}
+                placeholder="Select type of indirect sighting"
+                className="w-full h-12 text-base"
+              />
             </div>
           </CardContent>
         </Card>
@@ -156,24 +176,22 @@ export function ObservationTypeStep() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <Label htmlFor="loss_type">Type of Loss</Label>
-              <Select
+              <StepperSelect
                 value={formData.loss_type}
-                onValueChange={(value) => setFormData({ loss_type: value as any })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type of loss" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="No loss">No loss</SelectItem>
-                  <SelectItem value="crop">Crop</SelectItem>
-                  <SelectItem value="livestock">Livestock</SelectItem>
-                  <SelectItem value="property">Property</SelectItem>
-                  <SelectItem value="fencing">Fencing</SelectItem>
-                  <SelectItem value="solar panels">Solar Panels</SelectItem>
-                  <SelectItem value="FD establishment">FD Establishment</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={value => handleSelectChange('loss_type', value)}
+                options={[
+                  { value: "No loss", label: "No loss" },
+                  { value: "crop", label: "Crop" },
+                  { value: "livestock", label: "Livestock" },
+                  { value: "property", label: "Property" },
+                  { value: "fencing", label: "Fencing" },
+                  { value: "solar panels", label: "Solar Panels" },
+                  { value: "FD establishment", label: "FD Establishment" },
+                  { value: "Other", label: "Other" },
+                ]}
+                placeholder="Select type of loss"
+                className="w-full h-12 text-base"
+              />
             </div>
           </CardContent>
         </Card>

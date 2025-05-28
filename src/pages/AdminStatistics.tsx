@@ -1,43 +1,102 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { fetchAdminStatistics, AdminStatisticsData } from "@/lib/adminStatisticsService";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
+import { Loader2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 export default function AdminStatistics() {
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState("7d");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<AdminStatisticsData | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Dummy KPIs
-  const kpis = [
-    { label: "Total Users", value: 120, link: "/admin/users" },
-    { label: "Active Users", value: 87, link: "/admin/users" },
-    { label: "Total Records", value: 5400, link: "/admin/observations" },
-    { label: "Daily Active Users", value: 34, link: "/admin/users" },
-    { label: "Pending Approvals", value: 3, link: "/admin/observations" },
-    { label: "System Uptime %", value: "99.98%", link: "#" },
-    { label: "Error/Alert Count", value: 2, link: "/admin/settings" },
+  const fetchStats = async () => {
+    try {
+      setRefreshing(true);
+      const data = await fetchAdminStatistics();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+      toast.error('Failed to fetch statistics');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (autoRefresh) {
+      interval = setInterval(fetchStats, 60000); // Refresh every minute
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [autoRefresh]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-green-800" />
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to load statistics</h2>
+          <Button onClick={fetchStats}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Prepare data for charts
+  const userActivityData = stats.userActivityTimeline.map(item => ({
+    time: new Date(item.hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    activity: item.activity_count,
+    users: item.unique_users
+  })).reverse(); // Reverse to show chronological order
+
+  const recordCreationData = stats.recordCreationTimeline.map(item => ({
+    date: new Date(item.day).toLocaleDateString(),
+    records: item.record_count,
+    users: item.unique_users
+  }));
+
+  const resourceUtilizationData = stats.resourceUtilization.map(item => ({
+    time: new Date(item.hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    requests: item.request_count,
+    errors: item.error_count
+  })).reverse(); // Reverse to show chronological order
+
+  const userDistributionData = [
+    { name: 'Admins', value: stats.userStats.total_admins },
+    { name: 'Moderators', value: stats.userStats.total_moderators },
+    { name: 'Regular Users', value: stats.userStats.total_regular_users }
   ];
 
-  // Dummy recent activity
-  const recentActivity = [
-    { id: 1, event: "User login", user: "admin@example.com", time: "2024-06-01 10:00" },
-    { id: 2, event: "Edited record", user: "user1@example.com", time: "2024-06-01 09:45" },
-    { id: 3, event: "Role changed", user: "mod@example.com", time: "2024-06-01 09:30" },
-    { id: 4, event: "Failed login", user: "user2@example.com", time: "2024-06-01 09:15" },
-  ];
-
-  // Dummy tasks/notifications
-  const tasks = [
-    { id: 1, text: "Backup due in 2 hours" },
-    { id: 2, text: "3 pending approvals" },
-    { id: 3, text: "System update available" },
-  ];
+  const filteredUserDistributionData = userDistributionData.filter(entry => entry.value > 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-10">
       <div className="container mx-auto px-4">
         {/* Breadcrumb */}
         <nav className="mb-6" aria-label="Breadcrumb">
@@ -56,12 +115,10 @@ export default function AdminStatistics() {
             <li className="text-gray-600">Admin Dashboard & Statistics</li>
           </ol>
         </nav>
-        <h1 className="text-3xl font-bold text-green-800 mb-8 text-center">Admin Dashboard & Statistics</h1>
 
-        {/* Date filter and refresh toggle */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div className="flex gap-2 items-center">
-            <span className="font-medium">Date Range:</span>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard & Statistics</h1>
+          <div className="flex items-center gap-4">
             <select
               className="border rounded px-2 py-1"
               value={dateRange}
@@ -70,129 +127,145 @@ export default function AdminStatistics() {
               <option value="1d">Last 24 hours</option>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
-              <option value="custom">Custom</option>
             </select>
-            {dateRange === "custom" && (
-              <Input type="date" className="ml-2" />
-            )}
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="font-medium">Auto Refresh</span>
-            <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Auto Refresh</span>
+              <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchStats}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
 
         {/* KPI Tiles */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-10">
-          {kpis.map((kpi, idx) => (
-            <div
-              key={kpi.label}
-              className="bg-white rounded-lg shadow p-4 flex flex-col items-center cursor-pointer hover:shadow-lg transition"
-              onClick={() => kpi.link && kpi.link !== '#' ? navigate(kpi.link) : null}
-              title={kpi.link && kpi.link !== '#' ? `Go to ${kpi.label}` : undefined}
-            >
-              <span className="text-xs text-gray-500 mb-1">{kpi.label}</span>
-              <span className="text-2xl font-bold text-green-800">{kpi.value}</span>
-            </div>
-          ))}
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">Total Users</div>
+              <div className="text-2xl font-bold text-green-800">{stats.userStats.total_users}</div>
+              <div className="text-xs text-gray-500 mt-1">+{stats.userStats.new_users_7d} this week</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">Active Users</div>
+              <div className="text-2xl font-bold text-blue-800">{stats.userStats.active_users}</div>
+              <div className="text-xs text-gray-500 mt-1">{stats.userStats.daily_active_users} today</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">Total Records</div>
+              <div className="text-2xl font-bold text-purple-800">{stats.activityStats.total_records}</div>
+              <div className="text-xs text-gray-500 mt-1">+{stats.activityStats.records_24h} today</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">Daily Active Users</div>
+              <div className="text-2xl font-bold text-orange-800">{stats.userStats.daily_active_users}</div>
+              <div className="text-xs text-gray-500 mt-1">{stats.activityStats.active_users_24h} in last 24h</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">System Errors</div>
+              <div className="text-2xl font-bold text-red-800">{stats.systemHealth.errors_24h}</div>
+              <div className="text-xs text-gray-500 mt-1">{stats.systemHealth.errors_7d} in last 7 days</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">Failed Logins</div>
+              <div className="text-2xl font-bold text-yellow-800">{stats.systemHealth.failed_logins_24h}</div>
+              <div className="text-xs text-gray-500 mt-1">{stats.systemHealth.failed_logins_7d} in last 7 days</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white shadow-sm hover:shadow-md transition">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 mb-1">System Uptime</div>
+              <div className="text-2xl font-bold text-green-800">99.98%</div>
+              <div className="text-xs text-gray-500 mt-1">Last 30 days</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Charts & Visual Analytics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-          <Card className="cursor-pointer hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>User Signups Over Time</CardTitle>
+          <Card className="shadow-lg border-0 bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-semibold text-gray-900">User Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-48 flex items-center justify-center text-gray-400">[Line Chart Placeholder]</div>
-              <Button variant="link" className="mt-2" onClick={() => navigate('/admin/users')}>View Details</Button>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>Active vs Inactive Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48 flex items-center justify-center text-gray-400">[Pie Chart Placeholder]</div>
-              <Button variant="link" className="mt-2" onClick={() => navigate('/admin/users')}>View Details</Button>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>Logins by Day/Hour</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48 flex items-center justify-center text-gray-400">[Bar Chart Placeholder]</div>
-              <Button variant="link" className="mt-2" onClick={() => navigate('/admin/users')}>View Details</Button>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>Records Created per Module</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48 flex items-center justify-center text-gray-400">[Bar Chart Placeholder]</div>
-              <Button variant="link" className="mt-2" onClick={() => navigate('/admin/observations')}>View Details</Button>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>System/API Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48 flex items-center justify-center text-gray-400">[Line Chart Placeholder]</div>
-              <Button variant="link" className="mt-2" onClick={() => navigate('/admin/settings')}>View Details</Button>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>Resource Utilization</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48 flex items-center justify-center text-gray-400">[Resource Chart Placeholder]</div>
-              <Button variant="link" className="mt-2" onClick={() => navigate('/admin/settings')}>View Details</Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Activity Feed & Task Center */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity Feed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="divide-y divide-gray-100">
-                {recentActivity.map(act => (
-                  <li key={act.id} className="py-2 flex justify-between items-center">
-                    <div>
-                      <span className="font-medium text-green-800">{act.event}</span> by <span className="text-gray-700">{act.user}</span>
+              <div className="flex flex-col items-center justify-center h-80">
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={filteredUserDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={4}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    >
+                      {filteredUserDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex gap-6 mt-6">
+                  {filteredUserDistributionData.map((entry, index) => (
+                    <div key={entry.name} className="flex items-center gap-2">
+                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                      <span className="text-sm font-medium text-gray-700">{entry.name}</span>
+                      <span className="text-xs text-gray-500">({entry.value})</span>
                     </div>
-                    <span className="text-xs text-gray-500">{act.time}</span>
-                  </li>
-                ))}
-              </ul>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle>Task & Notification Center</CardTitle>
+              <CardTitle>Record Creation Timeline</CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="divide-y divide-gray-100">
-                {tasks.map(task => (
-                  <li key={task.id} className="py-2 flex items-center">
-                    <span className="text-green-700 mr-2">•</span> {task.text}
-                  </li>
-                ))}
-              </ul>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={recordCreationData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="records" fill="#8884d8" />
+                    <Bar dataKey="users" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Export Option */}
         <div className="flex justify-end">
-          <Button variant="outline">Export Dashboard Data</Button>
+          <Button variant="outline" onClick={() => {
+            // TODO: Implement export functionality
+            toast.info('Export functionality coming soon');
+          }}>
+            Export Dashboard Data
+          </Button>
         </div>
       </div>
     </div>

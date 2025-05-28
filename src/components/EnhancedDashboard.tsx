@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/lib/supabaseClient';
 import { BeatMap } from './BeatMap';
 import { DashboardData } from '@/types/dashboard';
-import { RefreshCw, AlertCircle, Users, Calendar, MapPin, Activity } from 'lucide-react';
+import { RefreshCw, AlertCircle, Users, Calendar, MapPin, Activity, Eye, AlertTriangle, FileText } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -22,6 +23,9 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface DashboardFilters {
   division?: string;
@@ -37,7 +41,69 @@ interface FilterOption {
   name: string;
 }
 
+interface HeatmapPoint {
+  lat: number;
+  lng: number;
+  type: 'sighting' | 'incident';
+  title: string;
+  description: string;
+  date: string;
+}
+
+interface GeoPolygon {
+  id: string;
+  name: string;
+  coordinates: [number, number][];
+  type: 'division' | 'range' | 'beat';
+}
+
+interface PolygonResponse {
+  id: string;
+  name: string;
+  geojson: string;
+}
+
+interface DivisionPolygon {
+  id: string;
+  new_division_id: string;
+  divisions: {
+    name: string;
+  };
+}
+
+interface RangePolygon {
+  id: string;
+  new_range_id: string;
+  ranges: {
+    name: string;
+  };
+}
+
+interface BeatPolygon {
+  id: string;
+  new_beat_id: string;
+  beats: {
+    name: string;
+  };
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+// Component to handle map bounds
+function MapBounds({ polygons }: { polygons: GeoPolygon[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (polygons.length > 0) {
+      const bounds = L.latLngBounds(
+        polygons.flatMap(polygon => polygon.coordinates)
+      );
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [polygons, map]);
+
+  return null;
+}
 
 export const EnhancedDashboard: React.FC = () => {
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -57,6 +123,7 @@ export const EnhancedDashboard: React.FC = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
+  const [selectedPolygons, setSelectedPolygons] = useState<GeoPolygon[]>([]);
 
   // Fetch all divisions
   useEffect(() => {
@@ -238,6 +305,187 @@ export const EnhancedDashboard: React.FC = () => {
     }
   };
 
+  // Fetch polygon data when filters change
+  useEffect(() => {
+    async function fetchPolygons() {
+      if (!filters.division) {
+        setSelectedPolygons([]);
+        return;
+      }
+
+      try {
+        let polygons: GeoPolygon[] = [];
+
+        // Fetch division polygon
+        const { data: divisionData, error: divisionError } = await supabase
+          .from('division_polygons')
+          .select(`
+            id,
+            new_division_id,
+            divisions!inner(
+              name
+            )
+          `)
+          .eq('new_division_id', filters.division)
+          .single() as { data: DivisionPolygon | null, error: any };
+
+        console.log('Division data:', divisionData);
+        console.log('Division error:', divisionError);
+
+        if (divisionData) {
+          try {
+            // Get the polygon data using a raw query
+            const { data: polygonData, error: polygonError } = await supabase
+              .from('division_polygons')
+              .select('polygon')
+              .eq('id', divisionData.id)
+              .single();
+
+            if (polygonError) {
+              console.error('Error fetching polygon:', polygonError);
+              return;
+            }
+
+            // Convert the polygon to GeoJSON
+            const { data: geoJsonData, error: geoJsonError } = await supabase
+              .rpc('st_asgeojson', { geom: polygonData.polygon });
+
+            if (geoJsonError) {
+              console.error('Error converting to GeoJSON:', geoJsonError);
+              return;
+            }
+
+            const geoJson = JSON.parse(geoJsonData);
+            console.log('Parsed division GeoJSON:', geoJson);
+            polygons.push({
+              id: divisionData.id,
+              name: divisionData.divisions.name,
+              coordinates: geoJson.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]),
+              type: 'division'
+            });
+          } catch (error) {
+            console.error('Error processing division polygon:', error);
+          }
+        }
+
+        // Fetch range polygon if selected
+        if (filters.range) {
+          const { data: rangeData, error: rangeError } = await supabase
+            .from('range_polygons')
+            .select(`
+              id,
+              new_range_id,
+              ranges!inner(
+                name
+              )
+            `)
+            .eq('new_range_id', filters.range)
+            .single() as { data: RangePolygon | null, error: any };
+
+          console.log('Range data:', rangeData);
+          console.log('Range error:', rangeError);
+
+          if (rangeData) {
+            try {
+              // Get the polygon data using a raw query
+              const { data: polygonData, error: polygonError } = await supabase
+                .from('range_polygons')
+                .select('polygon')
+                .eq('id', rangeData.id)
+                .single();
+
+              if (polygonError) {
+                console.error('Error fetching polygon:', polygonError);
+                return;
+              }
+
+              // Convert the polygon to GeoJSON
+              const { data: geoJsonData, error: geoJsonError } = await supabase
+                .rpc('st_asgeojson', { geom: polygonData.polygon });
+
+              if (geoJsonError) {
+                console.error('Error converting to GeoJSON:', geoJsonError);
+                return;
+              }
+
+              const geoJson = JSON.parse(geoJsonData);
+              console.log('Parsed range GeoJSON:', geoJson);
+              polygons.push({
+                id: rangeData.id,
+                name: rangeData.ranges.name,
+                coordinates: geoJson.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]),
+                type: 'range'
+              });
+            } catch (error) {
+              console.error('Error processing range polygon:', error);
+            }
+          }
+        }
+
+        // Fetch beat polygon if selected
+        if (filters.beat) {
+          const { data: beatData, error: beatError } = await supabase
+            .from('beat_polygons')
+            .select(`
+              id,
+              new_beat_id,
+              beats!inner(
+                name
+              )
+            `)
+            .eq('new_beat_id', filters.beat)
+            .single() as { data: BeatPolygon | null, error: any };
+
+          console.log('Beat data:', beatData);
+          console.log('Beat error:', beatError);
+
+          if (beatData) {
+            try {
+              // Get the polygon data using a raw query
+              const { data: polygonData, error: polygonError } = await supabase
+                .from('beat_polygons')
+                .select('polygon')
+                .eq('id', beatData.id)
+                .single();
+
+              if (polygonError) {
+                console.error('Error fetching polygon:', polygonError);
+                return;
+              }
+
+              // Convert the polygon to GeoJSON
+              const { data: geoJsonData, error: geoJsonError } = await supabase
+                .rpc('st_asgeojson', { geom: polygonData.polygon });
+
+              if (geoJsonError) {
+                console.error('Error converting to GeoJSON:', geoJsonError);
+                return;
+              }
+
+              const geoJson = JSON.parse(geoJsonData);
+              console.log('Parsed beat GeoJSON:', geoJson);
+              polygons.push({
+                id: beatData.id,
+                name: beatData.beats.name,
+                coordinates: geoJson.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]),
+                type: 'beat'
+              });
+            } catch (error) {
+              console.error('Error processing beat polygon:', error);
+            }
+          }
+        }
+
+        console.log('Final polygons array:', polygons);
+        setSelectedPolygons(polygons);
+      } catch (error) {
+        console.error('Error fetching polygon data:', error);
+      }
+    }
+
+    fetchPolygons();
+  }, [filters.division, filters.range, filters.beat]);
+
   if (loading) {
   return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -265,44 +513,203 @@ export const EnhancedDashboard: React.FC = () => {
 
   // Always render the dashboard UI, even if there is no data
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-6">
+    <div className="space-y-8">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Elephant Watch Dashboard</h1>
-          <p className="text-gray-500 mt-2 text-lg">Monitor and analyze elephant activities across divisions</p>
+          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+            Eravat Dashboard
+          </h2>
+          <p className="text-gray-600 mt-1">
+            Real-time monitoring and analysis of elephant activities
+          </p>
         </div>
-        <div className="flex items-center gap-4 mt-6 md:mt-0">
+        <div className="flex items-center gap-4">
           <Select
             value={filters.timeRange}
             onValueChange={(value) => handleFilterChange('timeRange', value)}
           >
-            <SelectTrigger className="w-[180px] shadow-md rounded-lg">
+            <SelectTrigger className="w-[180px] bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors">
               <SelectValue placeholder="Select time range" />
             </SelectTrigger>
-            <SelectContent className="z-[100]">
-              <SelectItem value="1d">Last 24 hours</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-              <SelectItem value="1y">Last year</SelectItem>
+            <SelectContent>
+              <SelectItem value="24h">Last 24 Hours</SelectItem>
+              <SelectItem value="7d">Last 7 Days</SelectItem>
+              <SelectItem value="30d">Last 30 Days</SelectItem>
+              <SelectItem value="90d">Last 90 Days</SelectItem>
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
-            size="icon"
             onClick={handleRefresh}
-            disabled={refreshing}
-            className="h-12 w-12 bg-white shadow-md hover:bg-blue-50 border-blue-200"
+            className="bg-gradient-to-r from-blue-600 to-green-600 text-white hover:from-blue-700 hover:to-green-700 shadow-sm"
           >
-            <RefreshCw className={`h-5 w-5 text-blue-600 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
           </Button>
         </div>
       </div>
 
+      {/* Map Section */}
+      <Card className="border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-green-50 border-b border-gray-200">
+          <div className="flex flex-col gap-4">
+            <div>
+              <CardTitle className="text-xl font-semibold text-gray-900">Activity Map</CardTitle>
+              <CardDescription>Geographic distribution of elephant activities</CardDescription>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  Division
+                </Label>
+                <Select
+                  value={filters.division || ''}
+                  onValueChange={(value) => {
+                    setFilters(f => ({ ...f, division: value, range: undefined, beat: undefined }));
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors">
+                    <SelectValue placeholder="Select Division" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {divisions.map((division) => (
+                      <SelectItem key={division.id} value={division.id}>
+                        {division.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  Range
+                </Label>
+                <Select
+                  value={filters.range || ''}
+                  onValueChange={(value) => {
+                    setFilters(f => ({ ...f, range: value, beat: undefined }));
+                  }}
+                  disabled={!filters.division}
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors disabled:opacity-50">
+                    <SelectValue placeholder="Select Range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ranges.map((range) => (
+                      <SelectItem key={range.id} value={range.id}>
+                        {range.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  Beat
+                </Label>
+                <Select
+                  value={filters.beat || ''}
+                  onValueChange={(value) => {
+                    setFilters(f => ({ ...f, beat: value }));
+                  }}
+                  disabled={!filters.range}
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors disabled:opacity-50">
+                    <SelectValue placeholder="Select Beat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {beats.map((beat) => (
+                      <SelectItem key={beat.id} value={beat.id}>
+                        {beat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="h-[500px] rounded-lg overflow-hidden border border-gray-200">
+            <MapContainer
+              center={[10.8505, 76.2711]}
+              zoom={8}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <MapBounds polygons={selectedPolygons} />
+              {selectedPolygons.map((polygon) => {
+                console.log('Rendering polygon:', polygon);
+                return (
+                  <Polygon
+                    key={polygon.id}
+                    positions={polygon.coordinates}
+                    pathOptions={{
+                      color: polygon.type === 'division' ? '#2563eb' : 
+                             polygon.type === 'range' ? '#f97316' : '#6b7280',
+                      fillColor: polygon.type === 'division' ? '#3b82f6' :
+                                polygon.type === 'range' ? '#fb923c' : '#9ca3af',
+                      fillOpacity: 0.2,
+                      weight: 2
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-2">
+                        <h3 className="font-semibold text-gray-900">{polygon.name}</h3>
+                        <p className="text-sm text-gray-600">
+                          {polygon.type.charAt(0).toUpperCase() + polygon.type.slice(1)} Boundary
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                );
+              })}
+              {data.heatmap.map((point, index) => (
+                <Marker
+                  key={index}
+                  position={[point.lat, point.lng]}
+                  icon={L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div class="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg"></div>`,
+                    iconSize: [16, 16],
+                  })}
+                >
+                  <Popup>
+                    <div className="p-2">
+                      <h3 className="font-semibold text-gray-900">{point.division_name}</h3>
+                      <p className="text-sm text-gray-600">
+                        {point.observation_count} observations
+                        {point.total_elephants_seen > 0 && ` • ${point.total_elephants_seen} elephants seen`}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Last observation: {new Date(point.last_observation_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <span className="text-sm text-gray-600">Activity Points</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-        <Card className="bg-gradient-to-br from-blue-100 to-blue-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="bg-gradient-to-br from-blue-100 to-blue-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-all duration-300 border-0">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold text-blue-700">Total Activities</CardTitle>
             <div className="bg-blue-200 p-2 rounded-full">
@@ -315,7 +722,7 @@ export const EnhancedDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-100 to-green-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
+        <Card className="bg-gradient-to-br from-green-100 to-green-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-all duration-300 border-0">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold text-green-700">Active Users</CardTitle>
             <div className="bg-green-200 p-2 rounded-full">
@@ -355,116 +762,19 @@ export const EnhancedDashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Map View & Filters */}
-      <Card className="mb-10 bg-white shadow-lg rounded-2xl border-2 border-blue-100">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-blue-900 flex items-center gap-2">
-            <MapPin className="h-6 w-6 text-blue-500" /> Geographic Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Area Filters (moved here) */}
-          <div className="mb-8 p-4 bg-blue-50 rounded-xl shadow-inner relative z-20">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Division Filter */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-blue-700 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-400" /> Division</label>
-                <Select
-                  value={filters.division || ''}
-                  onValueChange={value => {
-                    setFilters(f => ({ ...f, division: value, range: undefined, beat: undefined }));
-                  }}
-                >
-                  <SelectTrigger className="w-full bg-white border-blue-200 shadow-sm rounded-lg">
-                    <SelectValue placeholder="Select Division" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[100]">
-                    {divisions.map((division) => (
-                      <SelectItem key={division.id} value={division.id}>{division.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* Range Filter */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-blue-700 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-400" /> Range</label>
-                <Select
-                  value={filters.range || ''}
-                  onValueChange={value => {
-                    setFilters(f => ({ ...f, range: value, beat: undefined }));
-                  }}
-                  disabled={!filters.division}
-                >
-                  <SelectTrigger className="w-full bg-white border-blue-200 shadow-sm rounded-lg">
-                    <SelectValue placeholder="Select Range" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[100]">
-                    {ranges.map((range) => (
-                      <SelectItem key={range.id} value={range.id}>{range.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* Beat Filter */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-blue-700 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-400" /> Beat</label>
-                <Select
-                  value={filters.beat || ''}
-                  onValueChange={value => {
-                    setFilters(f => ({ ...f, beat: value }));
-                  }}
-                  disabled={!filters.range}
-                >
-                  <SelectTrigger className="w-full bg-white border-blue-200 shadow-sm rounded-lg">
-                    <SelectValue placeholder="Select Beat" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[100]">
-                    {beats.map((beat) => (
-                      <SelectItem key={beat.id} value={beat.id}>{beat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <div className="h-[500px] w-full rounded-xl overflow-hidden border-2 border-blue-200 shadow-lg">
-            <BeatMap
-              selectedBeat={filters.beat}
-              selectedRange={filters.range}
-              selectedDivision={filters.division}
-            />
-          </div>
-          {/* Map Legend */}
-          <div className="mt-6 flex items-center space-x-6 text-sm text-gray-700">
-            <div className="flex items-center">
-              <span className="inline-block w-4 h-4 bg-[#2563eb] bg-opacity-10 border border-[#2563eb] rounded mr-2"></span>
-              <span className="font-semibold">Division</span>
-            </div>
-            <div className="flex items-center">
-              <span className="inline-block w-4 h-4 bg-[#f59e42] bg-opacity-20 border border-[#f59e42] rounded mr-2"></span>
-              <span className="font-semibold">Range</span>
-            </div>
-            <div className="flex items-center">
-              <span className="inline-block w-4 h-4 bg-[#dc2626] bg-opacity-30 border border-[#dc2626] rounded mr-2"></span>
-              <span className="font-semibold">Beat</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Main Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-8">
         <TabsList className="bg-white p-2 rounded-xl shadow-md flex gap-4">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 font-semibold px-6 py-2 rounded-lg transition">Overview</TabsTrigger>
-          <TabsTrigger value="activity" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 font-semibold px-6 py-2 rounded-lg transition">Activity</TabsTrigger>
+          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 font-semibold px-6 py-2 rounded-lg transition-all duration-300">Overview</TabsTrigger>
+          <TabsTrigger value="activity" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 font-semibold px-6 py-2 rounded-lg transition-all duration-300">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Observations by Type */}
-            <Card className="bg-white shadow-md rounded-2xl">
+            <Card className="bg-white shadow-lg rounded-2xl border-0">
               <CardHeader>
-                <CardTitle className="text-lg font-bold text-blue-900">Observations by Type</CardTitle>
+                <CardTitle className="text-lg font-bold text-gray-900">Observations by Type</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
@@ -477,7 +787,7 @@ export const EnhancedDashboard: React.FC = () => {
                         contentStyle={{ 
                           backgroundColor: 'white',
                           border: '1px solid #e5e7eb',
-                          borderRadius: '0.5rem',
+                          borderRadius: '0.75rem',
                           boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                         }}
                       />

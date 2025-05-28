@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
   console.log('All required environment variables are present');
 
   const config = {
-    base: mode === 'development' ? '/' : '/elephant-watch-app/',
+    base: './',
     plugins: [react()],
     server: {
       host: "::",

@@ -1,58 +1,96 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { Users, FileText, Settings, Activity, AlertCircle, Database } from "lucide-react";
 
 const adminCards = [
   {
     title: "User Management",
     description: "Add, edit, or remove users. Assign roles and manage permissions.",
-    icon: "👤",
+    icon: <Users className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/users'),
-    color: "bg-white hover:bg-gray-50",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
   {
     title: "Observation & Report Management",
     description: "View, edit, or delete observations and reports submitted by users.",
-    icon: "📋",
+    icon: <FileText className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/observations'),
-    color: "bg-white hover:bg-gray-50",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
   {
     title: "System Log",
     description: "View activity, error, system, and login logs.",
-    icon: "📝",
+    icon: <Database className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/logs'),
-    color: "bg-white hover:bg-gray-50",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+  },
+  {
+    title: "System Settings",
+    description: "Configure system settings, notifications, and maintenance.",
+    icon: <Settings className="h-6 w-6" />,
+    onClick: (navigate: any) => navigate('/admin/settings'),
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+  },
+  {
+    title: "Activity Dashboard",
+    description: "View detailed statistics and activity reports.",
+    icon: <Activity className="h-6 w-6" />,
+    onClick: (navigate: any) => navigate('/admin/statistics'),
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+  },
+  {
+    title: "Alerts & Notifications",
+    description: "Manage system alerts and notification settings.",
+    icon: <AlertCircle className="h-6 w-6" />,
+    onClick: (navigate: any) => navigate('/admin/notifications'),
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
 ];
 
 export default function Admin() {
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-12">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 mb-3">Admin Panel</h1>
-          <p className="text-gray-600 text-lg">Manage your application's core functions</p>
+          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent tracking-tight mb-3">Admin Panel</h1>
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            Manage your application's core functions and monitor system performance
+          </p>
         </div>
-        <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-          {adminCards.map((card, idx) => (
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+          {adminCards.map((card) => (
             <Card
               key={card.title}
-              className={`shadow-lg cursor-pointer transition-all duration-300 rounded-xl p-6 flex flex-row items-center gap-6 ${card.color}`}
+              className="group cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-blue-100"
               onClick={() => card.onClick(navigate)}
             >
-              <div className="flex items-center justify-center text-5xl bg-gray-50 rounded-full p-4 shadow-sm min-w-[80px]">
-                {card.icon}
-              </div>
-              <div className="flex-1">
-                <CardHeader className="p-0 mb-2">
-                  <CardTitle className="text-2xl font-semibold text-gray-800">{card.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0 text-gray-600 text-base">
-                  {card.description}
-                </CardContent>
-              </div>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-4">
+                  <div className={`${card.iconBg} p-3 rounded-xl`}>
+                    <div className={card.iconColor}>{card.icon}</div>
+                  </div>
+                  <CardTitle className="text-xl font-semibold text-gray-900">{card.title}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">{card.description}</p>
+                <div className={`mt-4 h-1 w-full bg-gradient-to-r ${card.color} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+              </CardContent>
             </Card>
           ))}
         </div>

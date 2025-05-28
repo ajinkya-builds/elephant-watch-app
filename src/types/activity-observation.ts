@@ -24,6 +24,8 @@ export interface ActivityObservation {
     user_id: string;
     created_at?: Date;
     updated_at?: Date;
+    observer_name?: string;
+    observer_email?: string;
 }
 
 export interface ActivityObservationCreate extends Omit<ActivityObservation, 'id' | 'created_at' | 'updated_at'> {} 
