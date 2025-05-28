@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useState, useEffect, useCallback } from "react";
 
 import { supabase } from "@/lib/supabaseClient";
-import { StoredReportData, savePendingReport, getPendingReports, removePendingReport } from "@/lib/localStorageUtils";
+import { StoredReportData, savePendingReport, getPendingReports, removePendingReport, updatePendingReportRetry, getReportsReadyForRetry, hasExceededMaxRetries } from "@/lib/localStorageUtils";
 import { findBeatForCoordinates } from '../lib/utils/shapefileImporter';
 
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
@@ -26,6 +26,7 @@ import { ElephantSightingSection } from "./form-sections/ElephantSightingSection
 import { LocationDateTimeSection } from "./form-sections/LocationDateTimeSection";
 import { AdditionalInfoSection } from "./form-sections/AdditionalInfoSection";
 import { ReporterDetailsSection } from "./form-sections/ReporterDetailsSection";
+import { NetworkStatusIndicator } from './NetworkStatusIndicator';
 
 const reportFormSchema = z.object({
   email: z.string().email("Invalid email address").min(1, "Email is required"),
@@ -105,80 +106,89 @@ export function ReportForm() {
     getUser();
   }, [form]);
 
+  // Enhanced sync function with retry logic
   const syncPendingReports = useCallback(async () => {
-    if (isSyncing || !isOnline) return; // Don't sync if already syncing or offline
+    if (isSyncing || !isOnline) return;
 
-    const pendingReports = getPendingReports();
-    if (pendingReports.length === 0) {
-      return;
-    }
+    const reportsToSync = getReportsReadyForRetry();
+    if (reportsToSync.length === 0) return;
 
     setIsSyncing(true);
-    const syncToastId = toast.loading(`Syncing ${pendingReports.length} pending report(s)...`);
+    const syncToastId = toast.loading(`Syncing ${reportsToSync.length} pending report(s)...`);
 
     let successfulSyncs = 0;
     let failedSyncs = 0;
+    let maxRetriesExceeded = 0;
 
-    for (const storedReport of pendingReports) {
+    for (const storedReport of reportsToSync) {
       try {
-        // The 'data' field in StoredReportData holds the Supabase-structured object
         const { error } = await supabase.from("activity_reports").insert([storedReport.data]);
+        
         if (error) {
-          throw error; // Let the catch block handle it
+          throw error;
         }
-        removePendingReport(storedReport.id); // Remove from localStorage on success
+        
+        removePendingReport(storedReport.id);
         successfulSyncs++;
       } catch (error: any) {
         console.error("Failed to sync report:", storedReport.id, error);
-        failedSyncs++;
-        // Report remains in localStorage for next attempt
+        
+        if (hasExceededMaxRetries(storedReport)) {
+          maxRetriesExceeded++;
+          toast.error(`Report ${storedReport.id} failed after ${storedReport.retryCount} attempts. Please try submitting again.`);
+          removePendingReport(storedReport.id);
+        } else {
+          updatePendingReportRetry(storedReport.id, error);
+          failedSyncs++;
+        }
       }
     }
 
     toast.dismiss(syncToastId);
+    
     if (successfulSyncs > 0) {
       toast.success(`${successfulSyncs} report(s) synced successfully!`);
     }
     if (failedSyncs > 0) {
-      toast.error(`${failedSyncs} report(s) failed to sync. They will be retried later.`);
+      toast.error(`${failedSyncs} report(s) failed to sync. Will retry automatically.`);
     }
-    if (successfulSyncs === 0 && failedSyncs === 0 && pendingReports.length > 0) {
-        toast.info("No reports needed syncing or all failed previously and remain pending.");
+    if (maxRetriesExceeded > 0) {
+      toast.error(`${maxRetriesExceeded} report(s) exceeded maximum retry attempts.`);
     }
-
 
     setIsSyncing(false);
-  }, [isOnline, isSyncing]); // Added dependencies for useCallback
+  }, [isOnline, isSyncing]);
 
-
+  // Monitor online status
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success("You are back online!");
-      syncPendingReports(); // Attempt to sync when coming online
+      syncPendingReports();
     };
+
     const handleOffline = () => {
       setIsOnline(false);
-      toast.info("You are currently offline. Reports will be saved locally.");
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    // Initial check and attempt to sync if online
-    if (navigator.onLine) {
-        setIsOnline(true);
-        syncPendingReports();
-    } else {
-        setIsOnline(false);
-    }
-
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [syncPendingReports]); // Added syncPendingReports to dependency array
+  }, [syncPendingReports]);
+
+  // Periodically attempt to sync pending reports
+  useEffect(() => {
+    if (!isOnline) return;
+
+    const syncInterval = setInterval(() => {
+      syncPendingReports();
+    }, 30000); // Try to sync every 30 seconds when online
+
+    return () => clearInterval(syncInterval);
+  }, [isOnline, syncPendingReports]);
 
   const handleFetchData = () => {
     // ... (keep existing handleFetchData logic)
@@ -285,51 +295,54 @@ export function ReportForm() {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {!isOnline && (
-          <div className="p-3 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
-            <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
-            Currently {getPendingReports().length} report(s) pending sync.
-          </div>
-        )}
-         {isOnline && getPendingReports().length > 0 && !isSyncing && (
-          <div className="p-3 mb-4 text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
-            <span className="font-medium">{getPendingReports().length} report(s) pending sync.</span>
-            <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300" onClick={syncPendingReports}>Sync Now</Button>
-          </div>
-        )}
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email <span className="text-red-500">*</span></FormLabel>
-              <FormControl>
-                <Input type="email" placeholder="your.email@example.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {!isOnline && (
+            <div className="p-3 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
+              <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
+              Currently {getPendingReports().length} report(s) pending sync.
+            </div>
           )}
-        />
-        
-        <AdministrativeDetailsSection control={form.control} />
-        <DamageAssessmentSection control={form.control} />
-        <ElephantSightingSection control={form.control} />
-        <LocationDateTimeSection 
-          control={form.control} 
-          isFetching={isFetchingData} 
-          handleFetchData={handleFetchData} 
-        />
-        <AdditionalInfoSection control={form.control} />
-        <ReporterDetailsSection control={form.control} />
-        
-        <Button type="submit" disabled={isSubmitting || isFetchingData || isSyncing} className="w-full sm:w-auto">
-          {isSubmitting 
-            ? (isOnline ? "Submitting Online..." : "Saving Locally...") 
-            : "Submit Report / रिपोर्ट सबमिट करें"}
-        </Button>
-      </form>
-    </Form>
+           {isOnline && getPendingReports().length > 0 && !isSyncing && (
+            <div className="p-3 mb-4 text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
+              <span className="font-medium">{getPendingReports().length} report(s) pending sync.</span>
+              <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300" onClick={syncPendingReports}>Sync Now</Button>
+            </div>
+          )}
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email <span className="text-red-500">*</span></FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="your.email@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <AdministrativeDetailsSection control={form.control} />
+          <DamageAssessmentSection control={form.control} />
+          <ElephantSightingSection control={form.control} />
+          <LocationDateTimeSection 
+            control={form.control} 
+            isFetching={isFetchingData} 
+            handleFetchData={handleFetchData} 
+          />
+          <AdditionalInfoSection control={form.control} />
+          <ReporterDetailsSection control={form.control} />
+          
+          <Button type="submit" disabled={isSubmitting || isFetchingData || isSyncing} className="w-full sm:w-auto">
+            {isSubmitting 
+              ? (isOnline ? "Submitting Online..." : "Saving Locally...") 
+              : "Submit Report / रिपोर्ट सबमिट करें"}
+          </Button>
+        </form>
+      </Form>
+      <NetworkStatusIndicator isOnline={isOnline} isSyncing={isSyncing} />
+    </>
   );
 }
