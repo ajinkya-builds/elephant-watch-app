@@ -58,7 +58,6 @@ const App = () => {
   }, []);
 
   console.log('App component rendering...');
-<<<<<<< Updated upstream
 
   if (isLoading) {
     return (
@@ -129,78 +128,6 @@ const App = () => {
                   }
                 />
 
-=======
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading application...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-lg w-full">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Connection Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-          >
-            Retry Connection
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          {import.meta.env.PROD && LazyPwaReloader && (
-            <Suspense fallback={null}>
-              <LazyPwaReloader />
-            </Suspense>
-          )}
-          <HashRouter>
-            <AuthProvider>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/login" element={<Login />} />
-                
-                {/* Root path - Home page with role selection */}
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <Header />
-                      <Index />
-                      <Footer />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                {/* Dashboard - Main dashboard for authenticated users */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Header />
-                      <Dashboard />
-                      <Footer />
-                    </ProtectedRoute>
-                  }
-                />
-
->>>>>>> Stashed changes
                 {/* Report Activity - Accessible by all roles */}
                 <Route
                   path="/report"
@@ -213,7 +140,6 @@ const App = () => {
                   }
                 />
 
-<<<<<<< Updated upstream
                 {/* Admin Routes - Only accessible by admin */}
                 <Route
                   path="/admin"
@@ -285,79 +211,6 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
-=======
-              {/* Admin Routes - Only accessible by admin */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <Admin />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/users"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <AdminUsers />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/observations"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <AdminObservations />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/statistics"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <AdminStatistics />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/settings"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <AdminSettings />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/logs"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <AdminLogs />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/notifications"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Header />
-                    <AdminNotifications />
-                    <Footer />
-                  </ProtectedRoute>
-                }
-              />
->>>>>>> Stashed changes
 
                 {/* Manager Routes - Accessible by admin and manager */}
                 <Route
