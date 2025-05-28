@@ -1,11 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useActivityForm } from '@/contexts/ActivityFormContext';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Compass, Lock, Unlock, RefreshCw } from "lucide-react";
+import { Compass, Lock, Unlock, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
+
+interface CompassState {
+  heading: number;
+  accuracy: number;
+  isGPSBased: boolean;
+  isErratic: boolean;
+}
+
+const VELOCITY_THRESHOLD = 2; // meters per second
+const ERRATIC_THRESHOLD = 45; // degrees
+const SMOOTHING_WINDOW = 5; // number of readings to average
 
 export function CompassBearingStep() {
   const { formData, setFormData } = useActivityForm();
@@ -14,14 +26,30 @@ export function CompassBearingStep() {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationSamples, setCalibrationSamples] = useState<number[]>([]);
   const [calibrationOffset, setCalibrationOffset] = useState(0);
-  const [lastHeading, setLastHeading] = useState<number | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [compassState, setCompassState] = useState<CompassState>({
+    heading: 0,
+    accuracy: 0,
+    isGPSBased: false,
+    isErratic: false
+  });
+  
+  const headingHistory = useRef<number[]>([]);
+  const lastPosition = useRef<GeolocationPosition | null>(null);
+  const lastHeading = useRef<number | null>(null);
+  const watchId = useRef<number | null>(null);
 
   useEffect(() => {
     // Check if device is iOS
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(isIOSDevice);
+
+    // Load saved calibration offset
+    const savedOffset = localStorage.getItem('compassCalibrationOffset');
+    if (savedOffset) {
+      setCalibrationOffset(parseFloat(savedOffset));
+    }
 
     // Check if device orientation is supported
     if (window.DeviceOrientationEvent) {
@@ -34,6 +62,12 @@ export function CompassBearingStep() {
       toast.error("Device orientation is not supported on this device");
       setHasPermission(false);
     }
+
+    return () => {
+      if (watchId.current !== null) {
+        navigator.geolocation.clearWatch(watchId.current);
+      }
+    };
   }, []);
 
   const requestPermission = async () => {
@@ -73,8 +107,8 @@ export function CompassBearingStep() {
     toast.info("Please rotate your device in a figure-8 pattern for 10 seconds");
     
     const calibrationInterval = setInterval(() => {
-      if (lastHeading !== null) {
-        setCalibrationSamples(prev => [...prev, lastHeading]);
+      if (compassState.heading !== null) {
+        setCalibrationSamples(prev => [...prev, compassState.heading]);
       }
     }, 100);
 
@@ -84,6 +118,7 @@ export function CompassBearingStep() {
       if (calibrationSamples.length > 0) {
         const avg = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
         setCalibrationOffset(avg);
+        localStorage.setItem('compassCalibrationOffset', avg.toString());
         toast.success("Compass calibrated successfully");
       }
     }, 10000);
@@ -91,10 +126,12 @@ export function CompassBearingStep() {
 
   const calculateHeading = (event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
     let heading = 0;
+    let accuracy = 0;
 
     if (isIOS && event.webkitCompassHeading) {
       // iOS devices
       heading = event.webkitCompassHeading;
+      accuracy = event.webkitCompassAccuracy || 0;
     } else if (event.alpha !== null) {
       // Android devices
       const alpha = event.alpha;
@@ -108,52 +145,108 @@ export function CompassBearingStep() {
         const z = Math.sin(beta * Math.PI / 180) * Math.cos(gamma * Math.PI / 180);
         
         heading = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+        accuracy = event.absolute ? 1 : 0;
       } else {
         heading = Math.round((360 - alpha) % 360);
+        accuracy = event.absolute ? 1 : 0;
       }
     }
 
-    return heading;
+    return { heading, accuracy };
   };
 
   const handleDeviceOrientation = useCallback((event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
     if (!isTracking || isLocked) return;
 
-    const heading = calculateHeading(event);
+    const { heading, accuracy } = calculateHeading(event);
     
     if (heading !== null) {
       // Apply calibration offset
       let calibratedHeading = (heading + calibrationOffset) % 360;
       if (calibratedHeading < 0) calibratedHeading += 360;
 
-      // Smooth out readings
-      if (lastHeading !== null) {
-        const diff = Math.abs(calibratedHeading - lastHeading);
-        if (diff > 180) {
-          calibratedHeading = calibratedHeading > lastHeading ? calibratedHeading - 360 : calibratedHeading + 360;
-        }
-        calibratedHeading = Math.round(lastHeading * 0.7 + calibratedHeading * 0.3);
-      }
+      // Update heading history for smoothing
+      headingHistory.current = [...headingHistory.current.slice(-SMOOTHING_WINDOW + 1), calibratedHeading];
+      
+      // Calculate smoothed heading
+      const smoothedHeading = Math.round(
+        headingHistory.current.reduce((a, b) => a + b, 0) / headingHistory.current.length
+      );
 
-      setLastHeading(calibratedHeading);
+      // Check for erratic readings
+      const isErratic = headingHistory.current.length >= 3 && 
+        Math.max(...headingHistory.current) - Math.min(...headingHistory.current) > ERRATIC_THRESHOLD;
+
+      setCompassState(prev => ({
+        ...prev,
+        heading: smoothedHeading,
+        accuracy,
+        isGPSBased: false,
+        isErratic
+      }));
+
       if (!isLocked) {
-        setFormData({ compass_bearing: calibratedHeading });
+        setFormData({ compass_bearing: smoothedHeading });
       }
 
       if (isCalibrating) {
-        setCalibrationSamples(prev => [...prev, calibratedHeading]);
+        setCalibrationSamples(prev => [...prev, smoothedHeading]);
       }
     }
-  }, [isTracking, isLocked, calibrationOffset, lastHeading, setFormData, isCalibrating]);
+  }, [isTracking, isLocked, calibrationOffset, setFormData, isCalibrating]);
+
+  const handleGPSUpdate = useCallback((position: GeolocationPosition) => {
+    if (!isTracking || isLocked || !lastPosition.current) return;
+
+    const { speed } = position.coords;
+    if (speed && speed > VELOCITY_THRESHOLD) {
+      const prevPos = lastPosition.current.coords;
+      const currPos = position.coords;
+      
+      // Calculate heading from GPS coordinates
+      const heading = Math.round(
+        (Math.atan2(
+          currPos.longitude - prevPos.longitude,
+          currPos.latitude - prevPos.latitude
+        ) * 180 / Math.PI + 360) % 360
+      );
+
+      setCompassState(prev => ({
+        ...prev,
+        heading,
+        accuracy: 1,
+        isGPSBased: true,
+        isErratic: false
+      }));
+
+      if (!isLocked) {
+        setFormData({ compass_bearing: heading });
+      }
+    }
+
+    lastPosition.current = position;
+  }, [isTracking, isLocked, setFormData]);
 
   useEffect(() => {
     if (isTracking && hasPermission) {
-      window.addEventListener('deviceorientation', handleDeviceOrientation);
+      window.addEventListener('deviceorientationabsolute', handleDeviceOrientation as EventListener);
+      window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+
+      // Start GPS tracking
+      watchId.current = navigator.geolocation.watchPosition(
+        handleGPSUpdate,
+        (error) => console.error('GPS Error:', error),
+        { enableHighAccuracy: true }
+      );
     }
     return () => {
-      window.removeEventListener('deviceorientation', handleDeviceOrientation);
+      window.removeEventListener('deviceorientationabsolute', handleDeviceOrientation as EventListener);
+      window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+      if (watchId.current !== null) {
+        navigator.geolocation.clearWatch(watchId.current);
+      }
     };
-  }, [isTracking, hasPermission, handleDeviceOrientation]);
+  }, [isTracking, hasPermission, handleDeviceOrientation, handleGPSUpdate]);
 
   const toggleTracking = () => {
     if (!hasPermission) {
@@ -175,6 +268,12 @@ export function CompassBearingStep() {
     } else {
       toast.info("Compass bearing unlocked");
     }
+  };
+
+  const getAccuracyColor = (accuracy: number) => {
+    if (accuracy >= 0.8) return "bg-green-500";
+    if (accuracy >= 0.5) return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   return (
@@ -231,6 +330,29 @@ export function CompassBearingStep() {
                 <span className="text-lg">°</span>
               </div>
             </div>
+
+            {isTracking && (
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Accuracy:</span>
+                  <div className="flex items-center space-x-2">
+                    <Progress value={compassState.accuracy * 100} className="w-24" />
+                    <span className={`w-3 h-3 rounded-full ${getAccuracyColor(compassState.accuracy)}`} />
+                  </div>
+                </div>
+                {compassState.isGPSBased && (
+                  <div className="text-sm text-blue-500">
+                    Using GPS-based heading
+                  </div>
+                )}
+                {compassState.isErratic && (
+                  <div className="flex items-center space-x-2 text-sm text-red-500">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Compass readings are erratic. Please calibrate or use manual mode.</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="text-sm text-gray-500 text-center max-w-md">
               Enter the compass bearing in degrees, where:
