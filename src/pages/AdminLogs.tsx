@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  fetchActivityLogs, fetchErrorLogs, fetchLoginLogs, fetchSystemLogs
+  fetchErrorLogs, fetchLoginLogs, fetchSystemLogs
 } from "@/lib/logsService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search, AlertCircle, Database, Shield } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Helper to get browser info
 function getBrowserInfo() {
@@ -15,21 +16,20 @@ function getBrowserInfo() {
 }
 
 export default function AdminLogs() {
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [errorLogs, setErrorLogs] = useState<any[]>([]);
-  const [loginLogs, setLoginLogs] = useState<any[]>([]);
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
-  const [searchLog, setSearchLog] = useState("");
+  const [loginLogs, setLoginLogs] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("errors");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // Fetch all logs
   const fetchAllLogs = useCallback(async () => {
     setLoading(true);
-    const [a, e, l, s] = await Promise.all([
-      fetchActivityLogs(), fetchErrorLogs(), fetchLoginLogs(), fetchSystemLogs()
+    const [e, l, s] = await Promise.all([
+      fetchErrorLogs(), fetchLoginLogs(), fetchSystemLogs()
     ]);
-    setActivityLogs(a.data || []);
     setErrorLogs(e.data || []);
     setLoginLogs(l.data || []);
     setSystemLogs(s.data || []);
@@ -55,7 +55,7 @@ export default function AdminLogs() {
   console.log("loginLogs from Supabase:", loginLogs);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-10">
       <div className="container mx-auto px-4">
         <nav className="mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -73,160 +73,164 @@ export default function AdminLogs() {
             <li className="text-gray-600">System Logs</li>
           </ol>
         </nav>
-        <h1 className="text-3xl font-bold text-green-800 mb-8 text-center">System Logs</h1>
-        <div className="flex justify-end mb-4">
-          <Button onClick={fetchAllLogs} variant="default" className="flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-3">System Logs</h1>
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            Monitor system activity, errors, and user actions
+          </p>
         </div>
-        {loading ? (
-          <div className="text-center py-10 text-gray-500">Loading logs...</div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Activity Logs */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Activity Logs</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => downloadCSV(activityLogs, ["user_email", "action", "time", "ip"], "activity_logs.csv")}>Download</Button>
-              </CardHeader>
-              <CardContent>
-                <Input
-                  placeholder="Search activity logs..."
-                  value={searchLog}
-                  onChange={e => setSearchLog(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead>IP</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activityLogs
-                        .filter(l =>
-                          l.user_email?.toLowerCase().includes(searchLog.toLowerCase()) ||
-                          l.action?.toLowerCase().includes(searchLog.toLowerCase())
-                        )
-                        .slice(0, 5)
-                        .map(log => (
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-lg mb-8">
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-100 p-3 rounded-xl">
+                  <Database className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-xl font-semibold text-gray-900">Log Management</CardTitle>
+              </div>
+              <Button onClick={fetchAllLogs} variant="outline" className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Refresh Logs
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search logs..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Button variant="outline">Filter</Button>
+                <Button variant="outline">Export</Button>
+              </div>
+
+              <Tabs defaultValue="errors" className="space-y-4">
+                <TabsList className="bg-gray-100 p-1 rounded-lg">
+                  <TabsTrigger
+                    value="errors"
+                    className="data-[state=active]:bg-white data-[state=active]:text-red-600 data-[state=active]:shadow-sm"
+                  >
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Error Logs
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="system"
+                    className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm"
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    System Logs
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="login"
+                    className="data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Login Logs
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="errors" className="space-y-4">
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Level</TableHead>
+                          <TableHead>Message</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {errorLogs.map((log) => (
                           <TableRow key={log.id}>
-                            <TableCell>{log.user_email}</TableCell>
-                            <TableCell>{log.action}</TableCell>
-                            <TableCell>{log.time}</TableCell>
-                            <TableCell>{log.ip}</TableCell>
+                            <TableCell className="text-sm">{log.time}</TableCell>
+                            <TableCell className="text-sm">
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                log.level === 'Error' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {log.level}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm">{log.message}</TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                                Error
+                              </span>
+                            </TableCell>
                           </TableRow>
                         ))}
-                    </TableBody>
-                  </Table>
-                  {activityLogs.length === 0 && <div className="text-center text-gray-400 py-4">No activity logs found.</div>}
-                </div>
-              </CardContent>
-            </Card>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
 
-            {/* Error Logs */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Error Logs</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => downloadCSV(errorLogs, ["level", "message", "time"], "error_logs.csv")}>Download</Button>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Level</TableHead>
-                        <TableHead>Message</TableHead>
-                        <TableHead>Time</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {errorLogs.slice(0, 5).map(log => (
-                        <TableRow key={log.id}>
-                          <TableCell>{log.level}</TableCell>
-                          <TableCell>{log.message}</TableCell>
-                          <TableCell>{log.time}</TableCell>
+                <TabsContent value="system" className="space-y-4">
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Job</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Details</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {errorLogs.length === 0 && <div className="text-center text-gray-400 py-4">No error logs found.</div>}
-                </div>
-              </CardContent>
-            </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {systemLogs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="text-sm">{log.time}</TableCell>
+                            <TableCell className="text-sm">{log.job}</TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                log.status === 'Success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {log.status}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm">-</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
 
-            {/* System Logs */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>System Logs</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => downloadCSV(systemLogs, ["job", "status", "time"], "system_logs.csv")}>Download</Button>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Job</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Time</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {systemLogs.slice(0, 5).map(log => (
-                        <TableRow key={log.id}>
-                          <TableCell>{log.job}</TableCell>
-                          <TableCell>{log.status}</TableCell>
-                          <TableCell>{log.time}</TableCell>
+                <TabsContent value="login" className="space-y-4">
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email ID</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Status</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {systemLogs.length === 0 && <div className="text-center text-gray-400 py-4">No system logs found.</div>}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Login Logs */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Login Logs</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => downloadCSV(loginLogs, ["user_email", "status", "time", "ip", "browser"], "login_logs.csv")}>Download</Button>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead>IP</TableHead>
-                        <TableHead>Browser</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loginLogs.slice(0, 5).map(log => (
-                        <TableRow key={log.id}>
-                          <TableCell>{log.user_email}</TableCell>
-                          <TableCell>{log.status}</TableCell>
-                          <TableCell>{log.time}</TableCell>
-                          <TableCell>{log.ip}</TableCell>
-                          <TableCell>{log.browser}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {loginLogs.length === 0 && <div className="text-center text-gray-400 py-4">No login logs found.</div>}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                      </TableHeader>
+                      <TableBody>
+                        {loginLogs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="text-sm font-medium">{log.email || log.user}</TableCell>
+                            <TableCell className="text-sm">{log.time}</TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                log.status === 'Success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {log.status === 'Success' ? 'Successful' : 'Failed'}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -29,17 +29,18 @@ export class ActivityReportService {
         return data as ActivityReport;
     }
 
-    async getById(id: string): Promise<ActivityReport> {
+    async getById(id: string): Promise<ActivityReport | null> {
         const { data, error } = await supabase
             .from(this.table)
             .select()
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
         if (error) {
             throw new Error(`Error fetching activity report: ${error.message}`);
         }
 
+        if (!data) return null;
         return data as ActivityReport;
     }
 
