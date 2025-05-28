@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useActivityForm } from '@/contexts/ActivityFormContext';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Compass, Lock, Unlock } from "lucide-react";
+import { Compass, Lock, Unlock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export function CompassBearingStep() {
   const { formData, setFormData } = useActivityForm();
   const [isTracking, setIsTracking] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationSamples, setCalibrationSamples] = useState<number[]>([]);
+  const [calibrationOffset, setCalibrationOffset] = useState(0);
+  const [lastHeading, setLastHeading] = useState<number | null>(null);
 
   const handleBearingChange = (value: string) => {
     const bearing = parseInt(value);
@@ -18,6 +22,71 @@ export function CompassBearingStep() {
       setFormData({ compass_bearing: bearing });
     }
   };
+
+  const startCalibration = () => {
+    setIsCalibrating(true);
+    setCalibrationSamples([]);
+    toast.info("Please rotate your device in a figure-8 pattern for 10 seconds");
+    
+    // Stop calibration after 10 seconds
+    setTimeout(() => {
+      setIsCalibrating(false);
+      if (calibrationSamples.length > 0) {
+        const avg = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
+        setCalibrationOffset(avg);
+        toast.success("Compass calibrated successfully");
+      }
+    }, 10000);
+  };
+
+  const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
+    if (isLocked || isCalibrating) return;
+    
+    let heading: number | null = null;
+    
+    if ('webkitCompassHeading' in event) {
+      // iOS devices
+      heading = (event as any).webkitCompassHeading;
+    } else if (event.alpha !== null) {
+      // Android devices
+      const alpha = event.alpha;
+      const beta = event.beta;
+      const gamma = event.gamma;
+      
+      // Convert to heading using device orientation
+      if (beta !== null && gamma !== null) {
+        // Calculate heading based on device orientation
+        const x = Math.cos(beta * Math.PI / 180);
+        const y = Math.sin(beta * Math.PI / 180) * Math.sin(gamma * Math.PI / 180);
+        const z = Math.sin(beta * Math.PI / 180) * Math.cos(gamma * Math.PI / 180);
+        
+        heading = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+      } else {
+        heading = Math.round((360 - alpha) % 360);
+      }
+    }
+
+    if (heading !== null) {
+      // Apply calibration offset
+      heading = (heading + calibrationOffset) % 360;
+      
+      // Smooth out readings
+      if (lastHeading !== null) {
+        const diff = Math.abs(heading - lastHeading);
+        if (diff > 180) {
+          heading = heading > lastHeading ? heading - 360 : heading + 360;
+        }
+        heading = Math.round(lastHeading * 0.7 + heading * 0.3);
+      }
+      
+      setLastHeading(heading);
+      setFormData({ compass_bearing: heading });
+      
+      if (isCalibrating && heading !== null) {
+        setCalibrationSamples(prev => [...prev, heading]);
+      }
+    }
+  }, [isLocked, isCalibrating, calibrationOffset, lastHeading, setFormData]);
 
   const startCompassTracking = () => {
     if (!window.DeviceOrientationEvent) {
@@ -48,36 +117,13 @@ export function CompassBearingStep() {
   const enableCompassTracking = () => {
     setIsTracking(true);
     setIsLocked(false);
-    window.addEventListener('deviceorientationabsolute', handleOrientation);
     window.addEventListener('deviceorientation', handleOrientation);
     toast.success("Compass tracking started");
   };
 
   const stopCompassTracking = () => {
     setIsTracking(false);
-    window.removeEventListener('deviceorientationabsolute', handleOrientation);
     window.removeEventListener('deviceorientation', handleOrientation);
-  };
-
-  const handleOrientation = (event: DeviceOrientationEvent) => {
-    if (isLocked) return;
-    
-    // Get the compass heading
-    let heading: number | null = null;
-    
-    if ('webkitCompassHeading' in event) {
-      // iOS devices
-      heading = (event as any).webkitCompassHeading;
-    } else if (event.alpha !== null) {
-      // Android devices
-      heading = 360 - event.alpha;
-    }
-
-    if (heading !== null) {
-      // Round to nearest degree
-      const roundedHeading = Math.round(heading);
-      setFormData({ compass_bearing: roundedHeading });
-    }
   };
 
   const toggleLock = () => {
@@ -116,14 +162,25 @@ export function CompassBearingStep() {
               </Button>
               
               {isTracking && (
-                <Button
-                  type="button"
-                  onClick={toggleLock}
-                  variant="outline"
-                  className={isLocked ? 'border-orange-500 text-orange-500' : 'border-green-500 text-green-500'}
-                >
-                  {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    onClick={toggleLock}
+                    variant="outline"
+                    className={isLocked ? 'border-orange-500 text-orange-500' : 'border-green-500 text-green-500'}
+                  >
+                    {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={startCalibration}
+                    variant="outline"
+                    className="border-blue-500 text-blue-500"
+                    disabled={isCalibrating}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isCalibrating ? 'animate-spin' : ''}`} />
+                  </Button>
+                </>
               )}
             </div>
 

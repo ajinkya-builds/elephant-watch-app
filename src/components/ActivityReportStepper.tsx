@@ -108,12 +108,7 @@ function StepperContent() {
           ? formData.activity_date
           : formData.activity_date?.toISOString().split('T')[0];
 
-      const formattedTime =
-        typeof formData.activity_time === 'string'
-          ? (formData.activity_time.length === 5
-              ? formData.activity_time + ':00'
-              : formData.activity_time)
-          : formData.activity_time?.toString().slice(0, 8); // fallback
+      const formattedTime = formData.activity_time || '';
 
       // Explicitly cast and log types
       const latitude = Number(formData.latitude);
@@ -156,9 +151,10 @@ function StepperContent() {
 
       toast.success('Activity report submitted successfully')
       navigate('/')
-    } catch (error) {
-      console.error('Error submitting activity report:', error)
-      toast.error(error.message || 'Failed to submit activity report')
+    } catch (error: unknown) {
+      console.error('Error submitting activity report:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit activity report';
+      toast.error(errorMessage);
     }
   }
 
@@ -181,17 +177,20 @@ function StepperContent() {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-lg">
-      <CardHeader className="flex flex-col gap-4">
+    <Card className="w-full bg-white rounded-xl shadow-sm border border-gray-100">
+      <CardHeader className="space-y-6 p-6 border-b border-gray-100">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold text-green-800">
+          <CardTitle className="text-2xl font-bold text-gray-900">
             Elephant Watch Report
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-600">
               Step {currentStepIndex + 1} of {steps.length}
             </span>
-            <Progress value={((currentStepIndex + 1) / steps.length) * 100} className="w-48" />
+            <Progress 
+              value={((currentStepIndex + 1) / steps.length) * 100} 
+              className="w-48 h-2 bg-gray-100" 
+            />
           </div>
         </div>
         
@@ -202,8 +201,10 @@ function StepperContent() {
               variant={index === currentStepIndex ? "default" : "outline"}
               size="sm"
               className={`
-                ${index === currentStepIndex ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-white hover:bg-green-100'}
-                flex items-center gap-2 px-4 py-2 rounded-md
+                ${index === currentStepIndex 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' 
+                  : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200'}
+                flex items-center gap-2 px-4 py-2 rounded-md transition-colors
               `}
               disabled={index > currentStepIndex && !isStepValid(steps[index - 1].type)}
             >
@@ -217,11 +218,12 @@ function StepperContent() {
       <CardContent className="p-6">
         {CurrentStepComponent && <CurrentStepComponent />}
 
-        <div className="flex justify-between mt-6">
+        <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
           <Button
             variant="outline"
             onClick={goToPreviousStep}
             disabled={currentStepIndex === 0 || isSubmitting}
+            className="border-gray-200 text-gray-600 hover:bg-gray-50"
           >
             Previous
           </Button>
@@ -229,7 +231,7 @@ function StepperContent() {
             <Button
               onClick={handleSubmit}
               disabled={!isStepValid(currentStep) || isSubmitting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Report'}
             </Button>
@@ -237,6 +239,7 @@ function StepperContent() {
             <Button
               onClick={goToNextStep}
               disabled={!isStepValid(currentStep) || isSubmitting}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Next
             </Button>

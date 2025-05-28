@@ -11,6 +11,7 @@ import { ActivityReport } from "@/lib/observations";
 import { toast } from "sonner";
 import { Loader2, ChevronLeft, ChevronRight, Download, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 
 // All user_id references in this file must be public.users.id, not the auth UID. If setting user_id, look up by auth_id.
 
@@ -294,43 +295,35 @@ export default function AdminObservations() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        <nav className="mb-6" aria-label="Breadcrumb">
-          <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <li>
-              <button
-                className="hover:underline text-green-800 font-medium"
-                onClick={() => navigate('/admin')}
-              >
-                Admin Panel
-              </button>
-            </li>
-            <li><span className="mx-1">/</span></li>
-            <li className="text-gray-600">Observation & Report Management</li>
-          </ol>
-        </nav>
+        <Breadcrumb
+          items={[
+            { label: "Admin", href: "/admin" },
+            { label: "Observation & Report Management" }
+          ]}
+        />
 
-        <h1 className="text-3xl font-bold text-green-800 mb-8 text-center">
+        <h1 className="text-3xl font-bold mb-8 text-center bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
           Observation & Report Management
         </h1>
 
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="border-blue-100 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CardTitle className="text-xl">User-Submitted Reports</CardTitle>
+              <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">User-Submitted Reports</CardTitle>
               <div className="flex gap-2">
                 <Button 
                   variant="outline"
                   onClick={() => setFilters(prev => ({ ...prev, showUnsyncedOnly: !prev.showUnsyncedOnly }))}
-                  className={filters.showUnsyncedOnly ? "bg-red-100" : ""}
+                  className={`border-blue-200 hover:bg-blue-50 hover:text-blue-600 ${filters.showUnsyncedOnly ? "bg-red-100" : ""}`}
                 >
                   {filters.showUnsyncedOnly ? "Show All" : "Show Unsynced Only"}
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={handleExport}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 border-blue-200 hover:bg-blue-50 hover:text-blue-600"
                 >
                   <Download className="w-4 h-4" />
                   Export CSV
@@ -339,6 +332,7 @@ export default function AdminObservations() {
                   variant="destructive" 
                   onClick={handleBulkDelete}
                   disabled={selectedReports.size === 0}
+                  className="bg-red-500 hover:bg-red-600"
                 >
                   Delete Selected
                 </Button>
@@ -351,17 +345,19 @@ export default function AdminObservations() {
                 placeholder="Search by reporter name..."
                 value={filters.reporterName}
                 onChange={(e) => setFilters(prev => ({ ...prev, reporterName: e.target.value }))}
+                className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
               />
               <DatePicker
                 selected={filters.dateRange}
                 onChange={(date) => setFilters(prev => ({ ...prev, dateRange: date }))}
                 placeholderText="Filter by date..."
+                className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
               />
               <Select
                 value={pageSize.toString()}
                 onValueChange={(value) => setPageSize(Number(value))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-blue-100 focus:border-blue-500 focus:ring-blue-500">
                   <SelectValue placeholder="Rows per page" />
                 </SelectTrigger>
                 <SelectContent>
@@ -375,15 +371,15 @@ export default function AdminObservations() {
 
             <div className="relative">
               {isLoading && (
-                <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-                  <Loader2 className="w-8 h-8 animate-spin text-green-800" />
+                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                 </div>
               )}
               
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-blue-50">
                       <TableHead className="w-[50px]">
                         <Checkbox
                           checked={selectedReports.size === observations.length}
@@ -394,24 +390,25 @@ export default function AdminObservations() {
                               setSelectedReports(new Set());
                             }
                           }}
+                          className="border-blue-200"
                         />
                       </TableHead>
                       <TableHead 
-                        className="cursor-pointer"
+                        className="cursor-pointer text-blue-900"
                         onClick={() => handleSort('created_at')}
                       >
                         Date/Time {sortConfig?.key === 'created_at' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                       </TableHead>
-                      <TableHead>Reporter</TableHead>
-                      <TableHead>Details</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-blue-900">Reporter</TableHead>
+                      <TableHead className="text-blue-900">Details</TableHead>
+                      <TableHead className="text-blue-900">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {observations.map(obs => {
                       const isSynced = obs.activity_observation && obs.activity_observation.length > 0;
                       return (
-                        <TableRow key={obs.id}>
+                        <TableRow key={obs.id} className="hover:bg-blue-50/50 transition-colors">
                           <TableCell>
                             <Checkbox
                               checked={selectedReports.has(obs.id)}
@@ -424,6 +421,7 @@ export default function AdminObservations() {
                                 }
                                 setSelectedReports(newSelected);
                               }}
+                              className="border-blue-200"
                             />
                           </TableCell>
                           <TableCell>{new Date(obs.created_at).toLocaleString()}</TableCell>
@@ -439,7 +437,7 @@ export default function AdminObservations() {
                                 <Button
                                   size="sm"
                                   variant="default"
-                                  className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white"
+                                  className="flex items-center gap-1 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
                                   disabled
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
@@ -451,7 +449,7 @@ export default function AdminObservations() {
                                   variant="destructive"
                                   onClick={() => handleManualSync(obs.id)}
                                   disabled={syncing === obs.id}
-                                  className="flex items-center gap-1"
+                                  className="flex items-center gap-1 bg-red-500 hover:bg-red-600"
                                 >
                                   {syncing === obs.id ? (
                                     <>
@@ -466,16 +464,27 @@ export default function AdminObservations() {
                                   )}
                                 </Button>
                               )}
-                              <Button size="sm" variant="outline" onClick={() => setViewObs(obs)}>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => setViewObs(obs)}
+                                className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                              >
                                 View
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => setEditObs(obs)}>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => setEditObs(obs)}
+                                className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                              >
                                 Edit
                               </Button>
                               <Button 
                                 size="sm" 
                                 variant="destructive" 
                                 onClick={() => handleDelete(obs.id)}
+                                className="bg-red-500 hover:bg-red-600"
                               >
                                 Delete
                               </Button>
@@ -489,7 +498,7 @@ export default function AdminObservations() {
               </div>
 
               <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-blue-900">
                   Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalRecords)} of {totalRecords} records
                 </div>
                 <div className="flex items-center gap-2">
@@ -498,10 +507,11 @@ export default function AdminObservations() {
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
+                    className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  <span className="text-sm">
+                  <span className="text-sm text-blue-900">
                     Page {currentPage} of {totalPages}
                   </span>
                   <Button
@@ -509,6 +519,7 @@ export default function AdminObservations() {
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
+                    className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </Button>
@@ -520,62 +531,68 @@ export default function AdminObservations() {
 
         {/* View Modal */}
         {viewObs && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl">
-              <h2 className="text-xl font-bold mb-4">View Report</h2>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl border border-blue-100">
+              <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">View Report</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p><strong>Date:</strong> {new Date(viewObs.created_at).toLocaleDateString()}</p>
-                  <p><strong>Time:</strong> {new Date(viewObs.created_at).toLocaleTimeString()}</p>
-                  <p><strong>Reporter:</strong> {`${viewObs.users?.first_name || ''} ${viewObs.users?.last_name || ''}`.trim() || 'Unknown'}</p>
-                  {viewObs.reporter_mobile && <p><strong>Contact:</strong> {viewObs.reporter_mobile}</p>}
-                  {viewObs.email && <p><strong>Email:</strong> {viewObs.email}</p>}
-                  {viewObs.associated_division && <p><strong>Division:</strong> {viewObs.associated_division}</p>}
-                  {viewObs.associated_range && <p><strong>Range:</strong> {viewObs.associated_range}</p>}
-                  {viewObs.associated_beat && <p><strong>Beat:</strong> {viewObs.associated_beat}</p>}
+                  <p className="text-blue-900"><strong>Date:</strong> {new Date(viewObs.created_at).toLocaleDateString()}</p>
+                  <p className="text-blue-900"><strong>Time:</strong> {new Date(viewObs.created_at).toLocaleTimeString()}</p>
+                  <p className="text-blue-900"><strong>Reporter:</strong> {`${viewObs.users?.first_name || ''} ${viewObs.users?.last_name || ''}`.trim() || 'Unknown'}</p>
+                  {viewObs.reporter_mobile && <p className="text-blue-900"><strong>Contact:</strong> {viewObs.reporter_mobile}</p>}
+                  {viewObs.email && <p className="text-blue-900"><strong>Email:</strong> {viewObs.email}</p>}
+                  {viewObs.associated_division && <p className="text-blue-900"><strong>Division:</strong> {viewObs.associated_division}</p>}
+                  {viewObs.associated_range && <p className="text-blue-900"><strong>Range:</strong> {viewObs.associated_range}</p>}
+                  {viewObs.associated_beat && <p className="text-blue-900"><strong>Beat:</strong> {viewObs.associated_beat}</p>}
                 </div>
                 <div>
-                  {viewObs.total_elephants > 0 && <p><strong>Total Elephants:</strong> {viewObs.total_elephants}</p>}
-                  {viewObs.damage_done && <p><strong>Damage:</strong> {viewObs.damage_done}</p>}
-                  {viewObs.damage_description && <p><strong>Description:</strong> {viewObs.damage_description}</p>}
-                  {viewObs.latitude && <p><strong>Latitude:</strong> {viewObs.latitude}</p>}
-                  {viewObs.longitude && <p><strong>Longitude:</strong> {viewObs.longitude}</p>}
+                  {viewObs.total_elephants > 0 && <p className="text-blue-900"><strong>Total Elephants:</strong> {viewObs.total_elephants}</p>}
+                  {viewObs.damage_done && <p className="text-blue-900"><strong>Damage:</strong> {viewObs.damage_done}</p>}
+                  {viewObs.damage_description && <p className="text-blue-900"><strong>Description:</strong> {viewObs.damage_description}</p>}
+                  {viewObs.latitude && <p className="text-blue-900"><strong>Latitude:</strong> {viewObs.latitude}</p>}
+                  {viewObs.longitude && <p className="text-blue-900"><strong>Longitude:</strong> {viewObs.longitude}</p>}
                   {viewObs.activity_observation?.[0] && (
                     <>
-                      <p className="mt-4 font-semibold text-green-800">Observation Details:</p>
+                      <p className="mt-4 font-semibold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Observation Details:</p>
                       {viewObs.activity_observation[0].total_elephants > 0 && (
-                        <p><strong>Observed Elephants:</strong> {viewObs.activity_observation[0].total_elephants}</p>
+                        <p className="text-blue-900"><strong>Observed Elephants:</strong> {viewObs.activity_observation[0].total_elephants}</p>
                       )}
                       {viewObs.activity_observation[0].adult_male_count > 0 && (
-                        <p><strong>Adult Males:</strong> {viewObs.activity_observation[0].adult_male_count}</p>
+                        <p className="text-blue-900"><strong>Adult Males:</strong> {viewObs.activity_observation[0].adult_male_count}</p>
                       )}
                       {viewObs.activity_observation[0].adult_female_count > 0 && (
-                        <p><strong>Adult Females:</strong> {viewObs.activity_observation[0].adult_female_count}</p>
+                        <p className="text-blue-900"><strong>Adult Females:</strong> {viewObs.activity_observation[0].adult_female_count}</p>
                       )}
                       {viewObs.activity_observation[0].sub_adult_male_count > 0 && (
-                        <p><strong>Sub-adult Males:</strong> {viewObs.activity_observation[0].sub_adult_male_count}</p>
+                        <p className="text-blue-900"><strong>Sub-adult Males:</strong> {viewObs.activity_observation[0].sub_adult_male_count}</p>
                       )}
                       {viewObs.activity_observation[0].sub_adult_female_count > 0 && (
-                        <p><strong>Sub-adult Females:</strong> {viewObs.activity_observation[0].sub_adult_female_count}</p>
+                        <p className="text-blue-900"><strong>Sub-adult Females:</strong> {viewObs.activity_observation[0].sub_adult_female_count}</p>
                       )}
                       {viewObs.activity_observation[0].calf_count > 0 && (
-                        <p><strong>Calves:</strong> {viewObs.activity_observation[0].calf_count}</p>
+                        <p className="text-blue-900"><strong>Calves:</strong> {viewObs.activity_observation[0].calf_count}</p>
                       )}
                       {viewObs.activity_observation[0].damage_done && (
-                        <p><strong>Observed Damage:</strong> {viewObs.activity_observation[0].damage_done}</p>
+                        <p className="text-blue-900"><strong>Observed Damage:</strong> {viewObs.activity_observation[0].damage_done}</p>
                       )}
                       {viewObs.activity_observation[0].damage_description && (
-                        <p><strong>Damage Description:</strong> {viewObs.activity_observation[0].damage_description}</p>
+                        <p className="text-blue-900"><strong>Damage Description:</strong> {viewObs.activity_observation[0].damage_description}</p>
                       )}
                       {viewObs.activity_observation[0].created_at && (
-                        <p><strong>Observation Date:</strong> {new Date(viewObs.activity_observation[0].created_at).toLocaleString()}</p>
+                        <p className="text-blue-900"><strong>Observation Date:</strong> {new Date(viewObs.activity_observation[0].created_at).toLocaleString()}</p>
                       )}
                     </>
                   )}
                 </div>
               </div>
-              <div className="mt-4 flex justify-end">
-                <Button variant="outline" onClick={() => setViewObs(null)}>Close</Button>
+              <div className="mt-6 flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setViewObs(null)}
+                  className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                >
+                  Close
+                </Button>
               </div>
             </div>
           </div>
@@ -583,9 +600,9 @@ export default function AdminObservations() {
 
         {/* Edit Modal */}
         {editObs && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl">
-              <h2 className="text-xl font-bold mb-4">Edit Report</h2>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl border border-blue-100">
+              <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Edit Report</h2>
               <form 
                 className="space-y-4"
                 onSubmit={(e) => {
@@ -600,23 +617,44 @@ export default function AdminObservations() {
               >
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Total Elephants</label>
-                    <Input name="total_elephants" type="number" defaultValue={editObs.total_elephants} />
+                    <label className="block text-sm font-medium mb-1 text-blue-900">Total Elephants</label>
+                    <Input 
+                      name="total_elephants" 
+                      type="number" 
+                      defaultValue={editObs.total_elephants}
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Damage Done</label>
-                    <Input name="damage_done" defaultValue={editObs.damage_done} />
+                    <label className="block text-sm font-medium mb-1 text-blue-900">Damage Done</label>
+                    <Input 
+                      name="damage_done" 
+                      defaultValue={editObs.damage_done}
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium mb-1">Description</label>
-                    <Input name="damage_description" defaultValue={editObs.damage_description || ''} />
+                    <label className="block text-sm font-medium mb-1 text-blue-900">Description</label>
+                    <Input 
+                      name="damage_description" 
+                      defaultValue={editObs.damage_description || ''}
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setEditObs(null)}>
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setEditObs(null)}
+                    className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <Button 
+                    type="submit"
+                    className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white shadow-sm"
+                  >
                     Save Changes
                   </Button>
                 </div>

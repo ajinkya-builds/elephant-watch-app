@@ -98,4 +98,34 @@ SELECT
 FROM system_logs
 WHERE time >= NOW() - INTERVAL '24 hours'
 ORDER BY event_time DESC
-LIMIT 50; 
+LIMIT 50;
+
+-- Map Observations View
+CREATE OR REPLACE VIEW v_map_observations AS
+SELECT 
+    ao.id,
+    ao.latitude,
+    ao.longitude,
+    ao.activity_date,
+    ao.activity_time,
+    ao.observation_type,
+    ao.total_elephants,
+    ao.male_elephants,
+    ao.female_elephants,
+    ao.unknown_elephants,
+    ao.calves,
+    ao.indirect_sighting_type,
+    ao.loss_type,
+    ao.compass_bearing,
+    ao.photo_url,
+    ao.associated_division,
+    ao.associated_range,
+    ao.associated_beat,
+    u.email as observer_email,
+    CONCAT(u.first_name, ' ', u.last_name) as observer_name,
+    ao.created_at
+FROM activity_observation ao
+LEFT JOIN users u ON ao.user_id = u.id
+WHERE ao.latitude IS NOT NULL 
+  AND ao.longitude IS NOT NULL
+ORDER BY ao.created_at DESC; 

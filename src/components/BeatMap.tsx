@@ -2,10 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '@/styles/BeatMap.css';
 import { supabase } from '@/lib/supabaseClient';
 import { ewkbHexToGeoJSON } from '@/lib/utils/geometryUtils';
-import { Polygon as GeoJSONPolygon } from 'geojson';
+import { Polygon as GeoJSONPolygon, Position } from 'geojson';
 import { ActivityObservation } from '@/types/activity-observation';
+
+// Create custom marker icon
+const customIcon = new L.DivIcon({
+  className: 'custom-marker',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+  popupAnchor: [0, -6]
+});
 
 // Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -19,7 +28,7 @@ interface BeatPolygonData {
   id: string;
   beat_id: string;
   name: string;
-  polygon: GeoJSONPolygon; // GeoJSON polygon after conversion
+  polygon: GeoJSONPolygon;
   range_id: string;
   division_id: string;
   range_name?: string;
@@ -30,7 +39,7 @@ interface RangePolygonData {
   id: string;
   range_id: string;
   name: string;
-  polygon: GeoJSONPolygon; // GeoJSON polygon after conversion
+  polygon: GeoJSONPolygon;
   division_id: string;
   division_name?: string;
 }
@@ -39,7 +48,7 @@ interface DivisionPolygonData {
   id: string;
   division_id: string;
   name: string;
-  polygon: GeoJSONPolygon; // GeoJSON polygon after conversion
+  polygon: GeoJSONPolygon;
 }
 
 interface BeatData {
@@ -93,6 +102,20 @@ function MapZoomHandler({ onZoomChange }: { onZoomChange: (zoom: number) => void
     };
   }, [map, onZoomChange]);
 
+  return null;
+}
+
+// Add this component to fit map bounds to markers
+function MapBounds({ observations }: { observations: ActivityObservation[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (observations.length > 0) {
+      const bounds = L.latLngBounds(
+        observations.map(obs => [Number(obs.latitude), Number(obs.longitude)])
+      );
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [observations, map]);
   return null;
 }
 
@@ -374,7 +397,7 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
     async function fetchObservations() {
       try {
         const { data, error } = await supabase
-          .from('activity_observation')
+          .from('v_map_observations')
           .select('*');
         if (error) throw error;
         setObservations(data || []);
@@ -385,80 +408,49 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
     fetchObservations();
   }, []);
 
-  if (loading) return <div>Loading polygon data...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!beatPolygon && !rangePolygon && !divisionPolygon) {
-    return <div>Select a beat, range, or division to view the map</div>;
-  }
+  // Debug: Log observations
+  console.log('Observations for markers:', observations);
 
-  // Calculate the center based on available polygons
-  let center: [number, number] = [20.5937, 78.9629]; // Default to central India
-  let positions: [number, number][] = [];
-
-  if (beatPolygon?.polygon?.coordinates?.[0]) {
-    positions = beatPolygon.polygon.coordinates[0]
-      .map((coord: [number, number]) => {
-        const [lng, lat] = coord;
-        // Validate coordinates
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn('Invalid beat coordinates:', coord);
-          return null;
-        }
-        return [lat, lng] as [number, number];
-      })
-      .filter((coord): coord is [number, number] => coord !== null);
-  } else if (rangePolygon?.polygon?.coordinates?.[0]) {
-    positions = rangePolygon.polygon.coordinates[0]
-      .map((coord: [number, number]) => {
-        const [lng, lat] = coord;
-        // Validate coordinates
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn('Invalid range coordinates:', coord);
-          return null;
-        }
-        return [lat, lng] as [number, number];
-      })
-      .filter((coord): coord is [number, number] => coord !== null);
-  } else if (divisionPolygon?.polygon?.coordinates?.[0]) {
-    positions = divisionPolygon.polygon.coordinates[0]
-      .map((coord: [number, number]) => {
-        const [lng, lat] = coord;
-        // Validate coordinates
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn('Invalid division coordinates:', coord);
-          return null;
-        }
-        return [lat, lng] as [number, number];
-      })
-      .filter((coord): coord is [number, number] => coord !== null);
-  }
-
-  if (positions.length > 0) {
-    center = calculateCentroid(positions);
-  }
+  // Calculate initial center based on observations
+  const initialCenter = observations.length > 0
+    ? [Number(observations[0].latitude), Number(observations[0].longitude)]
+    : [20.5937, 78.9629]; // Default to central India
 
   // Determine which boundaries to show based on zoom level
   const showDivision = zoomLevel <= 10 && divisionPolygon;
   const showRange = zoomLevel <= 11 && rangePolygon;
   const showBeat = zoomLevel >= 11 && beatPolygon;
 
+  console.log('BeatMap component is mounted!');
+  console.log('Rendering BeatMap, observations:', observations);
+
+  observations.forEach(obs => {
+    console.log('Marker:', obs.id, obs.latitude, obs.longitude, typeof obs.latitude, typeof obs.longitude);
+  });
+
   return (
-    <div className="h-full w-full">
+    <div className="map-container">
+      {loading && <div className="map-loading">Loading map data...</div>}
+      {error && <div className="map-error">{error}</div>}
       <MapContainer
-        center={center}
-        zoom={13}
-        style={{ height: "100%", width: "100%" }}
+        center={initialCenter as [number, number]}
+        zoom={zoomLevel}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={true}
+        scrollWheelZoom={true}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         <MapZoomHandler onZoomChange={setZoomLevel} />
+        {/* Fit map to marker bounds */}
+        <MapBounds observations={observations} />
         
         {showDivision && divisionPolygon && (
           <Polygon
-            positions={divisionPolygon.polygon.coordinates[0].map((coord: [number, number]) => {
-              const [lng, lat] = coord;
+            positions={divisionPolygon.polygon.coordinates[0].map((coord: Position) => {
+              const [lng, lat] = coord as [number, number];
               return [lat, lng] as [number, number];
             })}
             pathOptions={{ 
@@ -479,8 +471,8 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
 
         {showRange && rangePolygon && (
           <Polygon
-            positions={rangePolygon.polygon.coordinates[0].map((coord: [number, number]) => {
-              const [lng, lat] = coord;
+            positions={rangePolygon.polygon.coordinates[0].map((coord: Position) => {
+              const [lng, lat] = coord as [number, number];
               return [lat, lng] as [number, number];
             })}
             pathOptions={{ 
@@ -504,9 +496,8 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
 
         {showBeat && beatPolygon && (
           <Polygon
-            positions={beatPolygon.polygon.coordinates[0].map((coord: [number, number]) => {
-              const [lng, lat] = coord;
-              console.log('Rendering beat coordinate:', [lat, lng]);
+            positions={beatPolygon.polygon.coordinates[0].map((coord: Position) => {
+              const [lng, lat] = coord as [number, number];
               return [lat, lng] as [number, number];
             })}
             pathOptions={{ 
@@ -531,19 +522,30 @@ export function BeatMap({ selectedBeat, selectedRange, selectedDivision }: BeatM
           </Polygon>
         )}
 
-        {/* Render observation markers */}
-        {observations.map(obs => (
-          <Marker key={obs.id} position={[obs.latitude, obs.longitude]}>
-            <Popup>
-              <div>
-                <div className="font-bold">{obs.observation_type}</div>
-                <div>Date: {obs.activity_date?.toString?.()}</div>
-                <div>Time: {obs.activity_time}</div>
-                {obs.loss_type && <div>Loss: {obs.loss_type}</div>}
-                {obs.total_elephants !== undefined && <div>Total Elephants: {obs.total_elephants}</div>}
-              </div>
-            </Popup>
-          </Marker>
+        {/* Render observation markers, filter out invalid coordinates, use default marker icon for debugging */}
+        {observations
+          .filter(obs => !isNaN(Number(obs.latitude)) && !isNaN(Number(obs.longitude)))
+          .map((observation) => (
+            <Marker
+              key={observation.id}
+              position={[Number(observation.latitude), Number(observation.longitude)]}
+              // icon={customIcon} // Use default icon for debugging
+            >
+              <Popup>
+                <div className="observation-popup">
+                  <h3>Elephant Observation</h3>
+                  <p><strong>Date:</strong> {new Date(observation.activity_date).toLocaleDateString()}</p>
+                  <p><strong>Time:</strong> {observation.activity_time}</p>
+                  <p><strong>Type:</strong> {observation.observation_type}</p>
+                  <div className="details">
+                    <p><strong>Total Elephants:</strong> {observation.total_elephants}</p>
+                    {observation.male_elephants && <p><strong>Males:</strong> {observation.male_elephants}</p>}
+                    {observation.female_elephants && <p><strong>Females:</strong> {observation.female_elephants}</p>}
+                    {observation.calves && <p><strong>Calves:</strong> {observation.calves}</p>}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
         ))}
       </MapContainer>
     </div>

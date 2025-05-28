@@ -21,6 +21,7 @@ import AdminNotifications from "./pages/AdminNotifications";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { checkSupabaseConnection } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { Footer } from "@/components/Footer";
 
 const queryClient = new QueryClient();
 
@@ -63,6 +64,7 @@ const App = () => {
                   <ProtectedRoute>
                     <Header />
                     <Index />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -74,6 +76,7 @@ const App = () => {
                   <ProtectedRoute>
                     <Header />
                     <Dashboard />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -85,6 +88,7 @@ const App = () => {
                   <ProtectedRoute>
                     <Header />
                     <ReportActivityPage />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -96,6 +100,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <Admin />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -105,6 +110,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <AdminUsers />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -114,6 +120,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <AdminObservations />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -123,6 +130,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <AdminStatistics />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -132,6 +140,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <AdminSettings />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -141,6 +150,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <AdminLogs />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -150,6 +160,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="admin">
                     <Header />
                     <AdminNotifications />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -161,6 +172,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="manager">
                     <Header />
                     <AdminUsers />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -170,6 +182,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="manager">
                     <Header />
                     <AdminObservations />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -179,6 +192,7 @@ const App = () => {
                   <ProtectedRoute requiredRole="manager">
                     <Header />
                     <AdminStatistics />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />
@@ -190,6 +204,7 @@ const App = () => {
                   <ProtectedRoute>
                     <Header />
                     <ReportActivityPage />
+                    <Footer />
                   </ProtectedRoute>
                 }
               />

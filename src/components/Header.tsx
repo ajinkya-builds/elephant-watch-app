@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, UserCircle, Settings, User } from "lucide-react";
+import { LogOut, UserCircle, Settings, User, PawPrint } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +31,13 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center">
-          <div className="flex-shrink-0 flex items-center">
-            <Link to="/" className="text-xl font-bold text-green-800">
-              Elephant Watch
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <Link to="/" className="flex items-center gap-2">
+              <span className="relative flex items-center justify-center w-8 h-8">
+                <span className="absolute inset-0 bg-gradient-to-r from-blue-500 to-green-500 rounded-full blur-md opacity-30 animate-pulse"></span>
+                <PawPrint className="w-7 h-7 text-blue-600 relative z-10" />
+              </span>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Eravat</span>
             </Link>
           </div>
           <nav className="ml-6 flex space-x-8">

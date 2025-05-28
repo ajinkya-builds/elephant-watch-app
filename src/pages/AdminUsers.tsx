@@ -30,10 +30,9 @@ interface Division {
 }
 
 interface Range {
-  id: string;
   new_id: string;
   name: string;
-  division_id: string;
+  new_division_id: string;
 }
 
 // All user_id references in this file must be public.users.id, not the auth UID. If setting user_id, look up by auth_id.
@@ -85,8 +84,8 @@ export default function AdminUsers() {
       // Now fetch the ranges
       const { data, error } = await supabase
         .from('ranges')
-        .select('id, new_id, name, division_id')
-        .eq('division_id', divisionId)
+        .select('new_id, name, new_division_id')
+        .eq('new_division_id', divisionId)
         .order('name');
 
       if (error) {
@@ -399,249 +398,274 @@ export default function AdminUsers() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Breadcrumb
-        items={[
-          { label: "Admin", href: "/admin" },
-          { label: "User Management" }
-        ]}
-      />
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>User Management</CardTitle>
-          {canCreateUserWithRole('data_collector') && (
-            <Button onClick={() => setShowModal(true)}>Add User</Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <Input
-              placeholder="Search users..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.first_name} {user.last_name}</TableCell>
-                  <TableCell>{user.email || '-'}</TableCell>
-                  <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>{user.position}</TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>{user.status}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditUser(user)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-8">
+      <div className="container mx-auto px-4">
+        <Breadcrumb
+          items={[
+            { label: "Admin", href: "/admin" },
+            { label: "User Management" }
+          ]}
+        />
+        <Card className="border-blue-100 shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-blue-50 to-blue-100">
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">User Management</CardTitle>
+            {canCreateUserWithRole('data_collector') && (
+              <Button 
+                onClick={() => setShowModal(true)}
+                className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white shadow-sm"
+              >
+                Add User
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <Input
+                placeholder="Search users..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-50">
+                  <TableHead className="text-blue-900">Name</TableHead>
+                  <TableHead className="text-blue-900">Email</TableHead>
+                  <TableHead className="text-blue-900">Phone</TableHead>
+                  <TableHead className="text-blue-900">Position</TableHead>
+                  <TableHead className="text-blue-900">Role</TableHead>
+                  <TableHead className="text-blue-900">Status</TableHead>
+                  <TableHead className="text-blue-900">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="hover:bg-blue-50/50 transition-colors">
+                    <TableCell>{user.first_name} {user.last_name}</TableCell>
+                    <TableCell>{user.email || '-'}</TableCell>
+                    <TableCell>{user.phone || '-'}</TableCell>
+                    <TableCell>{user.position}</TableCell>
+                    <TableCell>{user.role}</TableCell>
+                    <TableCell>{user.status}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditUser(user)}
+                          className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user)}
+                          className="bg-red-500 hover:bg-red-600"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">{editUser ? "Edit User" : "Add User"}</h2>
-            <form onSubmit={editUser ? (e) => {
-              e.preventDefault();
-              handleUpdateUser(editUser.id, {
-                first_name: editUser.first_name,
-                last_name: editUser.last_name,
-                email: editUser.email,
-                phone: editUser.phone,
-                role: editUser.role,
-                position: editUser.position
-              });
-            } : handleCreateUser} className="space-y-4">
-              <Input 
-                placeholder="First Name"
-                value={editUser?.first_name || newUser.first_name}
-                onChange={(e) => editUser 
-                  ? setEditUser({ ...editUser, first_name: e.target.value })
-                  : setNewUser({ ...newUser, first_name: e.target.value })
-                }
-              />
-              <Input 
-                placeholder="Last Name"
-                value={editUser?.last_name || newUser.last_name}
-                onChange={(e) => editUser
-                  ? setEditUser({ ...editUser, last_name: e.target.value })
-                  : setNewUser({ ...newUser, last_name: e.target.value })
-                }
-              />
-              <Input 
-                type="email"
-                placeholder="Email"
-                value={editUser?.email || newUser.email}
-                onChange={(e) => editUser
-                  ? setEditUser({ ...editUser, email: e.target.value })
-                  : setNewUser({ ...newUser, email: e.target.value })
-                }
-              />
-              <Input 
-                placeholder="Phone"
-                value={editUser?.phone || newUser.phone}
-                onChange={(e) => editUser
-                  ? setEditUser({ ...editUser, phone: e.target.value })
-                  : setNewUser({ ...newUser, phone: e.target.value })
-                }
-              />
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Position</label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={editUser?.position || newUser.position}
-                  onChange={(e) => {
-                    const value = e.target.value as "Ranger" | "DFO" | "Officer" | "Guard";
-                    if (editUser) {
-                      setEditUser({ ...editUser, position: value });
-                    } else {
-                      setNewUser({ ...newUser, position: value });
-                      // Reset region selections when position changes
-                      setSelectedDivision(null);
-                      setSelectedRange(null);
-                    }
-                  }}
-                >
-                  <option value="Ranger">Ranger</option>
-                  <option value="DFO">DFO</option>
-                  <option value="Officer">Officer</option>
-                  <option value="Guard">Guard</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Role</label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={editUser?.role || newUser.role}
-                  onChange={(e) => {
-                    const value = e.target.value as UserRole;
-                    if (editUser) {
-                      setEditUser({ ...editUser, role: value });
-                    } else {
-                      setNewUser({ ...newUser, role: value });
-                    }
-                  }}
-                >
-                  {user?.role === 'admin' && (
-                    <option value="admin">Admin</option>
-                  )}
-                  {user?.role === 'admin' && (
-                    <option value="manager">Manager</option>
-                  )}
-                  {(user?.role === 'admin' || user?.role === 'manager') && (
-                    <option value="data_collector">Data Collector</option>
-                  )}
-                </select>
-              </div>
-
-              {/* Region Assignment Section */}
-              {(newUser.position === 'Ranger' || newUser.position === 'DFO') && (
+        {showModal && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-4xl border border-blue-100">
+              <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+                {editUser ? "Edit User" : "Add User"}
+              </h2>
+              <form onSubmit={editUser ? (e) => {
+                e.preventDefault();
+                handleUpdateUser(editUser.id, {
+                  first_name: editUser.first_name,
+                  last_name: editUser.last_name,
+                  email: editUser.email,
+                  phone: editUser.phone,
+                  role: editUser.role,
+                  position: editUser.position
+                });
+              } : handleCreateUser} className="grid grid-cols-2 gap-8">
+                {/* Left Column - Form Entries */}
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Division</label>
-                    <div className="relative">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-4">Personal Information</h3>
+                  <div className="space-y-4">
+                    <Input 
+                      placeholder="First Name"
+                      value={editUser?.first_name || newUser.first_name}
+                      onChange={(e) => editUser 
+                        ? setEditUser({ ...editUser, first_name: e.target.value })
+                        : setNewUser({ ...newUser, first_name: e.target.value })
+                      }
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <Input 
+                      placeholder="Last Name"
+                      value={editUser?.last_name || newUser.last_name}
+                      onChange={(e) => editUser
+                        ? setEditUser({ ...editUser, last_name: e.target.value })
+                        : setNewUser({ ...newUser, last_name: e.target.value })
+                      }
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <Input 
+                      type="email"
+                      placeholder="Email"
+                      value={editUser?.email || newUser.email}
+                      onChange={(e) => editUser
+                        ? setEditUser({ ...editUser, email: e.target.value })
+                        : setNewUser({ ...newUser, email: e.target.value })
+                      }
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <Input 
+                      placeholder="Phone"
+                      value={editUser?.phone || newUser.phone}
+                      onChange={(e) => editUser
+                        ? setEditUser({ ...editUser, phone: e.target.value })
+                        : setNewUser({ ...newUser, phone: e.target.value })
+                      }
+                      className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    {!editUser && (
+                      <Input 
+                        type="password"
+                        placeholder="Password"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        className="border-blue-100 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column - Dropdowns */}
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-4">Role & Assignment</h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-blue-900">Position</label>
                       <select
-                        className="w-full p-2 border rounded-md"
-                        value={selectedDivision || "none"}
+                        className="w-full p-2 border border-blue-100 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                        value={editUser?.position || newUser.position}
                         onChange={(e) => {
-                          console.log('Division selected:', e.target.value);
-                          handleDivisionChange(e.target.value);
+                          const value = e.target.value as "Ranger" | "DFO" | "Officer" | "Guard";
+                          if (editUser) {
+                            setEditUser({ ...editUser, position: value });
+                          } else {
+                            setNewUser({ ...newUser, position: value });
+                            setSelectedDivision(null);
+                            setSelectedRange(null);
+                          }
                         }}
                       >
-                        <option value="none">Select a division</option>
-                        {divisions.map((division) => {
-                          console.log('Division option:', division);
-                          return (
-                            <option key={division.id} value={division.id}>
-                              {division.name}
-                            </option>
-                          );
-                        })}
+                        <option value="Ranger">Ranger</option>
+                        <option value="DFO">DFO</option>
+                        <option value="Officer">Officer</option>
+                        <option value="Guard">Guard</option>
                       </select>
                     </div>
-                  </div>
 
-                  {newUser.position === 'Ranger' && selectedDivision && selectedDivision !== 'none' && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Range</label>
-                      <div className="relative">
-                        <select
-                          className="w-full p-2 border rounded-md"
-                          value={selectedRange || "none"}
-                          onChange={(e) => {
-                            const selectedRangeId = e.target.value;
-                            console.log('Range selected:', selectedRangeId);
-                            handleRangeChange(selectedRangeId);
-                          }}
-                        >
-                          <option value="none">Select a range</option>
-                          {ranges.map((range) => (
-                            <option key={range.new_id} value={range.new_id}>
-                              {range.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <label className="text-sm font-medium text-blue-900">Role</label>
+                      <select
+                        className="w-full p-2 border border-blue-100 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                        value={editUser?.role || newUser.role}
+                        onChange={(e) => {
+                          const value = e.target.value as UserRole;
+                          if (editUser) {
+                            setEditUser({ ...editUser, role: value });
+                          } else {
+                            setNewUser({ ...newUser, role: value });
+                          }
+                        }}
+                      >
+                        {user?.role === 'admin' && (
+                          <option value="admin">Admin</option>
+                        )}
+                        {user?.role === 'admin' && (
+                          <option value="manager">Manager</option>
+                        )}
+                        {(user?.role === 'admin' || user?.role === 'manager') && (
+                          <option value="data_collector">Data Collector</option>
+                        )}
+                      </select>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {!editUser && (
-                <Input 
-                  type="password"
-                  placeholder="Password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                />
-              )}
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleModalClose}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {editUser ? "Update" : "Create"}
-                </Button>
-              </div>
-            </form>
+                    {/* Region Assignment Section */}
+                    {(newUser.position === 'Ranger' || newUser.position === 'DFO') && (
+                      <div className="space-y-4 pt-4 border-t border-blue-100">
+                        <h4 className="text-sm font-medium text-blue-900">Region Assignment</h4>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-blue-900">Division</label>
+                          <div className="relative">
+                            <select
+                              className="w-full p-2 border border-blue-100 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                              value={selectedDivision || "none"}
+                              onChange={(e) => handleDivisionChange(e.target.value)}
+                            >
+                              <option value="none">Select a division</option>
+                              {divisions.map((division) => (
+                                <option key={division.id} value={division.id}>
+                                  {division.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {newUser.position === 'Ranger' && selectedDivision && selectedDivision !== 'none' && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-blue-900">Range</label>
+                            <div className="relative">
+                              <select
+                                className="w-full p-2 border border-blue-100 rounded-md focus:border-blue-500 focus:ring-blue-500"
+                                value={selectedRange || "none"}
+                                onChange={(e) => handleRangeChange(e.target.value)}
+                              >
+                                <option value="none">Select a range</option>
+                                {ranges.map((range) => (
+                                  <option key={range.new_id} value={range.new_id}>
+                                    {range.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="col-span-2 flex justify-end gap-2 mt-6 pt-6 border-t border-blue-100">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleModalClose}
+                    className="border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white shadow-sm"
+                  >
+                    {editUser ? "Update" : "Create"}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 

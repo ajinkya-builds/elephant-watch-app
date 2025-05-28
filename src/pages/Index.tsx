@@ -2,97 +2,116 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PawPrint } from "lucide-react";
+import { PawPrint, Activity, Users, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { motion } from "framer-motion";
 
 export default function Index() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto py-8 px-4">
-        <div className="text-center mb-12">
-          <div className="flex justify-center mb-4">
-            <PawPrint className="w-16 h-16 text-green-600" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <div className="container mx-auto py-12 px-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
+          <div className="flex justify-center mb-6">
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-green-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
+              <PawPrint className="w-24 h-24 text-blue-600 relative z-10" />
+            </motion.div>
           </div>
-          <h1 className="text-4xl font-bold mb-4 text-green-800">Wild Elephant Monitoring System</h1>
-          <p className="text-xl text-muted-foreground">
-            Track and monitor elephant activities in your area
-          </p>
-        </div>
+          <motion.h1 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent"
+          >
+            Eravat
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="text-xl text-gray-600 max-w-2xl mx-auto"
+          >
+            Advanced Elephant Monitoring & Conservation Platform
+          </motion.p>
+        </motion.div>
 
         {/* Admin Button - Only show for admin users */}
         {user && user.role !== 'data_collector' && (
-          <div className="mb-8 text-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="mb-12 text-center"
+          >
             <Button 
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg"
+              className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white font-semibold py-3 px-8 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all duration-300"
               onClick={() => navigate('/admin')}
             >
               Access Admin Panel
             </Button>
-          </div>
+          </motion.div>
         )}
 
         {/* Main Content */}
-        {user?.role === 'data_collector' ? (
-          // Data Collector View - Single centered card
-          <div className="max-w-md mx-auto">
-            <Card className="hover:shadow-lg transition-shadow bg-white">
-              <CardHeader>
-                <CardTitle className="text-green-800">Report Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Report new elephant sightings or activities
-                </p>
-                <Button 
-                  className="w-full bg-green-600 hover:bg-green-700 text-white" 
-                  onClick={() => navigate("/report")}
-                >
-                  Report Activity
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          // Admin/Manager View - Grid layout with both cards
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <Card className="hover:shadow-lg transition-shadow bg-white">
-              <CardHeader>
-                <CardTitle className="text-green-800">Dashboard</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  View statistics and recent observations
-                </p>
-                <Button 
-                  className="w-full bg-green-600 hover:bg-green-700 text-white" 
-                  onClick={() => navigate("/dashboard")}
-                >
-                  Go to Dashboard
-                </Button>
-              </CardContent>
-            </Card>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto"
+        >
+          <Card className="hover:shadow-xl transition-all duration-300 bg-white border-0 rounded-2xl overflow-hidden group">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100">
+              <CardTitle className="text-blue-800 flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Dashboard
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <p className="text-gray-600 mb-6">
+                View comprehensive statistics and recent observations in real-time
+              </p>
+              <Button 
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl py-6 text-lg font-semibold transition-all duration-300 group-hover:scale-[1.02]"
+                onClick={() => navigate("/dashboard")}
+              >
+                Go to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
 
-            <Card className="hover:shadow-lg transition-shadow bg-white">
-              <CardHeader>
-                <CardTitle className="text-green-800">Report Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Report new elephant sightings or activities
-                </p>
-                <Button 
-                  className="w-full bg-green-600 hover:bg-green-700 text-white" 
-                  onClick={() => navigate("/report")}
-                >
-                  Report Activity
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+          <Card className="hover:shadow-xl transition-all duration-300 bg-white border-0 rounded-2xl overflow-hidden group">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-green-100">
+              <CardTitle className="text-green-800 flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Report Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <p className="text-gray-600 mb-6">
+                Report new elephant sightings or activities in your area
+              </p>
+              <Button 
+                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl py-6 text-lg font-semibold transition-all duration-300 group-hover:scale-[1.02]"
+                onClick={() => navigate("/report")}
+              >
+                Report Activity
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

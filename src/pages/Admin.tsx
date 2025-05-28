@@ -9,7 +9,7 @@ const adminCards = [
     description: "Add, edit, or remove users. Assign roles and manage permissions.",
     icon: <Users className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/users'),
-    color: "from-blue-500 to-blue-600",
+    color: "from-blue-600 to-green-600",
     iconBg: "bg-blue-100",
     iconColor: "text-blue-600",
   },
@@ -18,45 +18,45 @@ const adminCards = [
     description: "View, edit, or delete observations and reports submitted by users.",
     icon: <FileText className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/observations'),
-    color: "from-green-500 to-green-600",
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
   {
     title: "System Log",
     description: "View activity, error, system, and login logs.",
     icon: <Database className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/logs'),
-    color: "from-purple-500 to-purple-600",
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
   {
     title: "System Settings",
     description: "Configure system settings, notifications, and maintenance.",
     icon: <Settings className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/settings'),
-    color: "from-orange-500 to-orange-600",
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
   {
     title: "Activity Dashboard",
     description: "View detailed statistics and activity reports.",
     icon: <Activity className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/statistics'),
-    color: "from-red-500 to-red-600",
-    iconBg: "bg-red-100",
-    iconColor: "text-red-600",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
   {
     title: "Alerts & Notifications",
     description: "Manage system alerts and notification settings.",
     icon: <AlertCircle className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('/admin/notifications'),
-    color: "from-indigo-500 to-indigo-600",
-    iconBg: "bg-indigo-100",
-    iconColor: "text-indigo-600",
+    color: "from-blue-600 to-green-600",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
   },
 ];
 
@@ -66,7 +66,7 @@ export default function Admin() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-12">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-3">Admin Panel</h1>
+          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent tracking-tight mb-3">Admin Panel</h1>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto">
             Manage your application's core functions and monitor system performance
           </p>
@@ -76,7 +76,7 @@ export default function Admin() {
           {adminCards.map((card) => (
             <Card
               key={card.title}
-              className="group cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl"
+              className="group cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-blue-100"
               onClick={() => card.onClick(navigate)}
             >
               <CardHeader className="pb-4">

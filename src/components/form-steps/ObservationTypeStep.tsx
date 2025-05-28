@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useActivityForm } from '@/contexts/ActivityFormContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,11 +6,12 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import debounce from 'lodash/debounce';
 
 export function ObservationTypeStep() {
   const { formData, setFormData } = useActivityForm();
 
-  const handleObservationTypeChange = (type: 'direct' | 'indirect' | 'loss') => {
+  const handleObservationTypeChange = useCallback((type: 'direct' | 'indirect' | 'loss') => {
     setFormData({
       ...formData,
       observation_type: type,
@@ -23,7 +24,26 @@ export function ObservationTypeStep() {
       indirect_sighting_type: undefined,
       loss_type: undefined,
     });
-  };
+  }, [formData, setFormData]);
+
+  // Debounced handlers for number inputs
+  const debouncedSetFormData = useMemo(
+    () => debounce((updates: Partial<typeof formData>) => {
+      setFormData(updates);
+    }, 300),
+    [setFormData]
+  );
+
+  const handleNumberChange = useCallback((field: string, value: string) => {
+    const num = parseInt(value);
+    if (!isNaN(num) && num >= 0) {
+      debouncedSetFormData({ [field]: num });
+    }
+  }, [debouncedSetFormData]);
+
+  const handleSelectChange = useCallback((field: string, value: string) => {
+    setFormData({ [field]: value });
+  }, [setFormData]);
 
   return (
     <div className="space-y-6">
@@ -74,7 +94,7 @@ export function ObservationTypeStep() {
                   id="total_elephants"
                   min="0"
                   value={formData.total_elephants || ''}
-                  onChange={(e) => setFormData({ total_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('total_elephants', e.target.value)}
                 />
               </div>
 
@@ -85,7 +105,7 @@ export function ObservationTypeStep() {
                   id="male_elephants"
                   min="0"
                   value={formData.male_elephants || ''}
-                  onChange={(e) => setFormData({ male_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('male_elephants', e.target.value)}
                 />
               </div>
 
@@ -96,18 +116,18 @@ export function ObservationTypeStep() {
                   id="female_elephants"
                   min="0"
                   value={formData.female_elephants || ''}
-                  onChange={(e) => setFormData({ female_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('female_elephants', e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="unknown_elephants">Unknown Gender</Label>
+                <Label htmlFor="unknown_elephants">Unknown Elephants</Label>
                 <Input
                   type="number"
                   id="unknown_elephants"
                   min="0"
                   value={formData.unknown_elephants || ''}
-                  onChange={(e) => setFormData({ unknown_elephants: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('unknown_elephants', e.target.value)}
                 />
               </div>
 
@@ -118,7 +138,7 @@ export function ObservationTypeStep() {
                   id="calves"
                   min="0"
                   value={formData.calves || ''}
-                  onChange={(e) => setFormData({ calves: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => handleNumberChange('calves', e.target.value)}
                 />
               </div>
             </div>
@@ -133,7 +153,7 @@ export function ObservationTypeStep() {
               <Label htmlFor="indirect_sighting_type">Type of Indirect Sighting</Label>
               <Select
                 value={formData.indirect_sighting_type}
-                onValueChange={(value) => setFormData({ indirect_sighting_type: value as any })}
+                onValueChange={(value) => handleSelectChange('indirect_sighting_type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type of indirect sighting" />
@@ -158,7 +178,7 @@ export function ObservationTypeStep() {
               <Label htmlFor="loss_type">Type of Loss</Label>
               <Select
                 value={formData.loss_type}
-                onValueChange={(value) => setFormData({ loss_type: value as any })}
+                onValueChange={(value) => handleSelectChange('loss_type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type of loss" />
