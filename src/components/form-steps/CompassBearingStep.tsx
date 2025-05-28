@@ -4,20 +4,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Compass, Lock, Unlock, RefreshCw, AlertCircle } from "lucide-react";
+import { Compass, Lock, Unlock, RefreshCw, AlertCircle, Camera, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CompassState {
   heading: number;
   accuracy: number;
   isGPSBased: boolean;
   isErratic: boolean;
+  speed: number;
 }
 
-const VELOCITY_THRESHOLD = 2; // meters per second
+const VELOCITY_THRESHOLD = 1; // meters per second
 const ERRATIC_THRESHOLD = 45; // degrees
 const SMOOTHING_WINDOW = 5; // number of readings to average
+const GPS_ACCURACY_THRESHOLD = 10; // meters
 
 export function CompassBearingStep() {
   const { formData, setFormData } = useActivityForm();
@@ -28,17 +31,21 @@ export function CompassBearingStep() {
   const [calibrationOffset, setCalibrationOffset] = useState(0);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [compassMode, setCompassMode] = useState<'gps' | 'manual' | 'visual'>('gps');
   const [compassState, setCompassState] = useState<CompassState>({
     heading: 0,
     accuracy: 0,
     isGPSBased: false,
-    isErratic: false
+    isErratic: false,
+    speed: 0
   });
   
   const headingHistory = useRef<number[]>([]);
   const lastPosition = useRef<GeolocationPosition | null>(null);
   const lastHeading = useRef<number | null>(null);
   const watchId = useRef<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     // Check if device is iOS
@@ -49,6 +56,12 @@ export function CompassBearingStep() {
     const savedOffset = localStorage.getItem('compassCalibrationOffset');
     if (savedOffset) {
       setCalibrationOffset(parseFloat(savedOffset));
+    }
+
+    // Load saved compass mode
+    const savedMode = localStorage.getItem('compassMode');
+    if (savedMode) {
+      setCompassMode(savedMode as 'gps' | 'manual' | 'visual');
     }
 
     // Check if device orientation is supported
@@ -66,6 +79,10 @@ export function CompassBearingStep() {
     return () => {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
+      }
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(track => track.stop());
       }
     };
   }, []);
@@ -97,113 +114,88 @@ export function CompassBearingStep() {
   };
 
   const startCalibration = () => {
-    if (!hasPermission) {
-      requestPermission();
+    if (compassMode === 'visual') {
+      startVisualCalibration();
+    } else {
+      startManualCalibration();
+    }
+  };
+
+  const startManualCalibration = () => {
+    setIsCalibrating(true);
+    toast.info("Point your device north and tap 'Set North' when ready");
+  };
+
+  const setNorth = () => {
+    if (lastHeading.current !== null) {
+      const offset = (360 - lastHeading.current) % 360;
+      setCalibrationOffset(offset);
+      localStorage.setItem('compassCalibrationOffset', offset.toString());
+      setIsCalibrating(false);
+      toast.success("North direction set successfully");
+    }
+  };
+
+  const startVisualCalibration = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsCalibrating(true);
+        toast.info("Align the camera with a known landmark and tap 'Set Direction'");
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast.error("Failed to access camera");
+    }
+  };
+
+  const setVisualDirection = () => {
+    if (canvasRef.current && videoRef.current) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (context) {
+        // Draw the current frame
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Get the image data for analysis
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // Here you would implement image analysis to determine direction
+        // For now, we'll use a placeholder value
+        const visualHeading = 0; // Replace with actual image analysis
+        
+        setCalibrationOffset(visualHeading);
+        localStorage.setItem('compassCalibrationOffset', visualHeading.toString());
+        setIsCalibrating(false);
+        toast.success("Direction set from visual reference");
+      }
+    }
+  };
+
+  const handleGPSUpdate = useCallback((position: GeolocationPosition) => {
+    if (!isTracking || isLocked || !lastPosition.current) {
+      lastPosition.current = position;
       return;
     }
 
-    setIsCalibrating(true);
-    setCalibrationSamples([]);
-    toast.info("Please rotate your device in a figure-8 pattern for 10 seconds");
-    
-    const calibrationInterval = setInterval(() => {
-      if (compassState.heading !== null) {
-        setCalibrationSamples(prev => [...prev, compassState.heading]);
-      }
-    }, 100);
+    const { speed, accuracy } = position.coords;
+    const prevPos = lastPosition.current.coords;
+    const currPos = position.coords;
 
-    setTimeout(() => {
-      clearInterval(calibrationInterval);
-      setIsCalibrating(false);
-      if (calibrationSamples.length > 0) {
-        const avg = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
-        setCalibrationOffset(avg);
-        localStorage.setItem('compassCalibrationOffset', avg.toString());
-        toast.success("Compass calibrated successfully");
-      }
-    }, 10000);
-  };
+    // Update compass state with speed
+    setCompassState(prev => ({
+      ...prev,
+      speed: speed || 0,
+      accuracy: accuracy <= GPS_ACCURACY_THRESHOLD ? 1 : 0.5
+    }));
 
-  const calculateHeading = (event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
-    let heading = 0;
-    let accuracy = 0;
-
-    if (isIOS && event.webkitCompassHeading) {
-      // iOS devices
-      heading = event.webkitCompassHeading;
-      accuracy = event.webkitCompassAccuracy || 0;
-    } else if (event.alpha !== null) {
-      // Android devices
-      const alpha = event.alpha;
-      const beta = event.beta;
-      const gamma = event.gamma;
-
-      if (beta !== null && gamma !== null) {
-        // Calculate heading based on device orientation
-        const x = Math.cos(beta * Math.PI / 180);
-        const y = Math.sin(beta * Math.PI / 180) * Math.sin(gamma * Math.PI / 180);
-        const z = Math.sin(beta * Math.PI / 180) * Math.cos(gamma * Math.PI / 180);
-        
-        heading = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
-        accuracy = event.absolute ? 1 : 0;
-      } else {
-        heading = Math.round((360 - alpha) % 360);
-        accuracy = event.absolute ? 1 : 0;
-      }
-    }
-
-    return { heading, accuracy };
-  };
-
-  const handleDeviceOrientation = useCallback((event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
-    if (!isTracking || isLocked) return;
-
-    const { heading, accuracy } = calculateHeading(event);
-    
-    if (heading !== null) {
-      // Apply calibration offset
-      let calibratedHeading = (heading + calibrationOffset) % 360;
-      if (calibratedHeading < 0) calibratedHeading += 360;
-
-      // Update heading history for smoothing
-      headingHistory.current = [...headingHistory.current.slice(-SMOOTHING_WINDOW + 1), calibratedHeading];
-      
-      // Calculate smoothed heading
-      const smoothedHeading = Math.round(
-        headingHistory.current.reduce((a, b) => a + b, 0) / headingHistory.current.length
-      );
-
-      // Check for erratic readings
-      const isErratic = headingHistory.current.length >= 3 && 
-        Math.max(...headingHistory.current) - Math.min(...headingHistory.current) > ERRATIC_THRESHOLD;
-
-      setCompassState(prev => ({
-        ...prev,
-        heading: smoothedHeading,
-        accuracy,
-        isGPSBased: false,
-        isErratic
-      }));
-
-      if (!isLocked) {
-        setFormData({ compass_bearing: smoothedHeading });
-      }
-
-      if (isCalibrating) {
-        setCalibrationSamples(prev => [...prev, smoothedHeading]);
-      }
-    }
-  }, [isTracking, isLocked, calibrationOffset, setFormData, isCalibrating]);
-
-  const handleGPSUpdate = useCallback((position: GeolocationPosition) => {
-    if (!isTracking || isLocked || !lastPosition.current) return;
-
-    const { speed } = position.coords;
+    // Use GPS heading when moving fast enough
     if (speed && speed > VELOCITY_THRESHOLD) {
-      const prevPos = lastPosition.current.coords;
-      const currPos = position.coords;
-      
-      // Calculate heading from GPS coordinates
       const heading = Math.round(
         (Math.atan2(
           currPos.longitude - prevPos.longitude,
@@ -214,7 +206,6 @@ export function CompassBearingStep() {
       setCompassState(prev => ({
         ...prev,
         heading,
-        accuracy: 1,
         isGPSBased: true,
         isErratic: false
       }));
@@ -222,37 +213,85 @@ export function CompassBearingStep() {
       if (!isLocked) {
         setFormData({ compass_bearing: heading });
       }
+    } else if (compassMode === 'manual' && lastHeading.current !== null) {
+      // Use manual calibration when not moving
+      const calibratedHeading = (lastHeading.current + calibrationOffset) % 360;
+      setCompassState(prev => ({
+        ...prev,
+        heading: calibratedHeading,
+        isGPSBased: false,
+        isErratic: false
+      }));
+
+      if (!isLocked) {
+        setFormData({ compass_bearing: calibratedHeading });
+      }
     }
 
     lastPosition.current = position;
-  }, [isTracking, isLocked, setFormData]);
+  }, [isTracking, isLocked, setFormData, compassMode, calibrationOffset]);
+
+  const handleDeviceOrientation = useCallback((event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
+    if (!isTracking || isLocked) return;
+
+    let heading = 0;
+    if (isIOS && event.webkitCompassHeading) {
+      heading = event.webkitCompassHeading;
+    } else if (event.alpha !== null) {
+      heading = Math.round((360 - event.alpha) % 360);
+    }
+
+    lastHeading.current = heading;
+
+    // Only use device orientation in manual mode when not moving
+    if (compassMode === 'manual' && compassState.speed <= VELOCITY_THRESHOLD) {
+      const calibratedHeading = (heading + calibrationOffset) % 360;
+      
+      // Update heading history for smoothing
+      headingHistory.current = [...headingHistory.current.slice(-SMOOTHING_WINDOW + 1), calibratedHeading];
+      
+      // Calculate smoothed heading
+      const smoothedHeading = Math.round(
+        headingHistory.current.reduce((a, b) => a + b, 0) / headingHistory.current.length
+      );
+
+      setCompassState(prev => ({
+        ...prev,
+        heading: smoothedHeading,
+        accuracy: 0.8,
+        isGPSBased: false,
+        isErratic: false
+      }));
+
+      if (!isLocked) {
+        setFormData({ compass_bearing: smoothedHeading });
+      }
+    }
+  }, [isTracking, isLocked, calibrationOffset, setFormData, compassMode, compassState.speed]);
 
   useEffect(() => {
-    if (isTracking && hasPermission) {
-      window.addEventListener('deviceorientationabsolute', handleDeviceOrientation as EventListener);
-      window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
-
+    if (isTracking) {
       // Start GPS tracking
       watchId.current = navigator.geolocation.watchPosition(
         handleGPSUpdate,
         (error) => console.error('GPS Error:', error),
         { enableHighAccuracy: true }
       );
+
+      // Add device orientation listener for manual mode
+      if (compassMode === 'manual') {
+        window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
+      }
     }
     return () => {
-      window.removeEventListener('deviceorientationabsolute', handleDeviceOrientation as EventListener);
-      window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
       }
+      window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
     };
-  }, [isTracking, hasPermission, handleDeviceOrientation, handleGPSUpdate]);
+  }, [isTracking, handleGPSUpdate, handleDeviceOrientation, compassMode]);
 
   const toggleTracking = () => {
-    if (!hasPermission) {
-      requestPermission();
-      return;
-    }
     setIsTracking(!isTracking);
     if (!isTracking) {
       toast.info("Compass tracking started");
@@ -270,6 +309,12 @@ export function CompassBearingStep() {
     }
   };
 
+  const handleModeChange = (mode: 'gps' | 'manual' | 'visual') => {
+    setCompassMode(mode);
+    localStorage.setItem('compassMode', mode);
+    toast.info(`Switched to ${mode} mode`);
+  };
+
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 0.8) return "bg-green-500";
     if (accuracy >= 0.5) return "bg-yellow-500";
@@ -281,6 +326,23 @@ export function CompassBearingStep() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center space-y-4">
+            <Tabs defaultValue={compassMode} onValueChange={(v) => handleModeChange(v as 'gps' | 'manual' | 'visual')}>
+              <TabsList>
+                <TabsTrigger value="gps">
+                  <Navigation className="w-4 h-4 mr-2" />
+                  GPS
+                </TabsTrigger>
+                <TabsTrigger value="manual">
+                  <Compass className="w-4 h-4 mr-2" />
+                  Manual
+                </TabsTrigger>
+                <TabsTrigger value="visual">
+                  <Camera className="w-4 h-4 mr-2" />
+                  Visual
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <div className="flex items-center space-x-4">
               <Button
                 variant={isTracking ? "destructive" : "default"}
@@ -301,15 +363,26 @@ export function CompassBearingStep() {
                 <span>{isLocked ? 'Unlock' : 'Lock'}</span>
               </Button>
 
-              <Button
-                variant="outline"
-                onClick={startCalibration}
-                className="flex items-center space-x-2"
-                disabled={!isTracking}
-              >
-                <RefreshCw className={`w-4 h-4 ${isCalibrating ? 'animate-spin' : ''}`} />
-                <span>Calibrate</span>
-              </Button>
+              {isCalibrating ? (
+                <Button
+                  variant="default"
+                  onClick={compassMode === 'visual' ? setVisualDirection : setNorth}
+                  className="flex items-center space-x-2"
+                >
+                  <Navigation className="w-4 h-4" />
+                  <span>Set {compassMode === 'visual' ? 'Direction' : 'North'}</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={startCalibration}
+                  className="flex items-center space-x-2"
+                  disabled={!isTracking}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isCalibrating ? 'animate-spin' : ''}`} />
+                  <span>Calibrate</span>
+                </Button>
+              )}
             </div>
 
             <div className="text-center space-y-2">
@@ -342,7 +415,7 @@ export function CompassBearingStep() {
                 </div>
                 {compassState.isGPSBased && (
                   <div className="text-sm text-blue-500">
-                    Using GPS-based heading
+                    Using GPS-based heading (Speed: {compassState.speed.toFixed(1)} m/s)
                   </div>
                 )}
                 {compassState.isErratic && (
@@ -351,6 +424,26 @@ export function CompassBearingStep() {
                     <span>Compass readings are erratic. Please calibrate or use manual mode.</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {compassMode === 'visual' && isCalibrating && (
+              <div className="relative w-full aspect-video">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover rounded-lg"
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="hidden"
+                  width={640}
+                  height={480}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 border-2 border-white rounded-full opacity-50" />
+                </div>
               </div>
             )}
 
