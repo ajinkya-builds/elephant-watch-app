@@ -15,6 +15,9 @@ import { supabase } from '@/lib/supabaseClient';
 import { useNetworkStatus } from '@/utils/networkStatus';
 import { saveActivityOffline, getPendingActivities } from '@/utils/offlineStorage';
 import { SyncStatus } from '@/components/SyncStatus';
+import { useNetworkStatus } from '@/utils/networkStatus';
+import { saveActivityOffline, getPendingActivities } from '@/utils/offlineStorage';
+import { SyncStatus } from '@/components/SyncStatus';
 
 interface StepConfig {
   type: FormStep;
@@ -52,9 +55,11 @@ const steps: StepConfig[] = [
 
 function StepperContent() {
   const { currentStep, formData, goToNextStep, goToPreviousStep, isStepValid, isLastStep, resetForm } = useActivityForm();
+  const { currentStep, formData, goToNextStep, goToPreviousStep, isStepValid, isLastStep, resetForm } = useActivityForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isOnline = useNetworkStatus();
   const isOnline = useNetworkStatus();
   const currentStepIndex = ['dateTimeLocation', 'observationType', 'compassBearing', 'photo'].indexOf(currentStep);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +163,9 @@ function StepperContent() {
       toast.error(error.message || 'Failed to submit report');
     } finally {
       setIsSubmitting(false);
+      toast.error(error.message || 'Failed to submit report');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -223,10 +231,86 @@ function StepperContent() {
             ))}
           </div>
         </CardHeader>
+    <div className="container mx-auto p-4">
+      {!isOnline && (
+        <div className="p-3 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
+          <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
+        </div>
+      )}
+      <Card className="w-full bg-white rounded-xl shadow-sm border border-gray-100">
+        <CardHeader className="space-y-6 p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold text-gray-900">
+              Elephant Watch Report
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-600">
+                Step {currentStepIndex + 1} of {steps.length}
+              </span>
+              <Progress 
+                value={((currentStepIndex + 1) / steps.length) * 100} 
+                className="w-48 h-2 bg-gray-100" 
+              />
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            {steps.map((step, index) => (
+              <Button
+                key={step.type}
+                variant={index === currentStepIndex ? "default" : "outline"}
+                size="sm"
+                className={`
+                  ${index === currentStepIndex 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' 
+                    : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200'}
+                  flex items-center gap-2 px-4 py-2 rounded-md transition-colors
+                `}
+                disabled={index > currentStepIndex && !isStepValid(steps[index - 1].type)}
+              >
+                {step.icon}
+                {step.title}
+              </Button>
+            ))}
+          </div>
+        </CardHeader>
 
         <CardContent className="p-6">
           {CurrentStepComponent && <CurrentStepComponent />}
+        <CardContent className="p-6">
+          {CurrentStepComponent && <CurrentStepComponent />}
 
+          <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
+            <Button
+              variant="outline"
+              onClick={goToPreviousStep}
+              disabled={currentStepIndex === 0 || isSubmitting}
+              className="border-gray-200 text-gray-600 hover:bg-gray-50"
+            >
+              Previous
+            </Button>
+            {isLastStep() ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={!isStepValid(currentStep) || isSubmitting}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Report'}
+              </Button>
+            ) : (
+              <Button
+                onClick={goToNextStep}
+                disabled={!isStepValid(currentStep) || isSubmitting}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      <SyncStatus />
+    </div>
           <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
             <Button
               variant="outline"

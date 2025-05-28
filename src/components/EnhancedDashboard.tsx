@@ -87,6 +87,24 @@ interface BeatPolygon {
   };
 }
 
+interface ActivityMarker {
+  id: string;
+  latitude: number;
+  longitude: number;
+  observation_type: string;
+  activity_date: string;
+  activity_time: string;
+  total_elephants?: number;
+  male_elephants?: number;
+  female_elephants?: number;
+  unknown_elephants?: number;
+  calves?: number;
+  indirect_sighting_type?: string;
+  loss_type?: string;
+  compass_bearing?: number;
+  photo_url?: string;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 // Component to handle map bounds
@@ -124,6 +142,7 @@ export const EnhancedDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
   const [selectedPolygons, setSelectedPolygons] = useState<GeoPolygon[]>([]);
+  const [activityMarkers, setActivityMarkers] = useState<ActivityMarker[]>([]);
 
   // Fetch all divisions
   useEffect(() => {
@@ -486,6 +505,39 @@ export const EnhancedDashboard: React.FC = () => {
     fetchPolygons();
   }, [filters.division, filters.range, filters.beat]);
 
+  // Fetch activity markers from activity_observation
+  useEffect(() => {
+    async function fetchActivityMarkers() {
+      const { data, error } = await supabase
+        .from('activity_observation')
+        .select(`
+          id,
+          latitude,
+          longitude,
+          observation_type,
+          activity_date,
+          activity_time,
+          total_elephants,
+          male_elephants,
+          female_elephants,
+          unknown_elephants,
+          calves,
+          indirect_sighting_type,
+          loss_type,
+          compass_bearing,
+          photo_url
+        `);
+      if (error) {
+        console.error('Error fetching activity markers:', error);
+        setActivityMarkers([]);
+        return;
+      }
+      // Filter out invalid lat/lng
+      setActivityMarkers((data || []).filter((a: any) => a.latitude && a.longitude));
+    }
+    fetchActivityMarkers();
+  }, []);
+
   if (loading) {
   return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -547,6 +599,61 @@ export const EnhancedDashboard: React.FC = () => {
             Refresh
           </Button>
         </div>
+      </div>
+
+      {/* KPI Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="bg-gradient-to-br from-blue-100 to-blue-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold text-blue-700">Total Activities</CardTitle>
+            <div className="bg-blue-200 p-2 rounded-full">
+              <Activity className="h-5 w-5 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-blue-900">{data.kpiSummary?.total_activities || 0}</div>
+            <p className="text-xs text-blue-600 mt-1">Across all divisions</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-100 to-green-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold text-green-700">Active Users</CardTitle>
+            <div className="bg-green-200 p-2 rounded-full">
+              <Users className="h-5 w-5 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-green-900">{data.kpiSummary?.total_users || 0}</div>
+            <p className="text-xs text-green-600 mt-1">Total registered users</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-red-100 to-red-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold text-red-700">Total Loss</CardTitle>
+            <div className="bg-red-200 p-2 rounded-full">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-red-900">{data.kpiSummary?.total_loss_reports || 0}</div>
+            <p className="text-xs text-red-600 mt-1">Total loss reports</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-100 to-purple-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold text-purple-700">Today's Activities</CardTitle>
+            <div className="bg-purple-200 p-2 rounded-full">
+              <Calendar className="h-5 w-5 text-purple-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-purple-900">{data.kpiSummary?.today_activities || 0}</div>
+            <p className="text-xs text-purple-600 mt-1">Activities in last 24 hours</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Map Section */}
@@ -696,71 +803,79 @@ export const EnhancedDashboard: React.FC = () => {
                   </Popup>
                 </Marker>
               ))}
+              {activityMarkers.map((activity) => (
+                <Marker
+                  key={activity.id}
+                  position={[activity.latitude, activity.longitude]}
+                  icon={L.divIcon({
+                    className: 'custom-marker',
+                    html: `
+                      <div style="
+                        width: 24px;
+                        height: 24px;
+                        background-color: #22c55e;
+                        border: 3px solid white;
+                        border-radius: 50%;
+                        box-shadow: 0 0 10px rgba(0,0,0,0.3);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      ">
+                        <div style="
+                          width: 8px;
+                          height: 8px;
+                          background-color: white;
+                          border-radius: 50%;
+                        "></div>
+                      </div>
+                    `,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                    popupAnchor: [0, -12]
+                  })}
+                >
+                  <Popup>
+                    <div className="p-2">
+                      <h3 className="font-semibold text-gray-900">{activity.observation_type}</h3>
+                      <p className="text-sm text-gray-600">
+                        {activity.activity_date} {activity.activity_time}
+                      </p>
+                      {activity.total_elephants && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Total Elephants: {activity.total_elephants}
+                          {activity.male_elephants && ` (${activity.male_elephants} male)`}
+                          {activity.female_elephants && ` (${activity.female_elephants} female)`}
+                          {activity.calves && ` (${activity.calves} calves)`}
+                        </p>
+                      )}
+                      {activity.indirect_sighting_type && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Evidence: {activity.indirect_sighting_type}
+                        </p>
+                      )}
+                      {activity.loss_type && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Loss Type: {activity.loss_type}
+                        </p>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
             </MapContainer>
           </div>
           <div className="mt-4 flex items-center justify-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span className="text-sm text-gray-600">Activity Points</span>
+              <div className="w-6 h-6 rounded-full bg-green-600 border-2 border-white shadow-md flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              </div>
+              <span className="text-sm text-gray-600">
+                Activity Points ({activityMarkers.length})
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* KPI Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-blue-100 to-blue-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-all duration-300 border-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold text-blue-700">Total Activities</CardTitle>
-            <div className="bg-blue-200 p-2 rounded-full">
-              <Activity className="h-5 w-5 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold text-blue-900">{data.kpiSummary?.total_activities || 0}</div>
-            <p className="text-xs text-blue-600 mt-1">Across all divisions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-100 to-green-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-all duration-300 border-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold text-green-700">Active Users</CardTitle>
-            <div className="bg-green-200 p-2 rounded-full">
-              <Users className="h-5 w-5 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold text-green-900">{data.kpiSummary?.total_users || 0}</div>
-            <p className="text-xs text-green-600 mt-1">Total registered users</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-100 to-red-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold text-red-700">Total Loss</CardTitle>
-            <div className="bg-red-200 p-2 rounded-full">
-              <AlertCircle className="h-5 w-5 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold text-red-900">{data.kpiSummary?.total_loss_reports || 0}</div>
-            <p className="text-xs text-red-600 mt-1">Total loss reports</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-100 to-purple-50 shadow-lg rounded-2xl hover:scale-105 hover:shadow-xl transition-transform">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold text-purple-700">Today's Activities</CardTitle>
-            <div className="bg-purple-200 p-2 rounded-full">
-              <Calendar className="h-5 w-5 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold text-purple-900">{data.kpiSummary?.today_activities || 0}</div>
-            <p className="text-xs text-purple-600 mt-1">Activities in last 24 hours</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Main Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-8">
