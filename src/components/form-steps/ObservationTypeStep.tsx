@@ -155,10 +155,10 @@ export function ObservationTypeStep() {
                 value={formData.indirect_sighting_type}
                 onValueChange={(value) => handleSelectChange('indirect_sighting_type', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type of indirect sighting" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="w-full z-50">
                   <SelectItem value="Pugmark">Pugmark</SelectItem>
                   <SelectItem value="Dung">Dung</SelectItem>
                   <SelectItem value="Broken Branches">Broken Branches</SelectItem>
@@ -180,10 +180,10 @@ export function ObservationTypeStep() {
                 value={formData.loss_type}
                 onValueChange={(value) => handleSelectChange('loss_type', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type of loss" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="w-full z-50">
                   <SelectItem value="No loss">No loss</SelectItem>
                   <SelectItem value="crop">Crop</SelectItem>
                   <SelectItem value="livestock">Livestock</SelectItem>

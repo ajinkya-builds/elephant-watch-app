@@ -15,6 +15,41 @@ export function CompassBearingStep() {
   const [calibrationSamples, setCalibrationSamples] = useState<number[]>([]);
   const [calibrationOffset, setCalibrationOffset] = useState(0);
   const [lastHeading, setLastHeading] = useState<number | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if device orientation is supported
+    if (window.DeviceOrientationEvent) {
+      // Request permission for iOS devices
+      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+        setHasPermission(false);
+      } else {
+        setHasPermission(true);
+      }
+    } else {
+      toast.error("Device orientation is not supported on this device");
+      setHasPermission(false);
+    }
+  }, []);
+
+  const requestPermission = async () => {
+    try {
+      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+        const permission = await (DeviceOrientationEvent as any).requestPermission();
+        if (permission === 'granted') {
+          setHasPermission(true);
+          toast.success("Compass access granted");
+        } else {
+          setHasPermission(false);
+          toast.error("Compass access denied");
+        }
+      }
+    } catch (error) {
+      console.error('Error requesting permission:', error);
+      toast.error("Failed to get compass access");
+      setHasPermission(false);
+    }
+  };
 
   const handleBearingChange = (value: string) => {
     const bearing = parseInt(value);
@@ -24,6 +59,11 @@ export function CompassBearingStep() {
   };
 
   const startCalibration = () => {
+    if (!hasPermission) {
+      requestPermission();
+      return;
+    }
+
     setIsCalibrating(true);
     setCalibrationSamples([]);
     toast.info("Please rotate your device in a figure-8 pattern for 10 seconds");
@@ -39,149 +79,95 @@ export function CompassBearingStep() {
     }, 10000);
   };
 
-  const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
-    if (isLocked || isCalibrating) return;
-    
-    let heading: number | null = null;
-    
-    if ('webkitCompassHeading' in event) {
+  const handleDeviceOrientation = useCallback((event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
+    if (!isTracking || isLocked) return;
+
+    let heading = 0;
+    if (event.alpha !== null) {
       // iOS devices
-      heading = (event as any).webkitCompassHeading;
-    } else if (event.alpha !== null) {
+      heading = event.alpha;
+    } else if (event.webkitCompassHeading) {
       // Android devices
-      const alpha = event.alpha;
-      const beta = event.beta;
-      const gamma = event.gamma;
-      
-      // Convert to heading using device orientation
-      if (beta !== null && gamma !== null) {
-        // Calculate heading based on device orientation
-        const x = Math.cos(beta * Math.PI / 180);
-        const y = Math.sin(beta * Math.PI / 180) * Math.sin(gamma * Math.PI / 180);
-        const z = Math.sin(beta * Math.PI / 180) * Math.cos(gamma * Math.PI / 180);
-        
-        heading = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
-      } else {
-        heading = Math.round((360 - alpha) % 360);
-      }
+      heading = event.webkitCompassHeading;
     }
 
     if (heading !== null) {
       // Apply calibration offset
       heading = (heading + calibrationOffset) % 360;
-      
-      // Smooth out readings
-      if (lastHeading !== null) {
-        const diff = Math.abs(heading - lastHeading);
-        if (diff > 180) {
-          heading = heading > lastHeading ? heading - 360 : heading + 360;
-        }
-        heading = Math.round(lastHeading * 0.7 + heading * 0.3);
-      }
-      
+      if (heading < 0) heading += 360;
+
       setLastHeading(heading);
-      setFormData({ compass_bearing: heading });
-      
-      if (isCalibrating && heading !== null) {
-        setCalibrationSamples(prev => [...prev, heading]);
+      if (!isLocked) {
+        setFormData({ compass_bearing: Math.round(heading) });
       }
     }
-  }, [isLocked, isCalibrating, calibrationOffset, lastHeading, setFormData]);
+  }, [isTracking, isLocked, calibrationOffset, setFormData]);
 
-  const startCompassTracking = () => {
-    if (!window.DeviceOrientationEvent) {
-      toast.error("Device compass is not supported on this device");
+  useEffect(() => {
+    if (isTracking && hasPermission) {
+      window.addEventListener('deviceorientation', handleDeviceOrientation);
+    }
+    return () => {
+      window.removeEventListener('deviceorientation', handleDeviceOrientation);
+    };
+  }, [isTracking, hasPermission, handleDeviceOrientation]);
+
+  const toggleTracking = () => {
+    if (!hasPermission) {
+      requestPermission();
       return;
     }
-
-    // Request permission for iOS 13+ devices
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      (DeviceOrientationEvent as any).requestPermission()
-        .then((permissionState: string) => {
-          if (permissionState === 'granted') {
-            enableCompassTracking();
-          } else {
-            toast.error("Permission to access device orientation was denied");
-          }
-        })
-        .catch((error: Error) => {
-          toast.error("Error requesting device orientation permission");
-          console.error(error);
-        });
+    setIsTracking(!isTracking);
+    if (!isTracking) {
+      toast.info("Compass tracking started");
     } else {
-      // For non-iOS devices or older iOS versions
-      enableCompassTracking();
+      toast.info("Compass tracking stopped");
     }
-  };
-
-  const enableCompassTracking = () => {
-    setIsTracking(true);
-    setIsLocked(false);
-    window.addEventListener('deviceorientation', handleOrientation);
-    toast.success("Compass tracking started");
-  };
-
-  const stopCompassTracking = () => {
-    setIsTracking(false);
-    window.removeEventListener('deviceorientation', handleOrientation);
   };
 
   const toggleLock = () => {
     setIsLocked(!isLocked);
-    toast.success(isLocked ? "Compass unlocked" : "Compass bearing locked");
+    if (!isLocked) {
+      toast.info("Compass bearing locked");
+    } else {
+      toast.info("Compass bearing unlocked");
+    }
   };
-
-  useEffect(() => {
-    return () => {
-      stopCompassTracking();
-    };
-  }, []);
 
   return (
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center space-y-4">
-            <div className="relative">
-              <Compass 
-                className={`w-16 h-16 ${isTracking ? 'text-green-600' : 'text-gray-400'}`}
-                style={{
-                  transform: `rotate(${formData.compass_bearing || 0}deg)`,
-                  transition: 'transform 0.3s ease'
-                }}
-              />
-            </div>
-            
-            <div className="flex gap-2">
+            <div className="flex items-center space-x-4">
               <Button
-                type="button"
-                onClick={isTracking ? stopCompassTracking : startCompassTracking}
-                className={isTracking ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}
+                variant={isTracking ? "destructive" : "default"}
+                onClick={toggleTracking}
+                className="flex items-center space-x-2"
               >
-                {isTracking ? 'Stop Tracking' : 'Start Compass'}
+                <Compass className={`w-4 h-4 ${isTracking ? 'animate-spin' : ''}`} />
+                <span>{isTracking ? 'Stop Tracking' : 'Start Tracking'}</span>
               </Button>
-              
-              {isTracking && (
-                <>
-                  <Button
-                    type="button"
-                    onClick={toggleLock}
-                    variant="outline"
-                    className={isLocked ? 'border-orange-500 text-orange-500' : 'border-green-500 text-green-500'}
-                  >
-                    {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={startCalibration}
-                    variant="outline"
-                    className="border-blue-500 text-blue-500"
-                    disabled={isCalibrating}
-                  >
-                    <RefreshCw className={`w-4 h-4 ${isCalibrating ? 'animate-spin' : ''}`} />
-                  </Button>
-                </>
-              )}
+
+              <Button
+                variant={isLocked ? "default" : "outline"}
+                onClick={toggleLock}
+                className="flex items-center space-x-2"
+                disabled={!isTracking}
+              >
+                {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                <span>{isLocked ? 'Unlock' : 'Lock'}</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={startCalibration}
+                className="flex items-center space-x-2"
+                disabled={!isTracking}
+              >
+                <RefreshCw className={`w-4 h-4 ${isCalibrating ? 'animate-spin' : ''}`} />
+                <span>Calibrate</span>
+              </Button>
             </div>
 
             <div className="text-center space-y-2">
