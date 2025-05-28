@@ -16,12 +16,16 @@ export function CompassBearingStep() {
   const [calibrationOffset, setCalibrationOffset] = useState(0);
   const [lastHeading, setLastHeading] = useState<number | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // Check if device is iOS
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(isIOSDevice);
+
     // Check if device orientation is supported
     if (window.DeviceOrientationEvent) {
-      // Request permission for iOS devices
-      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      if (isIOSDevice) {
         setHasPermission(false);
       } else {
         setHasPermission(true);
@@ -34,7 +38,7 @@ export function CompassBearingStep() {
 
   const requestPermission = async () => {
     try {
-      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      if (isIOS && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
         const permission = await (DeviceOrientationEvent as any).requestPermission();
         if (permission === 'granted') {
           setHasPermission(true);
@@ -68,8 +72,14 @@ export function CompassBearingStep() {
     setCalibrationSamples([]);
     toast.info("Please rotate your device in a figure-8 pattern for 10 seconds");
     
-    // Stop calibration after 10 seconds
+    const calibrationInterval = setInterval(() => {
+      if (lastHeading !== null) {
+        setCalibrationSamples(prev => [...prev, lastHeading]);
+      }
+    }, 100);
+
     setTimeout(() => {
+      clearInterval(calibrationInterval);
       setIsCalibrating(false);
       if (calibrationSamples.length > 0) {
         const avg = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
@@ -79,29 +89,62 @@ export function CompassBearingStep() {
     }, 10000);
   };
 
+  const calculateHeading = (event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
+    let heading = 0;
+
+    if (isIOS && event.webkitCompassHeading) {
+      // iOS devices
+      heading = event.webkitCompassHeading;
+    } else if (event.alpha !== null) {
+      // Android devices
+      const alpha = event.alpha;
+      const beta = event.beta;
+      const gamma = event.gamma;
+
+      if (beta !== null && gamma !== null) {
+        // Calculate heading based on device orientation
+        const x = Math.cos(beta * Math.PI / 180);
+        const y = Math.sin(beta * Math.PI / 180) * Math.sin(gamma * Math.PI / 180);
+        const z = Math.sin(beta * Math.PI / 180) * Math.cos(gamma * Math.PI / 180);
+        
+        heading = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+      } else {
+        heading = Math.round((360 - alpha) % 360);
+      }
+    }
+
+    return heading;
+  };
+
   const handleDeviceOrientation = useCallback((event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
     if (!isTracking || isLocked) return;
 
-    let heading = 0;
-    if (event.alpha !== null) {
-      // iOS devices
-      heading = event.alpha;
-    } else if (event.webkitCompassHeading) {
-      // Android devices
-      heading = event.webkitCompassHeading;
-    }
-
+    const heading = calculateHeading(event);
+    
     if (heading !== null) {
       // Apply calibration offset
-      heading = (heading + calibrationOffset) % 360;
-      if (heading < 0) heading += 360;
+      let calibratedHeading = (heading + calibrationOffset) % 360;
+      if (calibratedHeading < 0) calibratedHeading += 360;
 
-      setLastHeading(heading);
+      // Smooth out readings
+      if (lastHeading !== null) {
+        const diff = Math.abs(calibratedHeading - lastHeading);
+        if (diff > 180) {
+          calibratedHeading = calibratedHeading > lastHeading ? calibratedHeading - 360 : calibratedHeading + 360;
+        }
+        calibratedHeading = Math.round(lastHeading * 0.7 + calibratedHeading * 0.3);
+      }
+
+      setLastHeading(calibratedHeading);
       if (!isLocked) {
-        setFormData({ compass_bearing: Math.round(heading) });
+        setFormData({ compass_bearing: calibratedHeading });
+      }
+
+      if (isCalibrating) {
+        setCalibrationSamples(prev => [...prev, calibratedHeading]);
       }
     }
-  }, [isTracking, isLocked, calibrationOffset, setFormData]);
+  }, [isTracking, isLocked, calibrationOffset, lastHeading, setFormData, isCalibrating]);
 
   useEffect(() => {
     if (isTracking && hasPermission) {

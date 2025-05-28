@@ -155,15 +155,20 @@ export function ObservationTypeStep() {
                 value={formData.indirect_sighting_type}
                 onValueChange={(value) => handleSelectChange('indirect_sighting_type', value)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-12 text-base">
                   <SelectValue placeholder="Select type of indirect sighting" />
                 </SelectTrigger>
-                <SelectContent position="popper" className="w-full z-50">
-                  <SelectItem value="Pugmark">Pugmark</SelectItem>
-                  <SelectItem value="Dung">Dung</SelectItem>
-                  <SelectItem value="Broken Branches">Broken Branches</SelectItem>
-                  <SelectItem value="Sound">Sound</SelectItem>
-                  <SelectItem value="Eyewitness">Eyewitness</SelectItem>
+                <SelectContent 
+                  position="popper" 
+                  className="w-full z-[100] max-h-[300px] overflow-y-auto"
+                  sideOffset={5}
+                  align="start"
+                >
+                  <SelectItem value="Pugmark" className="text-base py-3">Pugmark</SelectItem>
+                  <SelectItem value="Dung" className="text-base py-3">Dung</SelectItem>
+                  <SelectItem value="Broken Branches" className="text-base py-3">Broken Branches</SelectItem>
+                  <SelectItem value="Sound" className="text-base py-3">Sound</SelectItem>
+                  <SelectItem value="Eyewitness" className="text-base py-3">Eyewitness</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -180,18 +185,23 @@ export function ObservationTypeStep() {
                 value={formData.loss_type}
                 onValueChange={(value) => handleSelectChange('loss_type', value)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-12 text-base">
                   <SelectValue placeholder="Select type of loss" />
                 </SelectTrigger>
-                <SelectContent position="popper" className="w-full z-50">
-                  <SelectItem value="No loss">No loss</SelectItem>
-                  <SelectItem value="crop">Crop</SelectItem>
-                  <SelectItem value="livestock">Livestock</SelectItem>
-                  <SelectItem value="property">Property</SelectItem>
-                  <SelectItem value="fencing">Fencing</SelectItem>
-                  <SelectItem value="solar panels">Solar Panels</SelectItem>
-                  <SelectItem value="FD establishment">FD Establishment</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                <SelectContent 
+                  position="popper" 
+                  className="w-full z-[100] max-h-[300px] overflow-y-auto"
+                  sideOffset={5}
+                  align="start"
+                >
+                  <SelectItem value="No loss" className="text-base py-3">No loss</SelectItem>
+                  <SelectItem value="crop" className="text-base py-3">Crop</SelectItem>
+                  <SelectItem value="livestock" className="text-base py-3">Livestock</SelectItem>
+                  <SelectItem value="property" className="text-base py-3">Property</SelectItem>
+                  <SelectItem value="fencing" className="text-base py-3">Fencing</SelectItem>
+                  <SelectItem value="solar panels" className="text-base py-3">Solar Panels</SelectItem>
+                  <SelectItem value="FD establishment" className="text-base py-3">FD Establishment</SelectItem>
+                  <SelectItem value="Other" className="text-base py-3">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
