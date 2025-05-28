@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CrossPlatformSelect } from "@/components/ui/CrossPlatformSelect";
 
 interface DamageAssessmentSectionProps {
   control: Control<any>;
@@ -47,20 +48,13 @@ export function DamageAssessmentSection({ control }: DamageAssessmentSectionProp
         render={({ field }) => (
           <FormItem>
             <FormLabel>6a. Damage Done by Wild Elephants ? जंगली हाथियों द्वारा की गई हानि ? <span className="text-red-500">*</span></FormLabel>
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select damage type / हानि का प्रकार चुनें" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {damageOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CrossPlatformSelect
+              value={field.value}
+              onChange={field.onChange}
+              options={damageOptions.map(option => ({ value: option, label: option }))}
+              placeholder="Select damage type / हानि का प्रकार चुनें"
+              className="w-full h-12 text-base"
+            />
             <FormMessage />
           </FormItem>
         )}

@@ -7,6 +7,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import debounce from 'lodash/debounce';
+import { CrossPlatformSelect } from "@/components/ui/CrossPlatformSelect";
+import { StepperSelect, OptionType } from "@/components/ui/StepperSelect";
 
 export function ObservationTypeStep() {
   const { formData, setFormData } = useActivityForm();
@@ -151,26 +153,19 @@ export function ObservationTypeStep() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <Label htmlFor="indirect_sighting_type">Type of Indirect Sighting</Label>
-              <Select
+              <StepperSelect
                 value={formData.indirect_sighting_type}
-                onValueChange={(value) => handleSelectChange('indirect_sighting_type', value)}
-              >
-                <SelectTrigger className="w-full h-12 text-base">
-                  <SelectValue placeholder="Select type of indirect sighting" />
-                </SelectTrigger>
-                <SelectContent 
-                  position="popper" 
-                  className="w-full z-[100] max-h-[300px] overflow-y-auto"
-                  sideOffset={5}
-                  align="start"
-                >
-                  <SelectItem value="Pugmark" className="text-base py-3">Pugmark</SelectItem>
-                  <SelectItem value="Dung" className="text-base py-3">Dung</SelectItem>
-                  <SelectItem value="Broken Branches" className="text-base py-3">Broken Branches</SelectItem>
-                  <SelectItem value="Sound" className="text-base py-3">Sound</SelectItem>
-                  <SelectItem value="Eyewitness" className="text-base py-3">Eyewitness</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={value => handleSelectChange('indirect_sighting_type', value)}
+                options={[
+                  { value: "Pugmark", label: "Pugmark" },
+                  { value: "Dung", label: "Dung" },
+                  { value: "Broken Branches", label: "Broken Branches" },
+                  { value: "Sound", label: "Sound" },
+                  { value: "Eyewitness", label: "Eyewitness" },
+                ]}
+                placeholder="Select type of indirect sighting"
+                className="w-full h-12 text-base"
+              />
             </div>
           </CardContent>
         </Card>
@@ -181,29 +176,22 @@ export function ObservationTypeStep() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <Label htmlFor="loss_type">Type of Loss</Label>
-              <Select
+              <StepperSelect
                 value={formData.loss_type}
-                onValueChange={(value) => handleSelectChange('loss_type', value)}
-              >
-                <SelectTrigger className="w-full h-12 text-base">
-                  <SelectValue placeholder="Select type of loss" />
-                </SelectTrigger>
-                <SelectContent 
-                  position="popper" 
-                  className="w-full z-[100] max-h-[300px] overflow-y-auto"
-                  sideOffset={5}
-                  align="start"
-                >
-                  <SelectItem value="No loss" className="text-base py-3">No loss</SelectItem>
-                  <SelectItem value="crop" className="text-base py-3">Crop</SelectItem>
-                  <SelectItem value="livestock" className="text-base py-3">Livestock</SelectItem>
-                  <SelectItem value="property" className="text-base py-3">Property</SelectItem>
-                  <SelectItem value="fencing" className="text-base py-3">Fencing</SelectItem>
-                  <SelectItem value="solar panels" className="text-base py-3">Solar Panels</SelectItem>
-                  <SelectItem value="FD establishment" className="text-base py-3">FD Establishment</SelectItem>
-                  <SelectItem value="Other" className="text-base py-3">Other</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={value => handleSelectChange('loss_type', value)}
+                options={[
+                  { value: "No loss", label: "No loss" },
+                  { value: "crop", label: "Crop" },
+                  { value: "livestock", label: "Livestock" },
+                  { value: "property", label: "Property" },
+                  { value: "fencing", label: "Fencing" },
+                  { value: "solar panels", label: "Solar Panels" },
+                  { value: "FD establishment", label: "FD Establishment" },
+                  { value: "Other", label: "Other" },
+                ]}
+                placeholder="Select type of loss"
+                className="w-full h-12 text-base"
+              />
             </div>
           </CardContent>
         </Card>

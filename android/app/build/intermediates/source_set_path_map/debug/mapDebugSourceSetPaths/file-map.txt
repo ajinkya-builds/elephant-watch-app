@@ -1,0 +1,33 @@
+com.elephantwatch.app-recyclerview-1.1.0-0 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/048ce3aaf42c6e4ba23bf106f8430b98/transformed/recyclerview-1.1.0/res
+com.elephantwatch.app-jetified-viewpager2-1.0.0-1 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/0678aea8761fa7f318643dc29f12ef4f/transformed/jetified-viewpager2-1.0.0/res
+com.elephantwatch.app-jetified-lifecycle-process-2.4.1-2 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/res
+com.elephantwatch.app-jetified-savedstate-1.2.0-3 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/1bf96ee6a420a372bff955cd499c1452/transformed/jetified-savedstate-1.2.0/res
+com.elephantwatch.app-lifecycle-livedata-core-2.5.1-4 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/1f4fd50d2071644af8899ec8113961d7/transformed/lifecycle-livedata-core-2.5.1/res
+com.elephantwatch.app-constraintlayout-2.1.4-5 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/1ff7f8da05585b29c6e80a72cfe9e38a/transformed/constraintlayout-2.1.4/res
+com.elephantwatch.app-lifecycle-runtime-2.5.1-6 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/2f332ea48dc11cd60b5a5f16b49538d8/transformed/lifecycle-runtime-2.5.1/res
+com.elephantwatch.app-jetified-emoji2-1.2.0-7 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/res
+com.elephantwatch.app-jetified-startup-runtime-1.1.1-8 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3cf4356475c35d24cf97d3f2adbbba3f/transformed/jetified-startup-runtime-1.1.1/res
+com.elephantwatch.app-cardview-1.0.0-9 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/5c2ae57972a761b13014d17eab69860b/transformed/cardview-1.0.0/res
+com.elephantwatch.app-jetified-core-ktx-1.9.0-10 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/6d456ad43dff120e1d585e03963aaf70/transformed/jetified-core-ktx-1.9.0/res
+com.elephantwatch.app-transition-1.2.0-11 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/715db818be76048e60229f344f17bedf/transformed/transition-1.2.0/res
+com.elephantwatch.app-core-1.9.0-12 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/res
+com.elephantwatch.app-lifecycle-viewmodel-2.5.1-13 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7baaaa3d367a5c6edf417cafe7cb3d4b/transformed/lifecycle-viewmodel-2.5.1/res
+com.elephantwatch.app-jetified-activity-1.6.0-14 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/80c54353741d99c56f0473d6783e183b/transformed/jetified-activity-1.6.0/res
+com.elephantwatch.app-jetified-lifecycle-viewmodel-savedstate-2.5.1-15 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/8bbdf01ffdb591ebe562d404e309f238/transformed/jetified-lifecycle-viewmodel-savedstate-2.5.1/res
+com.elephantwatch.app-jetified-annotation-experimental-1.3.0-16 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/9177e60e7d9d01f0e5acbb6427fa38f3/transformed/jetified-annotation-experimental-1.3.0/res
+com.elephantwatch.app-jetified-appcompat-resources-1.6.1-17 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/9b82d8fc56586c9e8429357e147aedcc/transformed/jetified-appcompat-resources-1.6.1/res
+com.elephantwatch.app-fragment-1.3.6-18 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/9c14e3452a231a6a984bc7405069f332/transformed/fragment-1.3.6/res
+com.elephantwatch.app-swiperefreshlayout-1.1.0-19 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/a5a6c695ed0fe2fdbe77e73709bc99f5/transformed/swiperefreshlayout-1.1.0/res
+com.elephantwatch.app-webkit-1.7.0-20 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/b0ae1813f4c90de88305428f6f90d60d/transformed/webkit-1.7.0/res
+com.elephantwatch.app-coordinatorlayout-1.1.0-21 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/b1a031385d9d01dd70fc5619a73f02c7/transformed/coordinatorlayout-1.1.0/res
+com.elephantwatch.app-material-1.9.0-22 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/c0e1105cfc11731cb8216a7250424e36/transformed/material-1.9.0/res
+com.elephantwatch.app-drawerlayout-1.1.1-23 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/dd212105c33a0e4b7bc4432cba39a6db/transformed/drawerlayout-1.1.1/res
+com.elephantwatch.app-appcompat-1.6.1-24 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/e6340cfb1dcaf4d616636b1509aa4eb2/transformed/appcompat-1.6.1/res
+com.elephantwatch.app-jetified-emoji2-views-helper-1.2.0-25 /Users/ajinkyapatil/.gradle/caches/8.12/transforms/f451bba12659bcc3d0ea7e6a0f388a9b/transformed/jetified-emoji2-views-helper-1.2.0/res
+com.elephantwatch.app-pngs-26 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/build/generated/res/pngs/debug
+com.elephantwatch.app-resValues-27 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/build/generated/res/resValues/debug
+com.elephantwatch.app-packageDebugResources-28 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.elephantwatch.app-packageDebugResources-29 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.elephantwatch.app-debug-30 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.elephantwatch.app-debug-31 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/debug/res
+com.elephantwatch.app-main-32 /Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/res
