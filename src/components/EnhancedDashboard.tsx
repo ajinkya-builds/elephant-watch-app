@@ -568,14 +568,6 @@ export const EnhancedDashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-            Eravat Dashboard
-          </h2>
-          <p className="text-gray-600 mt-1">
-            Real-time monitoring and analysis of elephant activities
-          </p>
-        </div>
         <div className="flex items-center gap-4">
           <Select
             value={filters.timeRange}

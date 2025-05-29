@@ -295,14 +295,25 @@ export default function AdminObservations() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-10">
       <div className="container mx-auto p-2 sm:p-4">
-        <Breadcrumb
-          items={[
-            { label: "Admin", href: "/admin" },
-            { label: "Observation & Report Management" }
-          ]}
-        />
+        {/* Breadcrumb */}
+        <nav className="mb-6" aria-label="Breadcrumb">
+          <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <li>
+              <button
+                className="hover:underline text-green-800 font-medium"
+                onClick={() => navigate('/admin')}
+              >
+                Admin Panel
+              </button>
+            </li>
+            <li>
+              <span className="mx-1">/</span>
+            </li>
+            <li className="text-gray-600">Observations</li>
+          </ol>
+        </nav>
 
         <h1 className="text-3xl font-bold mb-8 text-center bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
           Observation & Report Management

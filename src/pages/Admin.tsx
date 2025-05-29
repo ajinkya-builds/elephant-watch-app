@@ -23,15 +23,6 @@ const adminCards = [
     iconColor: "text-blue-600",
   },
   {
-    title: "System Log",
-    description: "View activity, error, system, and login logs.",
-    icon: <Database className="h-6 w-6" />,
-    onClick: (navigate: any) => navigate('/admin/logs'),
-    color: "from-blue-600 to-green-600",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-  },
-  {
     title: "System Settings",
     description: "Configure system settings, notifications, and maintenance.",
     icon: <Settings className="h-6 w-6" />,

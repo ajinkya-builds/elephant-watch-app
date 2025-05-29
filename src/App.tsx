@@ -17,7 +17,6 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminObservations from "./pages/AdminObservations";
 import AdminStatistics from "./pages/AdminStatistics";
 import AdminSettings from "./pages/AdminSettings";
-import AdminLogs from "./pages/AdminLogs";
 import AdminNotifications from "./pages/AdminNotifications";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { checkSupabaseConnection } from "@/lib/supabaseClient";
@@ -187,16 +186,6 @@ const App = () => {
                     <ProtectedRoute requiredRole="admin">
                       <Header />
                       <AdminSettings />
-                      <Footer />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/logs"
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <AdminLogs />
                       <Footer />
                     </ProtectedRoute>
                   }
