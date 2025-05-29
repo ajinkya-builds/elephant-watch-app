@@ -296,7 +296,7 @@ export default function AdminObservations() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-8">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto p-2 sm:p-4">
         <Breadcrumb
           items={[
             { label: "Admin", href: "/admin" },

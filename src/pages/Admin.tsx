@@ -64,7 +64,7 @@ export default function Admin() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-12">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto p-2 sm:p-4">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent tracking-tight mb-3">Admin Panel</h1>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto">

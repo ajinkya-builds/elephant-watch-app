@@ -297,17 +297,17 @@ export function ReportForm() {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8 w-full max-w-full sm:max-w-2xl mx-auto p-2 sm:p-4">
           {!isOnline && (
-            <div className="p-3 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
+            <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
               <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
               Currently {getPendingReports().length} report(s) pending sync.
             </div>
           )}
-           {isOnline && getPendingReports().length > 0 && !isSyncing && (
-            <div className="p-3 mb-4 text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
+          {isOnline && getPendingReports().length > 0 && !isSyncing && (
+            <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
               <span className="font-medium">{getPendingReports().length} report(s) pending sync.</span>
-              <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300" onClick={syncPendingReports}>Sync Now</Button>
+              <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300 text-xs sm:text-sm" onClick={syncPendingReports}>Sync Now</Button>
             </div>
           )}
           <FormField
@@ -335,11 +335,14 @@ export function ReportForm() {
           <AdditionalInfoSection control={form.control} />
           <ReporterDetailsSection control={form.control} />
           
-          <Button type="submit" disabled={isSubmitting || isFetchingData || isSyncing} className="w-full sm:w-auto">
-            {isSubmitting 
-              ? (isOnline ? "Submitting Online..." : "Saving Locally...") 
-              : "Submit Report / रिपोर्ट सबमिट करें"}
-          </Button>
+          <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 mt-4 sm:mt-8 pt-2 sm:pt-6 border-t border-gray-100">
+            <Button type="button" variant="outline" onClick={handlePrevious} disabled={isFirstStep || isSubmitting} className="w-full sm:w-auto border-gray-200 text-gray-600 hover:bg-gray-50">
+              Previous
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+              {isSubmitting ? 'Submitting...' : isLastStep ? 'Submit Report' : 'Next'}
+            </Button>
+          </div>
         </form>
       </Form>
       <NetworkStatusIndicator isOnline={isOnline} isSyncing={isSyncing} />

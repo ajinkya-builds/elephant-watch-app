@@ -16,7 +16,7 @@ export default function AdminNotifications() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-10">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto p-2 sm:p-4">
         {/* Breadcrumb */}
         <nav className="mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm text-muted-foreground">

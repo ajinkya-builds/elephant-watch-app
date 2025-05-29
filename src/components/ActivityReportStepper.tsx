@@ -180,30 +180,29 @@ function StepperContent() {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-2 sm:p-4">
       {!isOnline && (
-        <div className="p-3 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
+        <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
           <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
         </div>
       )}
-      <Card className="w-full bg-white rounded-xl shadow-sm border border-gray-100">
-        <CardHeader className="space-y-6 p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl font-bold text-gray-900">
+      <Card className="w-full max-w-full sm:max-w-2xl bg-white rounded-xl shadow-sm border border-gray-100 mx-auto">
+        <CardHeader className="space-y-4 sm:space-y-6 p-4 sm:p-6 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+            <CardTitle className="text-lg sm:text-2xl font-bold text-gray-900">
               Elephant Watch Report
             </CardTitle>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-600">
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              <span className="text-xs sm:text-sm font-medium text-gray-600">
                 Step {currentStepIndex + 1} of {steps.length}
               </span>
               <Progress 
                 value={((currentStepIndex + 1) / steps.length) * 100} 
-                className="w-48 h-2 bg-gray-100" 
+                className="w-full sm:w-48 h-2 bg-gray-100" 
               />
             </div>
           </div>
-          
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-nowrap overflow-x-auto gap-2 pb-2 sm:pb-0 -mx-2 sm:mx-0 px-2 sm:px-0">
             {steps.map((step, index) => (
               <Button
                 key={step.type}
@@ -213,7 +212,7 @@ function StepperContent() {
                   ${index === currentStepIndex 
                     ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' 
                     : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200'}
-                  flex items-center gap-2 px-4 py-2 rounded-md transition-colors
+                  flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-md transition-colors whitespace-nowrap text-xs sm:text-sm
                 `}
                 disabled={index > currentStepIndex && !isStepValid(steps[index - 1].type)}
               >
@@ -223,16 +222,14 @@ function StepperContent() {
             ))}
           </div>
         </CardHeader>
-
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           {CurrentStepComponent && <CurrentStepComponent />}
-
-          <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row justify-between mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100 gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={goToPreviousStep}
               disabled={currentStepIndex === 0 || isSubmitting}
-              className="border-gray-200 text-gray-600 hover:bg-gray-50"
+              className="border-gray-200 text-gray-600 hover:bg-gray-50 w-full sm:w-auto"
             >
               Previous
             </Button>
@@ -240,7 +237,7 @@ function StepperContent() {
               <Button
                 onClick={handleSubmit}
                 disabled={!isStepValid(currentStep) || isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Report'}
               </Button>
@@ -248,7 +245,7 @@ function StepperContent() {
               <Button
                 onClick={goToNextStep}
                 disabled={!isStepValid(currentStep) || isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
               >
                 Next
               </Button>

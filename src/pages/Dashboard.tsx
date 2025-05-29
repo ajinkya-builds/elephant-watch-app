@@ -29,7 +29,7 @@ export default function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.2 }}
-        className="container mx-auto px-6 py-4"
+        className="container mx-auto p-2 sm:p-4"
       >
         <EnhancedDashboard />
       </motion.div>

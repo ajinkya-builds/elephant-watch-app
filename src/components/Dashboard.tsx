@@ -209,7 +209,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="container mx-auto p-2 sm:p-4">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
