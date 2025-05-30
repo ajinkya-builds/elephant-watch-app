@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, UserCircle, Settings, User, PawPrint } from "lucide-react";
+import { LogOut, UserCircle, Settings, User, PawPrint, Menu, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import { NotificationBell } from './NotificationBell';
 export function Header() {
   const { user, signOut, canManageUsers, canViewReports, canEditReports } = useAuth();
   const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -40,36 +41,78 @@ export function Header() {
               <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Eravat</span>
             </Link>
           </div>
-          {/* Hamburger for mobile */}
+          
+          {/* Enhanced Mobile Navigation */}
           <div className="sm:hidden ml-auto">
-            {/* Implement a simple hamburger menu for navigation links */}
-            <input id="nav-toggle" type="checkbox" className="hidden peer" />
-            <label htmlFor="nav-toggle" className="cursor-pointer p-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </label>
-            <div className="absolute left-0 top-16 w-full bg-white border-b shadow-md z-40 hidden peer-checked:block">
-              <nav className="flex flex-col items-center py-2 gap-2">
-                {user?.role !== 'data_collector' && (
-                  <Link to="/dashboard" className="block px-4 py-2 text-sm font-medium text-gray-900">Dashboard</Link>
-                )}
-                <Link to="/report" className="block px-4 py-2 text-sm font-medium text-gray-900">Report Activity</Link>
-              </nav>
-            </div>
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              aria-expanded={isMobileMenuOpen}
+            >
+              <span className="sr-only">Open main menu</span>
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" aria-hidden="true" />
+              ) : (
+                <Menu className="h-6 w-6" aria-hidden="true" />
+              )}
+            </button>
           </div>
-          {/* Desktop nav */}
+
+          {/* Mobile Menu */}
+          <div className={`absolute left-0 top-16 w-full bg-white border-b shadow-md z-40 transform transition-all duration-300 ease-in-out ${
+            isMobileMenuOpen ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0 pointer-events-none'
+          } sm:hidden`}>
+            <nav className="flex flex-col items-center py-2 gap-2">
+              {user?.role !== 'data_collector' && (
+                <Link 
+                  to="/dashboard" 
+                  className="w-full text-center px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+              )}
+              <Link 
+                to="/report" 
+                className="w-full text-center px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Report Activity
+              </Link>
+            </nav>
+          </div>
+
+          {/* Desktop Navigation */}
           <nav className="ml-0 sm:ml-6 hidden sm:flex space-x-8">
             {user?.role !== 'data_collector' && (
-              <Link to="/dashboard" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900">Dashboard</Link>
+              <Link 
+                to="/dashboard" 
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors"
+              >
+                Dashboard
+              </Link>
             )}
-            <Link to="/report" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900">Report Activity</Link>
+            <Link 
+              to="/report" 
+              className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors"
+            >
+              Report Activity
+            </Link>
           </nav>
         </div>
+
+        {/* User Menu Section */}
         <div className="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-0 w-full sm:w-auto justify-end">
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-12 px-4 rounded-full w-full sm:w-auto">
-                <span className="text-xs sm:text-sm font-medium truncate max-w-[120px] sm:max-w-none">{user?.email}</span>
+              <Button 
+                variant="ghost" 
+                className="relative h-12 px-4 rounded-full w-full sm:w-auto hover:bg-gray-100 transition-colors"
+              >
+                <span className="text-xs sm:text-sm font-medium truncate max-w-[120px] sm:max-w-none">
+                  {user?.email}
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>

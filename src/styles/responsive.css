@@ -1,0 +1,330 @@
+/* Responsive Typography */
+@layer utilities {
+  .text-responsive {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+
+  .heading-responsive {
+    @apply text-2xl sm:text-3xl lg:text-4xl xl:text-5xl;
+  }
+
+  .subheading-responsive {
+    @apply text-lg sm:text-xl lg:text-2xl;
+  }
+}
+
+/* Responsive Spacing */
+@layer utilities {
+  .section-padding {
+    @apply p-4 sm:p-6 lg:p-8 xl:p-10;
+  }
+
+  .container-padding {
+    @apply px-4 sm:px-6 lg:px-8 xl:px-10;
+  }
+
+  .responsive-gap {
+    @apply gap-4 sm:gap-6 lg:gap-8;
+  }
+}
+
+/* Responsive Grid Layouts */
+@layer utilities {
+  .responsive-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8;
+  }
+
+  .responsive-flex {
+    @apply flex flex-col sm:flex-row;
+  }
+}
+
+/* Responsive Images */
+@layer utilities {
+  .responsive-image {
+    @apply w-full h-auto object-cover;
+  }
+
+  .responsive-icon {
+    @apply w-6 h-6 sm:w-8 sm:h-8;
+  }
+}
+
+/* Responsive Tables */
+@layer utilities {
+  .responsive-table-container {
+    @apply overflow-x-auto -mx-4 sm:mx-0;
+  }
+
+  .responsive-table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+}
+
+/* Responsive Forms */
+@layer utilities {
+  .responsive-form {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  .responsive-input {
+    @apply w-full px-3 py-2 sm:px-4 sm:py-3;
+  }
+}
+
+/* Responsive Cards */
+@layer utilities {
+  .responsive-card {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+
+  .responsive-card-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6;
+  }
+}
+
+/* Responsive Navigation */
+@layer utilities {
+  .responsive-nav {
+    @apply flex flex-col sm:flex-row items-center gap-2 sm:gap-4;
+  }
+
+  .responsive-nav-item {
+    @apply w-full sm:w-auto text-center sm:text-left;
+  }
+}
+
+/* Responsive Buttons */
+@layer utilities {
+  .responsive-button {
+    @apply w-full sm:w-auto px-4 py-2 sm:px-6 sm:py-3;
+  }
+}
+
+/* Responsive Containers */
+@layer utilities {
+  .responsive-container {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8 xl:px-10;
+  }
+}
+
+/* Responsive Margins */
+@layer utilities {
+  .responsive-margin {
+    @apply m-4 sm:m-6 lg:m-8 xl:m-10;
+  }
+}
+
+/* Responsive Padding */
+@layer utilities {
+  .responsive-padding {
+    @apply p-4 sm:p-6 lg:p-8 xl:p-10;
+  }
+}
+
+/* Responsive Display */
+@layer utilities {
+  .responsive-hidden {
+    @apply hidden sm:block;
+  }
+
+  .responsive-visible {
+    @apply block sm:hidden;
+  }
+}
+
+/* Responsive Height */
+@layer utilities {
+  .responsive-height {
+    @apply h-auto sm:h-screen;
+  }
+}
+
+/* Responsive Width */
+@layer utilities {
+  .responsive-width {
+    @apply w-full sm:w-auto;
+  }
+}
+
+/* Responsive Position */
+@layer utilities {
+  .responsive-position {
+    @apply static sm:relative;
+  }
+}
+
+/* Responsive Z-Index */
+@layer utilities {
+  .responsive-z {
+    @apply z-0 sm:z-10;
+  }
+}
+
+/* Responsive Overflow */
+@layer utilities {
+  .responsive-overflow {
+    @apply overflow-x-auto sm:overflow-visible;
+  }
+}
+
+/* Responsive Border */
+@layer utilities {
+  .responsive-border {
+    @apply border-0 sm:border;
+  }
+}
+
+/* Responsive Shadow */
+@layer utilities {
+  .responsive-shadow {
+    @apply shadow-none sm:shadow-md;
+  }
+}
+
+/* Responsive Opacity */
+@layer utilities {
+  .responsive-opacity {
+    @apply opacity-100 sm:opacity-90;
+  }
+}
+
+/* Responsive Transform */
+@layer utilities {
+  .responsive-transform {
+    @apply transform-none sm:transform;
+  }
+}
+
+/* Responsive Transition */
+@layer utilities {
+  .responsive-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
+
+/* Responsive Animation */
+@layer utilities {
+  .responsive-animation {
+    @apply animate-none sm:animate-pulse;
+  }
+}
+
+/* Responsive Filter */
+@layer utilities {
+  .responsive-filter {
+    @apply filter-none sm:filter;
+  }
+}
+
+/* Responsive Backdrop */
+@layer utilities {
+  .responsive-backdrop {
+    @apply backdrop-none sm:backdrop-blur;
+  }
+}
+
+/* Responsive Gradient */
+@layer utilities {
+  .responsive-gradient {
+    @apply bg-gradient-to-r from-blue-600 to-green-600;
+  }
+}
+
+/* Responsive Background */
+@layer utilities {
+  .responsive-background {
+    @apply bg-white sm:bg-gray-50;
+  }
+}
+
+/* Responsive Text Color */
+@layer utilities {
+  .responsive-text {
+    @apply text-gray-900 sm:text-gray-800;
+  }
+}
+
+/* Responsive Border Color */
+@layer utilities {
+  .responsive-border-color {
+    @apply border-gray-200 sm:border-gray-300;
+  }
+}
+
+/* Responsive Shadow Color */
+@layer utilities {
+  .responsive-shadow-color {
+    @apply shadow-gray-200 sm:shadow-gray-300;
+  }
+}
+
+/* Responsive Ring Color */
+@layer utilities {
+  .responsive-ring-color {
+    @apply ring-gray-200 sm:ring-gray-300;
+  }
+}
+
+/* Responsive Focus */
+@layer utilities {
+  .responsive-focus {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+}
+
+/* Responsive Hover */
+@layer utilities {
+  .responsive-hover {
+    @apply hover:bg-gray-50 sm:hover:bg-gray-100;
+  }
+}
+
+/* Responsive Active */
+@layer utilities {
+  .responsive-active {
+    @apply active:bg-gray-100 sm:active:bg-gray-200;
+  }
+}
+
+/* Responsive Disabled */
+@layer utilities {
+  .responsive-disabled {
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+}
+
+/* Responsive Loading */
+@layer utilities {
+  .responsive-loading {
+    @apply animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500;
+  }
+}
+
+/* Responsive Error */
+@layer utilities {
+  .responsive-error {
+    @apply text-red-500 text-sm sm:text-base;
+  }
+}
+
+/* Responsive Success */
+@layer utilities {
+  .responsive-success {
+    @apply text-green-500 text-sm sm:text-base;
+  }
+}
+
+/* Responsive Warning */
+@layer utilities {
+  .responsive-warning {
+    @apply text-yellow-500 text-sm sm:text-base;
+  }
+}
+
+/* Responsive Info */
+@layer utilities {
+  .responsive-info {
+    @apply text-blue-500 text-sm sm:text-base;
+  }
+} 

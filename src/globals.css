@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './styles/responsive.css';
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -98,6 +100,30 @@
   body, #root {
     @apply flex flex-col min-h-screen;
   }
+
+  /* Base responsive styles */
+  html {
+    @apply text-base;
+  }
+
+  /* Responsive viewport meta tag */
+  @media (max-width: 640px) {
+    html {
+      @apply text-sm;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      @apply text-base;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    html {
+      @apply text-lg;
+    }
+  }
 }
 
 /* --- Dropdown and Map Z-Index Fixes --- */
@@ -120,4 +146,40 @@
 .leaflet-container,
 .map-container {
   z-index: 0 !important;
+}
+
+/* Responsive container max-widths */
+.container {
+  @apply mx-auto px-4 sm:px-6 lg:px-8;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
 }
