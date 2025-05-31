@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
-import { getPendingActivities } from '../utils/offlineStorage';
+import { getPendingActivities, getPendingReports, isAndroidApp } from '../utils/offlineStorage';
 
 export const SyncStatus = () => {
   const [pendingCount, setPendingCount] = useState(0);
   
   useEffect(() => {
     const updateCount = async () => {
-      const pending = await getPendingActivities();
+      let pending = [];
+      if (isAndroidApp()) {
+        pending = await getPendingReports();
+      } else {
+        pending = await getPendingActivities();
+      }
       setPendingCount(pending.length);
     };
     

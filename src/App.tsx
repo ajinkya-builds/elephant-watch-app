@@ -22,17 +22,30 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { checkSupabaseConnection } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { Footer } from "@/components/Footer";
+import { OfflineGuard } from "@/components/OfflineGuard";
+import { useNetworkStatus } from "@/utils/networkStatus";
+import { isAndroid } from "@/utils/platform";
+import './utils/syncService';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: isAndroid ? 1 : 3,
+      staleTime: isAndroid ? 1000 * 60 * 5 : 1000 * 60, // 5 minutes for Android
+      cacheTime: isAndroid ? 1000 * 60 * 30 : 1000 * 60 * 5, // 30 minutes for Android
+    },
+  },
+});
 
-// Dynamically import PwaReloader only for production builds
-const LazyPwaReloader = import.meta.env.PROD
+// Dynamically import PwaReloader only for production builds and non-Android
+const LazyPwaReloader = import.meta.env.PROD && !isAndroid
   ? React.lazy(() => import("./components/PwaReloader"))
   : null;
 
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isOnline = useNetworkStatus();
 
   useEffect(() => {
     console.log('App component mounted');
@@ -41,20 +54,22 @@ const App = () => {
         console.log('Checking Supabase connection...');
         const isConnected = await checkSupabaseConnection();
         console.log('Supabase connection status:', isConnected);
-        if (!isConnected) {
+        if (!isConnected && isOnline) {
           setError("Database connection error. Please try again later.");
           toast.error("Database connection error. Please try again later.");
         }
       } catch (err) {
         console.error('Connection check failed:', err);
-        setError("Failed to connect to the database. Please try again later.");
-        toast.error("Failed to connect to the database. Please try again later.");
+        if (isOnline) {
+          setError("Failed to connect to the database. Please try again later.");
+          toast.error("Failed to connect to the database. Please try again later.");
+        }
       } finally {
         setIsLoading(false);
       }
     };
     checkConnection();
-  }, []);
+  }, [isOnline]);
 
   console.log('App component rendering...');
 
@@ -69,7 +84,7 @@ const App = () => {
     );
   }
 
-  if (error) {
+  if (error && isOnline) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-lg w-full">
@@ -92,7 +107,7 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          {import.meta.env.PROD && LazyPwaReloader && (
+          {!isAndroid && import.meta.env.PROD && LazyPwaReloader && (
             <Suspense fallback={null}>
               <LazyPwaReloader />
             </Suspense>
@@ -108,9 +123,11 @@ const App = () => {
                   path="/"
                   element={
                     <ProtectedRoute>
-                      <Header />
-                      <Index />
-                      <Footer />
+                      <OfflineGuard allowedOffline={true}>
+                        <Header />
+                        <Index />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -120,9 +137,11 @@ const App = () => {
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Header />
-                      <Dashboard />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <Dashboard />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -132,9 +151,11 @@ const App = () => {
                   path="/report"
                   element={
                     <ProtectedRoute>
-                      <Header />
-                      <ReportActivityPage />
-                      <Footer />
+                      <OfflineGuard allowedOffline={true}>
+                        <Header />
+                        <ReportActivityPage />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -144,9 +165,11 @@ const App = () => {
                   path="/admin"
                   element={
                     <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <Admin />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <Admin />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -154,9 +177,11 @@ const App = () => {
                   path="/admin/users"
                   element={
                     <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <AdminUsers />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminUsers />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -164,9 +189,11 @@ const App = () => {
                   path="/admin/observations"
                   element={
                     <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <AdminObservations />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminObservations />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -174,9 +201,11 @@ const App = () => {
                   path="/admin/statistics"
                   element={
                     <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <AdminStatistics />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminStatistics />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -184,9 +213,11 @@ const App = () => {
                   path="/admin/settings"
                   element={
                     <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <AdminSettings />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminSettings />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -194,9 +225,11 @@ const App = () => {
                   path="/admin/notifications"
                   element={
                     <ProtectedRoute requiredRole="admin">
-                      <Header />
-                      <AdminNotifications />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminNotifications />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -206,9 +239,11 @@ const App = () => {
                   path="/manager/users"
                   element={
                     <ProtectedRoute requiredRole="manager">
-                      <Header />
-                      <AdminUsers />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminUsers />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -216,9 +251,11 @@ const App = () => {
                   path="/manager/observations"
                   element={
                     <ProtectedRoute requiredRole="manager">
-                      <Header />
-                      <AdminObservations />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminObservations />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -226,9 +263,11 @@ const App = () => {
                   path="/manager/statistics"
                   element={
                     <ProtectedRoute requiredRole="manager">
-                      <Header />
-                      <AdminStatistics />
-                      <Footer />
+                      <OfflineGuard allowedOffline={isAndroid}>
+                        <Header />
+                        <AdminStatistics />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />
@@ -238,9 +277,11 @@ const App = () => {
                   path="/collector/report"
                   element={
                     <ProtectedRoute>
-                      <Header />
-                      <ReportActivityPage />
-                      <Footer />
+                      <OfflineGuard allowedOffline={true}>
+                        <Header />
+                        <ReportActivityPage />
+                        <Footer />
+                      </OfflineGuard>
                     </ProtectedRoute>
                   }
                 />

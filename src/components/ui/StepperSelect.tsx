@@ -1,12 +1,42 @@
 import React from "react";
-import Select, { Props as ReactSelectProps } from "react-select";
+import { isAndroid } from "@/lib/isAndroidWebView";
+import { CrossPlatformSelect } from "./CrossPlatformSelect";
+
+// Simple native select for Android WebView
+function SimpleSelect({ value, onChange, options, placeholder, className }: any) {
+  return (
+    <select
+      value={value || ""}
+      onChange={e => onChange(e.target.value)}
+      className={className || "w-full h-12 text-base border rounded"}
+      style={{
+        width: "100%",
+        minHeight: 48,
+        fontSize: 16,
+        border: "1px solid #ccc",
+        borderRadius: 6,
+        background: "#fff",
+        color: "#222",
+        margin: "8px 0",
+        padding: "8px 12px",
+      }}
+    >
+      <option value="">{placeholder || "Select an option"}</option>
+      {options.map((opt: any) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export interface OptionType {
   value: string;
   label: string;
 }
 
-interface StepperSelectProps extends Omit<ReactSelectProps<OptionType, false>, "options" | "onChange" | "value"> {
+interface StepperSelectProps {
   options: OptionType[];
   value: string | undefined;
   onChange: (value: string) => void;
@@ -20,20 +50,25 @@ export const StepperSelect: React.FC<StepperSelectProps> = ({
   onChange,
   placeholder,
   className,
-  ...rest
 }) => {
-  const selectedOption = options.find(opt => opt.value === value) || null;
-
+  if (isAndroid()) {
+    return (
+      <SimpleSelect
+        options={options}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={className}
+      />
+    );
+  }
   return (
-    <Select
+    <CrossPlatformSelect
       options={options}
-      value={selectedOption}
-      onChange={opt => onChange(opt ? opt.value : "")}
-      placeholder={placeholder || "Select an option"}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
       className={className}
-      classNamePrefix="stepper-select"
-      isSearchable={false}
-      {...rest}
     />
   );
 }; 

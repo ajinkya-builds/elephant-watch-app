@@ -1,5 +1,5 @@
 import React from "react";
-import { isAndroidWebView } from "@/lib/isAndroidWebView";
+import { isAndroid } from "@/lib/isAndroidWebView";
 import {
   Select,
   SelectTrigger,
@@ -28,12 +28,28 @@ export function CrossPlatformSelect({
   placeholder,
   className,
 }: Props) {
-  if (isAndroidWebView()) {
+  if (isAndroid()) {
     return (
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
-        className={className || "w-full h-12 text-base border rounded"}
+        className={className}
+        style={{
+          width: "100%",
+          minHeight: 48,
+          fontSize: 16,
+          border: "2px solid #1976d2",
+          borderRadius: 6,
+          background: "#fff",
+          color: "#222",
+          margin: "8px 0",
+          padding: "8px 12px",
+          appearance: "auto",
+          WebkitAppearance: "auto",
+          MozAppearance: "auto",
+          // Add a strong box shadow for visibility
+          boxShadow: "0 0 0 2px #1976d2 inset",
+        }}
       >
         <option value="">{placeholder || "Select an option"}</option>
         {options.map(opt => (

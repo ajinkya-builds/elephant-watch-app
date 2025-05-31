@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { User, Session } from '@supabase/supabase-js';
+import { saveUserSession, getUserSession, clearUserSession, isAndroidApp } from '@/utils/offlineStorage';
+import { useNetworkStatus } from '@/utils/networkStatus';
 
 // Storage key constant for consistency
 const STORAGE_KEY = 'sb-pauafmgoewfdhwnexzy-auth-token';
@@ -8,11 +10,13 @@ const STORAGE_KEY = 'sb-pauafmgoewfdhwnexzy-auth-token';
 // Custom hook to directly read session from localStorage
 function useLocalStorageSession() {
   const [localSession, setLocalSession] = useState<Session | null>(null);
+  const isOnline = useNetworkStatus();
   
   useEffect(() => {
     // Initial load from localStorage
-    const loadSessionFromStorage = () => {
+    const loadSessionFromStorage = async () => {
       try {
+        // First try localStorage
         const sessionStr = localStorage.getItem(STORAGE_KEY);
         if (sessionStr) {
           const session = JSON.parse(sessionStr);
@@ -25,9 +29,20 @@ function useLocalStorageSession() {
             return session;
           }
         }
+
+        // If no localStorage session and we're in Android app, try Android storage
+        if (isAndroidApp()) {
+          const androidSession = await getUserSession();
+          if (androidSession) {
+            console.log('Android storage session found');
+            setLocalSession(androidSession);
+            return androidSession;
+          }
+        }
+
         return null;
       } catch (e) {
-        console.error('Error reading session from localStorage:', e);
+        console.error('Error reading session from storage:', e);
         return null;
       }
     };
@@ -96,8 +111,9 @@ export type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Get session directly from localStorage
   const localSession = useLocalStorageSession();
+  const isOnline = useNetworkStatus();
+  const mounted = React.useRef(true);
   
   const [state, setState] = useState<{
     user: ExtendedUser | null;
@@ -113,40 +129,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initialized: false
   });
 
-  // Effect to use localStorage session directly if available but no Supabase session
-  useEffect(() => {
-    if (localSession && !state.session && state.initialized) {
-      console.log('Using localStorage session as fallback:', {
-        userId: localSession.user?.id,
-        expiresAt: localSession.expires_at ? new Date(localSession.expires_at * 1000).toLocaleString() : 'unknown'
-      });
+  // Define processSession before it's used
+  const processSession = async (session: Session | null) => {
+    if (!mounted.current) return;
+
+    if (session) {
+      console.log(`Processing session for user ID: ${session.user?.id}`);
+
+      // Save session to all available storage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      if (isAndroidApp()) {
+        await saveUserSession(session);
+      }
       
-      // Force the session from localStorage into state
+      // Update state with session immediately
       setState(prev => ({
         ...prev,
-        session: localSession,
-        loading: true
+        session,
+        loading: true,
+        initialized: true
       }));
-      
-      // Attempt to fetch user profile based on localStorage session
-      if (localSession.user?.id) {
-        fetchUserProfile(localSession.user.id).then(profile => {
-          if (profile) {
+
+      // Only try to fetch user profile if we're online
+      if (isOnline) {
+        try {
+          const userId = session.user?.id;
+          if (userId) {
+            const profile = await fetchUserProfile(userId);
+            if (mounted.current && profile) {
+              setState(prev => ({
+                ...prev,
+                user: profile,
+                loading: false,
+                error: null
+              }));
+            }
+          }
+        } catch (error: any) {
+          console.error('Error fetching profile:', error);
+          // Don't set error state if we're offline
+          if (isOnline && mounted.current) {
             setState(prev => ({
               ...prev,
-              user: profile,
-              loading: false
-            }));
-          } else {
-            setState(prev => ({
-              ...prev,
-              loading: false
+              loading: false,
+              error: error.message
             }));
           }
-        });
+        }
+      } else {
+        // If offline, just use the session without profile
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: null
+        }));
       }
+    } else {
+      setState(prev => ({
+        ...prev,
+        session: null,
+        user: null,
+        loading: false,
+        initialized: true
+      }));
     }
-  }, [localSession, state.session, state.initialized]);
+  };
+
+  // Effect to initialize session
+  useEffect(() => {
+    const initializeSession = async () => {
+      if (!state.initialized) {
+        if (isOnline) {
+          // Try to get session from Supabase if online
+          const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+          if (supabaseSession) {
+            await processSession(supabaseSession);
+            return;
+          }
+        }
+
+        // If no Supabase session or offline, use local session
+        if (localSession) {
+          await processSession(localSession);
+        } else {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            initialized: true
+          }));
+        }
+      }
+    };
+
+    initializeSession();
+  }, [state.initialized, localSession, isOnline]);
 
   // Function to refresh the session
   const refreshSession = async () => {
@@ -229,7 +305,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handlingInitializationRef = React.useRef(false);
 
   useEffect(() => {
-    let mounted = true;
+    // Set mounted to true on mount
+    mounted.current = true;
+    
     let refreshTimeout: NodeJS.Timeout;
     let userRefreshTimeout: NodeJS.Timeout;
 
@@ -257,80 +335,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const processSession = async (session: Session | null) => {
-      if (!mounted) return;
-
-      if (session) {
-        console.log(`Processing session for user ID: ${session.user?.id}`);
-
-        // ALWAYS save to localStorage
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-        
-        // Update state with session immediately
-        setState(prev => ({
-          ...prev,
-          session,
-          loading: true,
-          initialized: true // Mark as initialized right away
-        }));
-
-        // Fetch user profile after a delay
-        userRefreshTimeout = setTimeout(async () => {
-          if (!mounted) return;
-
-          try {
-            const userId = session.user?.id;
-            if (userId) {
-              const profile = await fetchUserProfile(userId);
-              if (mounted && profile) {
-                setState(prev => ({
-                  ...prev,
-                  user: profile,
-                  loading: false,
-                  error: null
-                }));
-              } else if (mounted) {
-                setState(prev => ({
-                  ...prev,
-                  loading: false,
-                  error: 'Failed to fetch user profile'
-                }));
-              }
-            } else {
-              if (mounted) {
-                setState(prev => ({
-                  ...prev,
-                  loading: false,
-                  error: 'No user ID in session'
-                }));
-              }
-            }
-          } catch (error: any) {
-            if (mounted) {
-              console.error('Error fetching profile:', error);
-              setState(prev => ({
-                ...prev,
-                loading: false,
-                error: error.message
-              }));
-            }
-          }
-        }, 1000); // 1 second delay
-      } else {
-        console.log('No active session to process');
-        if (mounted) {
-          setState(prev => ({
-            ...prev,
-            session: null,
-            user: null,
-            loading: false,
-            initialized: true
-          }));
-        }
-      }
-    };
-
-    // Enhanced version that manually handles localStorage
     const initializeAuth = async () => {
       // Prevent multiple initializations
       if (handlingInitializationRef.current) {
@@ -364,7 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (error) {
           console.error('Error getting initial session:', error);
-          if (mounted) {
+          if (mounted.current) {
             setState(prev => ({ ...prev, loading: false, error: error.message, initialized: true }));
           }
           return;
@@ -389,7 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // Process the refreshed session
               await processSession(refreshedSession);
             } else {
-              if (mounted) {
+              if (mounted.current) {
                 setState(prev => ({ ...prev, loading: false, initialized: true }));
               }
             }
@@ -401,13 +405,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           console.log('No active session found during initialization');
-          if (mounted) {
+          if (mounted.current) {
             setState(prev => ({ ...prev, loading: false, initialized: true }));
           }
         }
       } catch (error: any) {
         console.error('Error in initializeAuth:', error);
-        if (mounted) {
+        if (mounted.current) {
           setState(prev => ({ ...prev, loading: false, error: error.message, initialized: true }));
         }
       } finally {
@@ -429,7 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // For other events, handle normally
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          if (mounted) {
+          if (mounted.current) {
             // Make sure session is saved to localStorage
             if (session) {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
@@ -440,7 +444,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else if (event === 'SIGNED_OUT') {
-          if (mounted) {
+          if (mounted.current) {
             // Clear localStorage
             localStorage.removeItem(STORAGE_KEY);
             console.log('Session removed from localStorage after SIGNED_OUT');
@@ -448,7 +452,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setState({ user: null, session: null, loading: false, error: null, initialized: true });
           }
         } else if (event === 'USER_UPDATED') {
-          if (mounted && session) {
+          if (mounted.current && session) {
             // Make sure session is saved to localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
             console.log('Session saved to localStorage after USER_UPDATED');
@@ -489,7 +493,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (timeUntilExpiry <= 0) {
           console.log('Session already expired, refreshing immediately');
           refreshSession().then(refreshedSession => {
-            if (refreshedSession && mounted) {
+            if (refreshedSession && mounted.current) {
               // Make sure session is saved to localStorage
               localStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedSession));
               
@@ -506,7 +510,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         refreshTimeout = setTimeout(async () => {
           const refreshedSession = await refreshSession();
-          if (refreshedSession && mounted) {
+          if (refreshedSession && mounted.current) {
             // Make sure session is saved to localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedSession));
             
@@ -520,7 +524,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setupRefreshInterval();
 
     return () => {
-      mounted = false;
+      // Set mounted to false on unmount
+      mounted.current = false;
       subscription.unsubscribe();
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
@@ -535,20 +540,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      // Determine if identifier is email or phone
       const isEmail = identifier.includes('@');
       
-      // Log authentication attempt
       console.log('Attempting authentication with:', {
         type: isEmail ? 'email' : 'phone',
-        identifier: isEmail ? identifier : '******' // Don't log phone numbers
+        identifier: isEmail ? identifier : '******'
       });
 
       const credentials = isEmail 
         ? { email: identifier, password }
         : { phone: identifier, password };
 
-      // Add explicit options for session persistence
       const { data, error } = await supabase.auth.signInWithPassword({
         ...credentials,
         options: {
@@ -556,80 +558,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      if (error) {
-        console.error('Authentication error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data.user || !data.session) {
-        console.error('No user data received');
         throw new Error('No user data received after authentication');
       }
 
-      // Save session to localStorage explicitly with our consistent key
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.session));
-      console.log('Session saved to localStorage after authentication');
-      console.log('Auth user details:', {
-        id: data.user.id,
-        email: data.user.email,
-        phone: data.user.phone
-      });
-
-      // Double-check that the session was actually saved
-      const storedSessionStr = localStorage.getItem(STORAGE_KEY);
-      if (!storedSessionStr) {
-        console.error('Failed to save session to localStorage after authentication!');
-      } else {
-        try {
-          const storedSession = JSON.parse(storedSessionStr);
-          console.log('Verified session in localStorage:', {
-            hasAccessToken: !!storedSession.access_token,
-            expiresAt: storedSession.expires_at ? new Date(storedSession.expires_at * 1000).toLocaleString() : 'unknown'
-          });
-        } catch (e) {
-          console.error('Error parsing stored session after save:', e);
-        }
+      // Save session to Android storage if available
+      if (isAndroidApp()) {
+        await saveUserSession(data.session);
       }
 
-      console.log('Authentication successful, fetching user profile...');
-
-      // Use our dedicated function to fetch the user profile
       const profile = await fetchUserProfile(data.user.id);
       
-      if (!profile) {
-        console.log('Failed to find user profile, creating minimal user profile from auth data');
-        
-        // Create a minimal user from auth data as fallback
-        const minimalUser = {
-          id: data.user.id,
-          auth_id: data.user.id,
-          email: data.user.email,
-          phone: data.user.phone,
-          role: 'admin' as UserRole, // Assume admin for auth fallback
-          first_name: identifier.split('@')[0] || 'User', // Take part before @ for emails
-          last_name: 'Account',
-          position: 'Officer' as 'Officer',
-          status: 'active' as 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        console.log('Created minimal user:', minimalUser);
-        
-        setState(prev => ({
-          ...prev,
-          user: minimalUser,
-          session: data.session,
-          loading: false,
-          error: null,
-          initialized: true
-        }));
-        
-        return minimalUser;
-      }
-
-      console.log('User profile fetched successfully:', profile);
-
       setState(prev => ({
         ...prev,
         user: profile,
@@ -640,13 +581,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
 
       return profile;
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'An error occurred during login'
+        error: error.message
       }));
       throw error;
     }
@@ -656,22 +596,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      // First, directly clear localStorage to ensure immediate logout effect
-      localStorage.removeItem(STORAGE_KEY);
-      console.log('Session explicitly removed from localStorage before signOut');
+      // Clear Android storage if available
+      if (isAndroidApp()) {
+        await clearUserSession();
+      }
       
-      // Then call Supabase signOut
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Double-check that localStorage is cleared
-      const storedSession = localStorage.getItem(STORAGE_KEY);
-      if (storedSession) {
-        console.warn('Session still exists in localStorage after signOut, forcibly removing...');
-        localStorage.removeItem(STORAGE_KEY);
-      }
-      
-      // Ensure state is properly reset
       setState({
         user: null,
         session: null,
@@ -683,10 +615,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Sign-out completed successfully');
     } catch (error: any) {
       console.error('Sign-out error:', error);
-      
-      // Still remove from localStorage even on error
-      localStorage.removeItem(STORAGE_KEY);
-      
       setState(prev => ({
         ...prev,
         loading: false,

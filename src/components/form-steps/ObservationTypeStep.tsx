@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import debounce from 'lodash/debounce';
 import { CrossPlatformSelect } from "@/components/ui/CrossPlatformSelect";
 import { StepperSelect, OptionType } from "@/components/ui/StepperSelect";
+import { isAndroid } from '@/lib/isAndroidWebView';
 
 export function ObservationTypeStep() {
   const { formData, setFormData } = useActivityForm();
@@ -153,19 +154,21 @@ export function ObservationTypeStep() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <Label htmlFor="indirect_sighting_type">Type of Indirect Sighting</Label>
-              <StepperSelect
-                value={formData.indirect_sighting_type}
-                onChange={value => handleSelectChange('indirect_sighting_type', value)}
-                options={[
-                  { value: "Pugmark", label: "Pugmark" },
-                  { value: "Dung", label: "Dung" },
-                  { value: "Broken Branches", label: "Broken Branches" },
-                  { value: "Sound", label: "Sound" },
-                  { value: "Eyewitness", label: "Eyewitness" },
-                ]}
-                placeholder="Select type of indirect sighting"
-                className="w-full h-12 text-base"
-              />
+              <Select
+                value={formData.indirect_sighting_type || ''}
+                onValueChange={value => handleSelectChange('indirect_sighting_type', value)}
+              >
+                <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors">
+                  <SelectValue placeholder="Select type of indirect sighting" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pugmark">Pugmark</SelectItem>
+                  <SelectItem value="Dung">Dung</SelectItem>
+                  <SelectItem value="Broken Branches">Broken Branches</SelectItem>
+                  <SelectItem value="Sound">Sound</SelectItem>
+                  <SelectItem value="Eyewitness">Eyewitness</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -176,22 +179,41 @@ export function ObservationTypeStep() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               <Label htmlFor="loss_type">Type of Loss</Label>
-              <StepperSelect
-                value={formData.loss_type}
-                onChange={value => handleSelectChange('loss_type', value)}
-                options={[
-                  { value: "No loss", label: "No loss" },
-                  { value: "crop", label: "Crop" },
-                  { value: "livestock", label: "Livestock" },
-                  { value: "property", label: "Property" },
-                  { value: "fencing", label: "Fencing" },
-                  { value: "solar panels", label: "Solar Panels" },
-                  { value: "FD establishment", label: "FD Establishment" },
-                  { value: "Other", label: "Other" },
-                ]}
-                placeholder="Select type of loss"
-                className="w-full h-12 text-base"
-              />
+              {isAndroid() ? (
+                <select
+                  id="loss_type"
+                  value={formData.loss_type || ''}
+                  onChange={e => handleSelectChange('loss_type', e.target.value)}
+                  className="w-full h-12 text-base border rounded"
+                >
+                  <option value="">Select type of loss</option>
+                  <option value="No loss">No loss</option>
+                  <option value="crop">Crop</option>
+                  <option value="livestock">Livestock</option>
+                  <option value="property">Property</option>
+                  <option value="fencing">Fencing</option>
+                  <option value="solar panels">Solar Panels</option>
+                  <option value="FD establishment">FD Establishment</option>
+                  <option value="Other">Other</option>
+                </select>
+              ) : (
+                <StepperSelect
+                  value={formData.loss_type}
+                  onChange={value => handleSelectChange('loss_type', value)}
+                  options={[
+                    { value: "No loss", label: "No loss" },
+                    { value: "crop", label: "Crop" },
+                    { value: "livestock", label: "Livestock" },
+                    { value: "property", label: "Property" },
+                    { value: "fencing", label: "Fencing" },
+                    { value: "solar panels", label: "Solar Panels" },
+                    { value: "FD establishment", label: "FD Establishment" },
+                    { value: "Other", label: "Other" },
+                  ]}
+                  placeholder="Select type of loss"
+                  className="w-full h-12 text-base"
+                />
+              )}
             </div>
           </CardContent>
         </Card>

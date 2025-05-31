@@ -62,55 +62,53 @@ function StepperContent() {
 
   const handleSubmit = async () => {
     try {
-      // Get the session and fetch the user's id from the users table
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('You must be logged in to submit an activity report');
-        return;
+      setIsSubmitting(true);
+      let userId = null;
+      if (isOnline) {
+        // Get the session and fetch the user's id from the users table
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error('You must be logged in to submit an activity report');
+          return;
+        }
+        // Get the user's auth_id from the session
+        const authId = session.user.id;
+        if (!authId) {
+          toast.error('User auth ID not found');
+          return;
+        }
+        // Look up the app user by auth_id
+        const { data: userRow, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', authId)
+          .single();
+        if (userError) {
+          console.error('Error fetching user:', userError);
+          toast.error('Error fetching user information');
+          return;
+        }
+        if (!userRow || !userRow.id) {
+          console.error('User not found in users table');
+          toast.error('User not found in system');
+          return;
+        }
+        userId = userRow.id;
+      } else {
+        // Use user from context if available, otherwise fallback to session
+        userId = user?.id || null;
       }
-
-      // Get the user's auth_id from the session
-      const authId = session.user.id;
-      if (!authId) {
-        toast.error('User auth ID not found');
-        return;
-      }
-
-      // Look up the app user by auth_id
-      const { data: userRow, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('auth_id', authId)
-        .single();
-
-      if (userError) {
-        console.error('Error fetching user:', userError);
-        toast.error('Error fetching user information');
-        return;
-      }
-
-      if (!userRow || !userRow.id) {
-        console.error('User not found in users table');
-        toast.error('User not found in system');
-        return;
-      }
-
-      const userId = userRow.id;
-
       // Validate form data
       if (!formData.activity_date || !formData.activity_time || !formData.observation_type) {
         toast.error('Please fill in all required fields')
         return
       }
-
       // Format the activity date and time as strings
       const formattedDate =
         typeof formData.activity_date === 'string'
           ? formData.activity_date
           : formData.activity_date?.toISOString().split('T')[0];
-
       const formattedTime = formData.activity_time || '';
-
       // Prepare the report data
       const reportData = {
         activity_date: formattedDate,
@@ -129,13 +127,11 @@ function StepperContent() {
         photo_url: formData.photo_url ? String(formData.photo_url) : null,
         user_id: userId
       };
-
       if (isOnline) {
         // Try to submit to Supabase directly
         const { error: insertError } = await supabase
           .from('activity_reports')
           .insert([reportData]);
-
         if (insertError) {
           console.error('Insert error details:', insertError);
           // If online submission fails, save offline

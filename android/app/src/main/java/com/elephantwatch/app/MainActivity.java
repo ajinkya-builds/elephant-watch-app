@@ -2,6 +2,7 @@ package com.elephantwatch.app;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -10,6 +11,14 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.util.Log;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager.NetworkCallback;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -21,6 +30,9 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private PermissionRequest permissionRequest;
     private static final String TAG = "MainActivity";
+    private ConnectivityManager connectivityManager;
+    private NetworkCallback networkCallback;
+    private boolean isOnline = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +46,41 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webview);
         setupWebView();
         checkAndRequestPermissions();
+        setupNetworkCallback();
+    }
+
+    private void setupNetworkCallback() {
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        
+        networkCallback = new NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                isOnline = true;
+                runOnUiThread(() -> {
+                    webView.evaluateJavascript(
+                        "window.dispatchEvent(new Event('online'))",
+                        null
+                    );
+                });
+            }
+
+            @Override
+            public void onLost(Network network) {
+                isOnline = false;
+                runOnUiThread(() -> {
+                    webView.evaluateJavascript(
+                        "window.dispatchEvent(new Event('offline'))",
+                        null
+                    );
+                });
+            }
+        };
+
+        NetworkRequest networkRequest = new NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build();
+
+        connectivityManager.registerNetworkCallback(networkRequest, networkCallback);
     }
 
     private void setupWebView() {
@@ -45,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setAllowContentAccess(true);
         webSettings.setAllowFileAccessFromFileURLs(true);
         webSettings.setAllowUniversalAccessFromFileURLs(true);
-        webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
         webSettings.setDatabaseEnabled(true);
         webSettings.setSupportZoom(true);
         webSettings.setBuiltInZoomControls(true);
@@ -54,6 +101,9 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
+        
+        // Add JavaScript interface
+        webView.addJavascriptInterface(new WebAppInterface(this), "Android");
         
         // Enable hardware acceleration
         webView.setLayerType(WebView.LAYER_TYPE_HARDWARE, null);
@@ -82,10 +132,65 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 Log.d(TAG, "Page finished loading: " + url);
-                // Inject error handling JavaScript
+                // Inject offline handling JavaScript
                 String js = "window.onerror = function(msg, url, line) {" +
                            "  console.error('JavaScript Error: ' + msg + ' at ' + url + ':' + line);" +
                            "  return false;" +
+                           "};" +
+                           "window.addEventListener('online', function() {" +
+                           "  window.dispatchEvent(new CustomEvent('syncPendingReports'));" +
+                           "});" +
+                           "window.addEventListener('offline', function() {" +
+                           "  window.dispatchEvent(new CustomEvent('handleOffline'));" +
+                           "});" +
+                           // Add offline storage functions
+                           "window.offlineStorage = {" +
+                           "  savePendingReport: function(report) {" +
+                           "    Android.savePendingReport(JSON.stringify(report));" +
+                           "  }," +
+                           "  getPendingReports: function() {" +
+                           "    return JSON.parse(Android.getPendingReports());" +
+                           "  }," +
+                           "  removePendingReport: function(index) {" +
+                           "    Android.removePendingReport(index);" +
+                           "  }," +
+                           "  saveUserSession: function(session) {" +
+                           "    Android.saveUserSession(JSON.stringify(session));" +
+                           "  }," +
+                           "  getUserSession: function() {" +
+                           "    const session = Android.getUserSession();" +
+                           "    return session === 'null' ? null : JSON.parse(session);" +
+                           "  }," +
+                           "  clearUserSession: function() {" +
+                           "    Android.clearUserSession();" +
+                           "  }," +
+                           "  getPendingReportsCount: function() {" +
+                           "    return Android.getPendingReportsCount();" +
+                           "  }" +
+                           "};" +
+                           // Override navigator.geolocation
+                           "navigator.geolocation.getCurrentPosition = function(success, error, options) {" +
+                           "  Android.getCurrentLocation();" +
+                           "  window.onLocationReceived = function(location) {" +
+                           "    success({" +
+                           "      coords: {" +
+                           "        latitude: location.latitude," +
+                           "        longitude: location.longitude," +
+                           "        accuracy: location.accuracy," +
+                           "        altitude: null," +
+                           "        altitudeAccuracy: null," +
+                           "        heading: null," +
+                           "        speed: null" +
+                           "      }," +
+                           "      timestamp: location.timestamp" +
+                           "    });" +
+                           "  };" +
+                           "  window.onLocationError = function(error) {" +
+                           "    error({" +
+                           "      code: error.code," +
+                           "      message: error.message" +
+                           "    });" +
+                           "  };" +
                            "};";
                 view.evaluateJavascript(js, null);
                 super.onPageFinished(view, url);
@@ -146,8 +251,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Load the app from assets for offline support
-        webView.loadUrl("file:///android_asset/index.html");
+        // Load from local dev server in debug mode, otherwise from assets
+        boolean isDebug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (isDebug) {
+            // Use 10.0.2.2 to access host machine's localhost from Android emulator
+            // For physical device, use your computer's local network IP
+            webView.loadUrl("http://10.0.2.2:8080");
+        } else {
+            webView.loadUrl("file:///android_asset/index.html");
+        }
     }
 
     private void checkAndRequestPermissions() {
@@ -156,7 +268,9 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.BLUETOOTH,
-            Manifest.permission.BLUETOOTH_CONNECT
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.INTERNET,
+            Manifest.permission.ACCESS_NETWORK_STATE
         };
 
         List<String> permissionsToRequest = new ArrayList<>();
@@ -203,5 +317,17 @@ public class MainActivity extends AppCompatActivity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (connectivityManager != null && networkCallback != null) {
+            connectivityManager.unregisterNetworkCallback(networkCallback);
+        }
+    }
+
+    public WebView getWebView() {
+        return webView;
     }
 } 

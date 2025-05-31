@@ -1,38 +1,57 @@
-import { getPendingActivities, markActivitySynced, markActivityFailed, OfflineActivity } from './offlineStorage';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
+import { 
+  getPendingReports, 
+  removePendingReport, 
+  getPendingReportsCount,
+  isAndroidApp 
+} from '@/utils/offlineStorage';
 
-export const syncPendingActivities = async (): Promise<void> => {
-  if (!navigator.onLine) return;
+let isSyncing = false;
+
+export const syncPendingReports = async () => {
+  if (!isAndroidApp() || isSyncing) return;
   
-  const pendingActivities = await getPendingActivities();
-  
-  for (const activity of pendingActivities) {
-    try {
-      // Remove offline-specific fields before syncing
-      const { id, timestamp, syncStatus, createdOffline, ...activityData } = activity;
-      
-      // Submit to Supabase
-      const { error } = await supabase
-        .from('activities')
-        .insert([activityData]);
-        
-      if (error) throw error;
-      
-      await markActivitySynced(id);
-      console.log(`Synced activity ${id}`);
-    } catch (error) {
-      console.error(`Failed to sync activity ${activity.id}:`, error);
-      await markActivityFailed(activity.id);
+  isSyncing = true;
+  try {
+    const pendingReports = await getPendingReports();
+    
+    for (let i = 0; i < pendingReports.length; i++) {
+      try {
+        const { error } = await supabase
+          .from('activity_reports')
+          .insert([pendingReports[i]]);
+
+        if (error) throw error;
+
+        await removePendingReport(i);
+        toast.success('Report synced successfully');
+      } catch (error: any) {
+        console.error('Error syncing report:', error);
+        toast.error(`Failed to sync report: ${error.message}`);
+        break; // Stop syncing if we encounter an error
+      }
     }
+  } catch (error: any) {
+    console.error('Error during sync:', error);
+    toast.error(`Sync failed: ${error.message}`);
+  } finally {
+    isSyncing = false;
   }
 };
 
 // Auto-sync when coming online
-window.addEventListener('online', syncPendingActivities);
+window.addEventListener('online', () => {
+  console.log('[SyncService] Online event detected, starting sync');
+  syncPendingReports();
+});
 
-// Periodic sync attempt
+// Periodically attempt to sync pending reports when online
 setInterval(() => {
   if (navigator.onLine) {
-    syncPendingActivities();
+    syncPendingReports();
   }
-}, 30000); // Every 30 seconds 
+}, 30000); // Try to sync every 30 seconds when online
+
+// Export the sync function for manual triggering
+export default syncPendingReports; 

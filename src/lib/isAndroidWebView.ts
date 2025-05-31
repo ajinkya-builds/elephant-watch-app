@@ -1,7 +1,6 @@
-export function isAndroidWebView() {
+export function isAndroid() {
   return (
     typeof navigator !== "undefined" &&
-    /wv/.test(navigator.userAgent) &&
     /Android/.test(navigator.userAgent)
   );
 } 
