@@ -12,121 +12,124 @@
 12    <uses-permission android:name="android.permission.INTERNET" />
 12-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:6:5-67
 12-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:6:22-64
-13
-14    <!-- Camera Permission -->
-15    <uses-permission android:name="android.permission.CAMERA" />
-15-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:9:5-65
-15-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:9:22-62
-16
-17    <!-- Location Permissions -->
-18    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-18-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:12:5-79
-18-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:12:22-76
-19    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-19-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:13:5-81
-19-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:13:22-78
-20
-21    <!-- Bluetooth Permissions -->
-22    <uses-permission android:name="android.permission.BLUETOOTH" />
-22-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:16:5-68
-22-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:16:22-65
-23    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-23-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:17:5-76
-23-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:17:22-73
-24
-25    <!-- Device Orientation -->
-26    <uses-feature
-26-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:20:5-98
-27        android:name="android.hardware.sensor.accelerometer"
-27-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:20:19-71
-28        android:required="true" />
-28-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:20:72-95
-29    <uses-feature
-29-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:21:5-92
-30        android:name="android.hardware.sensor.compass"
-30-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:21:19-65
-31        android:required="true" />
-31-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:21:66-89
-32
-33    <permission
-33-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:22:5-24:47
-34        android:name="com.elephantwatch.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
-34-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:23:9-81
-35        android:protectionLevel="signature" />
-35-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:24:9-44
-36
-37    <uses-permission android:name="com.elephantwatch.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
-37-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:26:5-97
-37-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:26:22-94
-38
-39    <application
-39-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:23:5-44:19
-40        android:name="com.elephantwatch.app.MainApplication"
-40-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:24:9-40
-41        android:allowBackup="true"
-41-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:25:9-35
-42        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
-42-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:28:18-86
-43        android:debuggable="true"
-44        android:extractNativeLibs="false"
-45        android:icon="@mipmap/ic_launcher"
-45-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:26:9-43
-46        android:label="@string/app_name"
-46-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:27:9-41
-47        android:roundIcon="@mipmap/ic_launcher_round"
-47-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:28:9-54
-48        android:supportsRtl="true"
-48-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:29:9-35
-49        android:testOnly="true"
-50        android:theme="@style/Theme.ElephantWatch"
-50-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:30:9-51
-51        android:usesCleartextTraffic="true" >
-51-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:31:9-44
-52        <activity
-52-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:33:9-43:20
-53            android:name="com.elephantwatch.app.MainActivity"
-53-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:34:13-41
-54            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
-54-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:35:13-122
-55            android:exported="true"
-55-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:38:13-36
-56            android:launchMode="singleTask"
-56-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:36:13-44
-57            android:windowSoftInputMode="adjustResize" >
-57-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:37:13-55
-58            <intent-filter>
-58-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:39:13-42:29
-59                <action android:name="android.intent.action.MAIN" />
-59-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:40:17-69
-59-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:40:25-66
-60
-61                <category android:name="android.intent.category.LAUNCHER" />
-61-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:41:17-77
-61-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:41:27-74
-62            </intent-filter>
-63        </activity>
-64
-65        <provider
-65-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
-66            android:name="androidx.startup.InitializationProvider"
-66-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:25:13-67
-67            android:authorities="com.elephantwatch.app.androidx-startup"
-67-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:26:13-68
-68            android:exported="false" >
-68-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:27:13-37
-69            <meta-data
-69-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
-70                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-70-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:30:17-75
-71                android:value="androidx.startup" />
-71-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:31:17-49
-72            <meta-data
-72-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
-73                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-73-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
-74                android:value="androidx.startup" />
-74-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
-75        </provider>
-76    </application>
-77
-78</manifest>
+13    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+13-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:7:5-79
+13-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:7:22-76
+14
+15    <!-- Camera Permission -->
+16    <uses-permission android:name="android.permission.CAMERA" />
+16-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:10:5-65
+16-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:10:22-62
+17
+18    <!-- Location Permissions -->
+19    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+19-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:13:5-79
+19-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:13:22-76
+20    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+20-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:14:5-81
+20-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:14:22-78
+21
+22    <!-- Bluetooth Permissions -->
+23    <uses-permission android:name="android.permission.BLUETOOTH" />
+23-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:17:5-68
+23-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:17:22-65
+24    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+24-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:18:5-76
+24-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:18:22-73
+25
+26    <!-- Device Orientation -->
+27    <uses-feature
+27-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:21:5-98
+28        android:name="android.hardware.sensor.accelerometer"
+28-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:21:19-71
+29        android:required="true" />
+29-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:21:72-95
+30    <uses-feature
+30-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:22:5-92
+31        android:name="android.hardware.sensor.compass"
+31-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:22:19-65
+32        android:required="true" />
+32-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:22:66-89
+33
+34    <permission
+34-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:22:5-24:47
+35        android:name="com.elephantwatch.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+35-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:23:9-81
+36        android:protectionLevel="signature" />
+36-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:24:9-44
+37
+38    <uses-permission android:name="com.elephantwatch.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+38-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:26:5-97
+38-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:26:22-94
+39
+40    <application
+40-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:24:5-45:19
+41        android:name="com.elephantwatch.app.MainApplication"
+41-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:25:9-40
+42        android:allowBackup="true"
+42-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:26:9-35
+43        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+43-->[androidx.core:core:1.9.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/7519728c43c7501f1f98ec97271e1ab9/transformed/core-1.9.0/AndroidManifest.xml:28:18-86
+44        android:debuggable="true"
+45        android:extractNativeLibs="false"
+46        android:icon="@mipmap/ic_launcher"
+46-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:27:9-43
+47        android:label="@string/app_name"
+47-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:28:9-41
+48        android:roundIcon="@mipmap/ic_launcher_round"
+48-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:29:9-54
+49        android:supportsRtl="true"
+49-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:30:9-35
+50        android:testOnly="true"
+51        android:theme="@style/Theme.ElephantWatch"
+51-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:31:9-51
+52        android:usesCleartextTraffic="true" >
+52-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:32:9-44
+53        <activity
+53-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:34:9-44:20
+54            android:name="com.elephantwatch.app.MainActivity"
+54-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:35:13-41
+55            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+55-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:36:13-122
+56            android:exported="true"
+56-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:39:13-36
+57            android:launchMode="singleTask"
+57-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:37:13-44
+58            android:windowSoftInputMode="adjustResize" >
+58-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:38:13-55
+59            <intent-filter>
+59-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:40:13-43:29
+60                <action android:name="android.intent.action.MAIN" />
+60-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:41:17-69
+60-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:41:25-66
+61
+62                <category android:name="android.intent.category.LAUNCHER" />
+62-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:42:17-77
+62-->/Users/ajinkyapatil/Documents/Main Projects/elephant-watch-app/android/app/src/main/AndroidManifest.xml:42:27-74
+63            </intent-filter>
+64        </activity>
+65
+66        <provider
+66-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+67            android:name="androidx.startup.InitializationProvider"
+67-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:25:13-67
+68            android:authorities="com.elephantwatch.app.androidx-startup"
+68-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:26:13-68
+69            android:exported="false" >
+69-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:27:13-37
+70            <meta-data
+70-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+71                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+71-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:30:17-75
+72                android:value="androidx.startup" />
+72-->[androidx.emoji2:emoji2:1.2.0] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/3ada78449962b76c994c018e7f89db60/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:31:17-49
+73            <meta-data
+73-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
+74                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+74-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
+75                android:value="androidx.startup" />
+75-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/ajinkyapatil/.gradle/caches/8.12/transforms/14e9e9959583dfbe9baca4321db8031d/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
+76        </provider>
+77    </application>
+78
+79</manifest>
