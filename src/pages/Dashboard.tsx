@@ -15,9 +15,13 @@ export default function Dashboard() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-white/20 rounded-full blur-lg"></div>
-                <img src="/elephant_photo.png" alt="Elephant Logo" className="w-8 h-8 sm:w-10 sm:h-10 relative z-10" />
+              <div className="relative w-8 h-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
+                <img
+                  src="/elephant-watch-app/elephant_photo.png"
+                  alt="Elephant Logo"
+                  className="relative w-full h-full object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Eravat Dashboard</h1>
