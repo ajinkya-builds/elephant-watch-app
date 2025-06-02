@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PawPrint, Activity, Users, MapPin } from "lucide-react";
+import { Activity, Users, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 
@@ -27,7 +27,7 @@ export default function Index() {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-green-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
-              <PawPrint className="w-16 h-16 sm:w-24 sm:h-24 text-blue-600 relative z-10" />
+              <img src="/elephant_photo.png" alt="Elephant Logo" className="w-16 h-16 sm:w-24 sm:h-24 relative z-10" />
             </motion.div>
           </div>
           <motion.h1 

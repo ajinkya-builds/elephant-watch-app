@@ -1,7 +1,6 @@
 import React from "react";
 import { EnhancedDashboard } from '@/components/EnhancedDashboard';
 import { motion } from "framer-motion";
-import { PawPrint } from "lucide-react";
 
 export default function Dashboard() {
   return (
@@ -18,7 +17,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="absolute inset-0 bg-white/20 rounded-full blur-lg"></div>
-                <PawPrint className="w-8 h-8 sm:w-10 sm:h-10 text-white relative z-10" />
+                <img src="/elephant_photo.png" alt="Elephant Logo" className="w-8 h-8 sm:w-10 sm:h-10 relative z-10" />
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Eravat Dashboard</h1>

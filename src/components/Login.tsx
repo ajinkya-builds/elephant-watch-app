@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toast } from "sonner";
-import { PawPrint, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from '@/contexts/AuthContext';
@@ -144,7 +144,7 @@ export default function Login() {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-green-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
-              <PawPrint className="w-24 h-24 text-blue-600 relative z-10" />
+              <img src="/elephant_photo.png" alt="Elephant Logo" className="w-24 h-24 relative z-10" />
             </motion.div>
           </div>
           <motion.h1 

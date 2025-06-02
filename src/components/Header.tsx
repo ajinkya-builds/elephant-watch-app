@@ -36,7 +36,7 @@ export function Header() {
             <Link to="/" className="flex items-center gap-2">
               <span className="relative flex items-center justify-center w-8 h-8">
                 <span className="absolute inset-0 bg-gradient-to-r from-blue-500 to-green-500 rounded-full blur-md opacity-30 animate-pulse"></span>
-                <PawPrint className="w-7 h-7 text-blue-600 relative z-10" />
+                <img src="/elephant_photo.png" alt="Elephant Logo" className="w-7 h-7 relative z-10" />
               </span>
               <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Eravat</span>
             </Link>
