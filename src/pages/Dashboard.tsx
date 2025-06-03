@@ -16,7 +16,6 @@ export default function Dashboard() {
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
             <div className="flex items-center gap-4">
               <div className="relative w-8 h-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
                 <img
                   src="/elephant-watch-app/elephant_photo.png"
                   alt="Elephant Logo"

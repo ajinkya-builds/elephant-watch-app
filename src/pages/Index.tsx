@@ -27,7 +27,7 @@ export default function Index() {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-green-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
-              <img src="/elephant_photo.png" alt="Elephant Logo" className="w-16 h-16 sm:w-24 sm:h-24 relative z-10" />
+              <img src="/elephant-watch-app/elephant_photo.png" alt="Elephant Logo" className="w-16 h-16 sm:w-24 sm:h-24 relative z-10" />
             </motion.div>
           </div>
           <motion.h1 

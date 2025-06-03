@@ -137,14 +137,11 @@ export default function Login() {
           className="text-center mb-16"
         >
           <div className="flex items-center justify-center mb-8">
-            <div className="relative w-24 h-24">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
-              <img
-                src="/elephant-watch-app/elephant_photo.png"
-                alt="Elephant Logo"
-                className="relative w-full h-full object-contain"
-              />
-            </div>
+            <img
+              src="/elephant-watch-app/elephant_photo.png"
+              alt="Elephant Logo"
+              className="w-24 h-24 object-contain"
+            />
           </div>
           <motion.h1 
             initial={{ opacity: 0 }}
