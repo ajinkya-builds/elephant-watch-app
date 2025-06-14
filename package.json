@@ -49,7 +49,7 @@
     "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/auth-helpers-shared": "^0.7.0",
     "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.49.8",
+    "@supabase/supabase-js": "^2.50.0",
     "@tanstack/react-query": "^5.56.2",
     "@types/leaflet": "^1.9.17",
     "@types/localforage": "^0.0.33",
