@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
-// Storage key constant for consistency
-const STORAGE_KEY = 'sb-pauafmgoewfdhwnexzy-auth-token';
+// Storage key constant for consistency - Updated to new Supabase project ID
+const STORAGE_KEY = 'sb-vfsyjvjghftfebvxyjba-auth-token';
 
 // Debug environment variables
 console.log('=== Supabase Client Configuration Debug ===');
@@ -177,7 +177,11 @@ const customStorage = {
 };
 
 // Create the Supabase client with enhanced configuration
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Ensure we're using the correct URL and key
+export const supabase = createClient(
+  'https://vfsyjvjghftfebvxyjba.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmc3lqdmpnaGZ0ZmVidnh5amJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNTU3MjYsImV4cCI6MjA2NDYzMTcyNn0.td6SnbD51RuNG_tTuKSC7Jwcz_lUk1tcrcNTwC3OLxc',
+  {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
