@@ -29,7 +29,7 @@
     "test:coverage": "npm run test:frontend:coverage && npm run test:backend:coverage",
     "test:frontend:coverage": "cd frontend && npm run test:coverage",
     "test:backend:coverage": "cd backend && npm run test:coverage",
-    "predeploy": "npm run build",
+    "predeploy": "npm run build && touch frontend/dist/.nojekyll",
     "deploy": "gh-pages -d frontend/dist",
     "format": "npm run format --workspaces",
     "prepare": "husky install"
