@@ -75,3 +75,4 @@ yarn-error.log
 # OS files
 .DS_Store
 Thumbs.db
+node_modules

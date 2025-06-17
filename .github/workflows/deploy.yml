@@ -115,6 +115,8 @@ jobs:
             .github
             .gitignore
             README.md
+            CNAME
+          commit-message: "Deploy to GitHub Pages"
 
       - name: Verify Deployment
         id: verify

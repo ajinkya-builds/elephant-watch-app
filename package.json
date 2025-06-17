@@ -2,7 +2,7 @@
   "name": "elephant-watch-app",
   "private": true,
   "version": "1.0.0",
-  "homepage": "https://ajinkyapatil.github.io/elephant-watch-app",
+  "homepage": "https://ajinkya-builds.github.io/elephant-watch-app",
   "workspaces": [
     "frontend",
     "backend"
