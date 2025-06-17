@@ -117,13 +117,13 @@ export async function getAdminStatistics(): Promise<AdminStatisticsData> {
     ]);
 
     return {
-      userStats: userStats || defaultUserStats,
-      activityStats: activityStats || defaultActivityStats,
-      systemHealth: systemHealth || defaultSystemHealth,
-      userActivityTimeline: userActivityTimeline || [],
-      recordCreationTimeline: recordCreationTimeline || [],
-      resourceUtilization: resourceUtilization || [],
-      recentActivity: recentActivity || []
+      userStats: (userStats || defaultUserStats) as UserStats,
+      activityStats: (activityStats || defaultActivityStats) as ActivityStats,
+      systemHealth: (systemHealth || defaultSystemHealth) as SystemHealth,
+      userActivityTimeline: (userActivityTimeline || []) as unknown as UserActivityTimeline[],
+      recordCreationTimeline: (recordCreationTimeline || []) as unknown as RecordCreationTimeline[],
+      resourceUtilization: (resourceUtilization || []) as unknown as ResourceUtilization[],
+      recentActivity: (recentActivity || []) as unknown as RecentActivity[]
     };
   } catch (error) {
     console.error('Error fetching admin statistics:', error);

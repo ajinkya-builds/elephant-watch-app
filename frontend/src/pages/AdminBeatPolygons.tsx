@@ -36,7 +36,7 @@ export default function AdminBeatPolygons() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPolygons(data || []);
+      setPolygons((data || []) as unknown as BeatPolygon[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch polygons');
     } finally {

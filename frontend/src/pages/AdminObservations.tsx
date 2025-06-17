@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabaseClient";
-import { ActivityReport, ActivityObservation, User, ObservationType, IndirectSightingType, LossType, ActivityReportUpdate } from "@/types/activity-report";
+import { ActivityReport, ActivityObservation, User, ObservationType, IndirectSightingType, LossType, ActivityReportUpdate, ReportStatus } from "@/types/activity-report";
 import { toast } from "sonner";
 import { Loader2, ChevronLeft, ChevronRight, Download, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -183,6 +183,10 @@ interface Observation extends ActivityReport {
   users?: User;
 }
 
+interface SupabaseResponseWithUsers extends SupabaseResponse {
+  users: SupabaseUser;
+}
+
 export default function AdminObservations() {
   const [observations, setObservations] = useState<Observation[]>([]);
   const [viewObs, setViewObs] = useState<Observation | null>(null);
@@ -217,8 +221,9 @@ export default function AdminObservations() {
 
       const observations: Observation[] = Array.isArray(reports)
         ? reports
-            .filter(isSupabaseResponse)
-            .map((report) => convertToActivityReport(report as SupabaseResponse))
+            .filter((report): report is SupabaseResponseWithUsers => 
+              isSupabaseResponse(report) && 'users' in report)
+            .map(convertToActivityReport)
         : [];
 
       setObservations(observations);
@@ -335,83 +340,72 @@ export default function AdminObservations() {
     }));
   };
 
-  const handleEdit = async (form: HTMLFormElement) => {
-    if (!editObs) return;
-
+  const handleEdit = async (formData: FormData) => {
+    if (!editObs?.id) return;
+    
     try {
-      const formData = new FormData(form);
-      const updatedReport: ActivityReportUpdate = {
-        activity_date: activityDate || editObs.activity_date,
-        activity_time: formData.get('activity_time') as string,
-        observation_type: formData.get('observation_type') as ObservationType,
-        latitude: formData.get('latitude') as string,
-        longitude: formData.get('longitude') as string
-      };
-
-      const { error } = await supabase
+      const result = await supabase
         .from('activity_reports')
-        .update(updatedReport)
+        .update({
+          activity_date: formData.get('activity_date'),
+          activity_time: formData.get('activity_time'),
+          latitude: formData.get('latitude'),
+          longitude: formData.get('longitude'),
+          observation_type: formData.get('observation_type'),
+          status: formData.get('status'),
+          is_offline: formData.get('is_offline') === 'true',
+          division_id: formData.get('division_id'),
+          range_id: formData.get('range_id'),
+          beat_id: formData.get('beat_id'),
+          compass_bearing: formData.get('compass_bearing'),
+          distance: formData.get('distance'),
+          indirect_sighting_type: formData.get('indirect_sighting_type'),
+          damage_done: formData.get('damage_done'),
+          damage_description: formData.get('damage_description'),
+          loss_type: formData.get('loss_type'),
+          photo_url: formData.get('photo_url'),
+          reporter_mobile: formData.get('reporter_mobile'),
+          total_elephants: formData.get('total_elephants'),
+          adult_male_count: formData.get('adult_male_count'),
+          adult_female_count: formData.get('adult_female_count'),
+          unknown_count: formData.get('unknown_count'),
+          associated_division: formData.get('associated_division'),
+          associated_range: formData.get('associated_range'),
+          associated_beat: formData.get('associated_beat'),
+          email: formData.get('email')
+        })
         .eq('id', editObs.id);
 
-      if (error) throw error;
+      if (result.error) {
+        throw result.error;
+      }
 
+      toast.success('Observation updated successfully');
       setEditObs(null);
-      setActivityDate(null);
       fetchObservations();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update observation');
+    } catch (error) {
+      toast.error('Failed to update observation');
+      console.error('Error updating observation:', error);
     }
   };
 
   const handleManualSync = async (reportId: string) => {
+    setSyncing(reportId);
     try {
-      setSyncing(reportId);
-      
-      // First check if observation already exists
-      const { data: existingObs, error: checkError } = await supabase
-        .from('activity_observation')
-        .select('*')
-        .eq('activity_report_id', reportId);
+      const result = await supabase
+        .from('activity_reports')
+        .update({ status: 'synced' })
+        .eq('id', reportId);
 
-      if (checkError) {
-        console.error('Error checking existing observation:', checkError);
-        throw checkError;
+      if (result.error) {
+        throw result.error;
       }
 
-      if (existingObs && existingObs.length > 0) {
-        toast.success('Report already synced');
-        await fetchObservations();
-        return;
-      }
-
-      // Process the report
-      const { data: result, error: processError } = await supabase.rpc('process_new_activity_reports', { 
-        report_id: reportId 
-      }) as { data: SupabaseResponse | null; error: any };
-
-      if (processError) {
-        console.error('Processing error:', processError);
-        throw processError;
-      }
-
-      if (!result) {
-        throw new Error('No response from server');
-      }
-
-      if (result.status === 'error') {
-        console.error('Processing error:', result.error, result.detail);
-        throw new Error(result.error || result.message || 'Failed to process report');
-      }
-
-      if (result.status !== 'success') {
-        throw new Error(result.message || 'Unexpected response from server');
-      }
-
-      toast.success(result.message || 'Report synced successfully');
-      await fetchObservations();
+      toast.success('Report synced successfully');
+      fetchObservations();
     } catch (error) {
-      console.error('Error syncing report:', error);
       toast.error('Failed to sync report');
+      console.error('Error syncing report:', error);
     } finally {
       setSyncing(null);
     }
@@ -610,7 +604,9 @@ export default function AdminObservations() {
                               className="border-blue-200"
                             />
                           </TableCell>
-                          <TableCell>{new Date(obs.created_at).toLocaleString()}</TableCell>
+                          <TableCell>
+                            {obs.created_at ? new Date(obs.created_at).toLocaleString() : 'N/A'}
+                          </TableCell>
                           <TableCell>{`${obs.users?.first_name || ''} ${obs.users?.last_name || ''}`.trim() || 'Unknown'}</TableCell>
                           <TableCell>
                             {obs.total_elephants && obs.total_elephants > 0 ?
@@ -723,8 +719,8 @@ export default function AdminObservations() {
               <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">View Report</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-blue-900"><strong>Date:</strong> {new Date(viewObs.created_at).toLocaleDateString()}</p>
-                  <p className="text-blue-900"><strong>Time:</strong> {new Date(viewObs.created_at).toLocaleTimeString()}</p>
+                  <p className="text-blue-900"><strong>Date:</strong> {viewObs.created_at ? new Date(viewObs.created_at).toLocaleDateString() : 'N/A'}</p>
+                  <p className="text-blue-900"><strong>Time:</strong> {viewObs.created_at ? new Date(viewObs.created_at).toLocaleTimeString() : 'N/A'}</p>
                   <p className="text-blue-900"><strong>Reporter:</strong> {`${viewObs.users?.first_name || ''} ${viewObs.users?.last_name || ''}`.trim() || 'Unknown'}</p>
                   {viewObs.reporter_mobile && <p className="text-blue-900"><strong>Contact:</strong> {viewObs.reporter_mobile}</p>}
                   {viewObs.email && <p className="text-blue-900"><strong>Email:</strong> {viewObs.email}</p>}
@@ -796,7 +792,11 @@ export default function AdminObservations() {
               <h2 className="text-xl font-bold mb-4">Edit Observation</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
-                handleEdit(e.currentTarget);
+                const form = e.currentTarget;
+                if (form instanceof HTMLFormElement) {
+                  const formData = new FormData(form);
+                  handleEdit(formData);
+                }
               }}>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

@@ -24,13 +24,7 @@ export default function AdminObservations() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setObservations(data?.map(report => ({
-        ...report,
-        activity_date: new Date(report.activity_date),
-        created_at: report.created_at ? new Date(report.created_at) : undefined,
-        updated_at: report.updated_at ? new Date(report.updated_at) : undefined,
-        synced_at: report.synced_at ? new Date(report.synced_at) : undefined
-      })) || []);
+      setObservations((data || []) as unknown as ActivityReport[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch observations');
     } finally {

@@ -34,14 +34,16 @@ const logLoginAttempt = async (identifier: string, status: 'success' | 'failed')
     const { data: ipInfo } = await supabaseAdmin.rpc('get_ip_info');
 
     const isEmail = identifier.includes('@');
+    const ip = ipInfo && typeof ipInfo === 'object' && ipInfo !== null && 'ip' in ipInfo ? ipInfo.ip : null;
+    const userAgent = browserInfo && typeof browserInfo === 'object' && browserInfo !== null && 'user_agent' in browserInfo ? browserInfo.user_agent : null;
     const loginData = {
       email: isEmail ? identifier : null,
       phone: !isEmail ? identifier : null,
       login_type: isEmail ? 'email' : 'phone',
       status,
       time: new Date().toISOString(),
-      ip: ipInfo?.ip || null,
-      browser: browserInfo?.user_agent || null
+      ip,
+      browser: userAgent
     };
 
     const { error } = await supabaseAdmin

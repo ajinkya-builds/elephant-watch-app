@@ -119,9 +119,7 @@ export function CompassBearingStep() {
 
   const handleDistanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
-    if (!isNaN(value) && value >= 0) {
-      updateFormData({ distance: value });
-    }
+    updateFormData({ distance: isNaN(value) ? null : value });
   };
 
   const handleDistanceUnitChange = (value: DistanceUnit) => {
@@ -485,12 +483,12 @@ export function CompassBearingStep() {
                   id="distance"
                   type="number"
                   min="0"
-                  value={formData.distance || ''}
+                  value={formData.distance ?? ''}
                   onChange={handleDistanceChange}
                   placeholder="Enter distance"
                 />
                 <Select
-                  value={formData.distance_unit || 'meters'}
+                  value={formData.distance_unit ?? 'meters'}
                   onValueChange={handleDistanceUnitChange}
                 >
                   <SelectTrigger className="w-[120px]">

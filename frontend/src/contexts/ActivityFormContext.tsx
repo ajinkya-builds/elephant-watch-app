@@ -18,6 +18,9 @@ interface ActivityFormData {
   loss_type: string | null;
   compass_bearing: number | null;
   photo_url: string | null;
+  distance: number | null;
+  distance_unit: 'meters' | 'feet' | null;
+  description: string | null;
 }
 
 interface ActivityFormContextType {
@@ -46,6 +49,9 @@ const initialFormData: ActivityFormData = {
   loss_type: null,
   compass_bearing: null,
   photo_url: null,
+  distance: null,
+  distance_unit: null,
+  description: null,
 };
 
 const ActivityFormContext = createContext<ActivityFormContextType | undefined>(undefined);

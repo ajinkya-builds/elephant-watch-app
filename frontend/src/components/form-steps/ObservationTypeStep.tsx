@@ -227,7 +227,7 @@ export const ObservationTypeStep: React.FC = () => {
               {isAndroid() ? (
                 <select
                   id="loss_type"
-                  value={formData.loss_type || ''}
+                  value={formData.loss_type ?? undefined}
                   onChange={e => handleSelectChange('loss_type', e.target.value)}
                   className="w-full h-12 text-base border rounded"
                 >
@@ -243,7 +243,7 @@ export const ObservationTypeStep: React.FC = () => {
                 </select>
               ) : (
                 <StepperSelect
-                  value={formData.loss_type}
+                  value={formData.loss_type ?? ''}
                   onChange={value => handleSelectChange('loss_type', value)}
                   options={[
                     { value: "No loss", label: "No loss" },

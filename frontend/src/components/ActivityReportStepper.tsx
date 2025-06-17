@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/NewAuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useNetworkStatus } from '@/utils/networkStatus';
 import { SyncStatus } from '@/components/SyncStatus';
-import { ActivityReport, ActivityReportInput } from '@/types/activity-report';
+import { ActivityReport, ActivityReportInput, ObservationType, IndirectSightingType, LossType } from '@/types/activity-report';
 
 interface StepConfig {
   type: FormStep;
@@ -53,6 +53,20 @@ const steps: StepConfig[] = [
 interface ActivityReportStepperProps {
   onSubmit: (reportData: Partial<ActivityReport>) => Promise<void>;
   isSubmitting: boolean;
+}
+
+interface ActivityFormData {
+  observation_type: ObservationType;
+  latitude: string | number;
+  longitude: string | number;
+  distance?: number;
+  distance_unit?: 'meters' | 'feet';
+  description?: string;
+  photo_url?: string | null;
+  indirect_sighting_type?: IndirectSightingType | null;
+  loss_type?: LossType | null;
+  activity_date?: Date;
+  activity_time?: string;
 }
 
 const formatDate = (date: Date | string | undefined): string => {
@@ -103,9 +117,9 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
         status: 'draft',
         activity_date: new Date(formattedDate),
         activity_time: formattedTime,
-        observation_type: formData.observation_type || 'direct', // Default to 'direct' if not set
-        latitude: formData.latitude || '0', // Provide default values
-        longitude: formData.longitude || '0',
+        observation_type: formData.observation_type as ObservationType,
+        latitude: String(formData.latitude || '0'),
+        longitude: String(formData.longitude || '0'),
         is_offline: !isOnline,
         
         // Optional fields with type conversion
@@ -115,12 +129,12 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
         unknown_elephants: formData.unknown_elephants ? Number(formData.unknown_elephants) : undefined,
         calves: formData.calves ? Number(formData.calves) : undefined,
         compass_bearing: formData.compass_bearing ? Number(formData.compass_bearing) : undefined,
-        distance: formData.distance ? Number(formData.distance) : undefined,
-        distance_unit: formData.distance_unit as 'meters' | 'feet' | undefined,
-        description: formData.description,
-        photo_url: formData.photo_url,
-        indirect_sighting_type: formData.indirect_sighting_type,
-        loss_type: formData.loss_type
+        distance: formData.distance != null ? Number(formData.distance) : undefined,
+        distance_unit: formData.distance_unit || undefined,
+        description: formData.description || undefined,
+        photo_url: formData.photo_url || undefined,
+        indirect_sighting_type: formData.indirect_sighting_type as IndirectSightingType | undefined,
+        loss_type: formData.loss_type as LossType | undefined
       };
       
       // Ensure required fields are present
