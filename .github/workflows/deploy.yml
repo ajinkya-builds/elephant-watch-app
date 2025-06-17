@@ -65,12 +65,14 @@ jobs:
           VITE_SUPABASE_URL: "https://pauafmgoewfdhwnsexzy.supabase.co"
           VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdWFmbWdvZXdmZGh3bnNleHp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2ODAwMTgsImV4cCI6MjA2MjI1NjAxOH0.iSTx9Upe8wekbKvk5ZiUMeWGi-WB67gqdZG8Bf-DO-0"
           VITE_SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdWFmbWdvZXdmZGh3bnNleHp5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjY4MDAxOCwiZXhwIjoyMDYyMjU2MDE4fQ.AmhwlpdZxs__o8VPv4N2Zf-3zb8JgiDqyJfNnEHQX1k"
+          VITE_BASE_PATH: "/elephant-watch-app/"
         run: |
           echo "Starting build process..."
           echo "Environment variables set"
           echo "VITE_SUPABASE_URL is set: $([ ! -z "$VITE_SUPABASE_URL" ] && echo 'yes' || echo 'no')"
           echo "VITE_SUPABASE_ANON_KEY is set: $([ ! -z "$VITE_SUPABASE_ANON_KEY" ] && echo 'yes' || echo 'no')"
           echo "VITE_SUPABASE_SERVICE_ROLE_KEY is set: $([ ! -z "$VITE_SUPABASE_SERVICE_ROLE_KEY" ] && echo 'yes' || echo 'no')"
+          echo "VITE_BASE_PATH is set: $([ ! -z "$VITE_BASE_PATH" ] && echo 'yes' || echo 'no')"
           
           echo "Running build command..."
           npm run build --verbose
@@ -99,6 +101,8 @@ jobs:
           mkdir -p deploy
           # Copy only the frontend/dist contents to the deployment directory
           cp -r frontend/dist/* deploy/
+          # Copy .nojekyll file
+          cp .nojekyll deploy/
           # List contents to verify
           echo "Deployment directory contents:"
           ls -la deploy/

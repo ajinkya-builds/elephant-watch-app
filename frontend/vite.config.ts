@@ -27,13 +27,10 @@ export default defineConfig(({ mode }) => {
   }
   console.log('All required environment variables are present');
 
-  // Base configuration
-  const config = {
-    server: {
-      port: 5173,
-      strictPort: true,
-    },
-    base: mode === 'production' ? '/elephant-watch-app/' : '/',
+  const base = mode === 'production' ? '/elephant-watch-app/' : '/';
+
+  return {
+    base,
     plugins: [
       react(),
       VitePWA({
@@ -44,6 +41,8 @@ export default defineConfig(({ mode }) => {
           short_name: 'Elephant Watch',
           description: 'Track and report elephant activities',
           theme_color: '#ffffff',
+          start_url: base,
+          scope: base,
           icons: [
             {
               src: 'pwa-192x192.png',
@@ -59,11 +58,6 @@ export default defineConfig(({ mode }) => {
         }
       })
     ],
-    server: {
-      host: "::",
-      port: 3000,
-      strictPort: true,
-    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -101,14 +95,4 @@ export default defineConfig(({ mode }) => {
       },
     },
   };
-
-  console.log('Configuration generated:', {
-    base: config.base,
-    build: {
-      outDir: config.build.outDir,
-      assetsDir: config.build.assetsDir
-    }
-  });
-
-  return config;
 });
