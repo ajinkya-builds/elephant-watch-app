@@ -38,6 +38,7 @@ jobs:
         run: |
           echo "Installing dependencies..."
           npm ci --verbose
+          cd frontend && npm install vite-plugin-pwa --save-dev
           if [ $? -ne 0 ]; then
             echo "::error::Failed to install dependencies"
             exit 1
@@ -83,10 +84,10 @@ jobs:
           fi
           
           echo "Checking build output..."
-          if [ ! -f "dist/index.html" ]; then
+          if [ ! -f "frontend/dist/index.html" ]; then
             echo "::error::index.html not found in build output"
             echo "Contents of dist directory:"
-            ls -la dist || true
+            ls -la frontend/dist || true
             exit 1
           fi
           echo "Build completed successfully"
@@ -95,7 +96,7 @@ jobs:
         id: deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: dist
+          folder: frontend/dist
           branch: gh-pages
           clean: true
 
@@ -105,7 +106,7 @@ jobs:
           echo "Waiting for deployment to complete..."
           sleep 30
           echo "Checking deployment status..."
-          curl -s -o /dev/null -w "%{http_code}" https://ajinkya-builds.github.io/elephant-watch-app/ > status.txt
+          curl -s -o /dev/null -w "%{http_code}" https://ajinkyapatil.github.io/elephant-watch-app/ > status.txt
           STATUS=$(cat status.txt)
           if [ "$STATUS" != "200" ]; then
             echo "::error::Deployment verification failed. Status code: $STATUS"
