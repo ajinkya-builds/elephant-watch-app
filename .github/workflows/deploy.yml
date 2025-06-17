@@ -110,6 +110,11 @@ jobs:
           folder: deploy
           branch: gh-pages
           clean: true
+          clean-exclude: |
+            .git
+            .github
+            .gitignore
+            README.md
 
       - name: Verify Deployment
         id: verify
