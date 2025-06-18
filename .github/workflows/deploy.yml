@@ -60,6 +60,7 @@ jobs:
 
       - name: Build
         id: build
+        working-directory: ./frontend
         env:
           VITE_SUPABASE_URL: "https://pauafmgoewfdhwnsexzy.supabase.co"
           VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdWFmbWdvZXdmZGh3bnNleHp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2ODAwMTgsImV4cCI6MjA2MjI1NjAxOH0.iSTx9Upe8wekbKvk5ZiUMeWGi-WB67gqdZG8Bf-DO-0"
@@ -73,8 +74,9 @@ jobs:
           echo "VITE_SUPABASE_SERVICE_ROLE_KEY is set: $([ ! -z "$VITE_SUPABASE_SERVICE_ROLE_KEY" ] && echo 'yes' || echo 'no')"
           echo "VITE_BASE_PATH is set: $([ ! -z "$VITE_BASE_PATH" ] && echo 'yes' || echo 'no')"
           
-          echo "Running build command..."
-          cd frontend && npm install --verbose && npm run build --verbose
+          echo "Running build command in frontend directory..."
+          npm install --verbose
+          npm run build --verbose
           BUILD_EXIT_CODE=$?
           
           if [ $BUILD_EXIT_CODE -ne 0 ]; then
