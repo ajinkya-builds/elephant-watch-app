@@ -74,7 +74,7 @@ jobs:
           echo "VITE_BASE_PATH is set: $([ ! -z "$VITE_BASE_PATH" ] && echo 'yes' || echo 'no')"
           
           echo "Running build command..."
-          npm run build:frontend --verbose
+          cd frontend && npm run build --verbose
           BUILD_EXIT_CODE=$?
           
           if [ $BUILD_EXIT_CODE -ne 0 ]; then
@@ -85,10 +85,10 @@ jobs:
           fi
           
           echo "Checking build output..."
-          if [ ! -f "frontend/dist/index.html" ]; then
+          if [ ! -f "dist/index.html" ]; then
             echo "::error::index.html not found in build output"
             echo "Contents of dist directory:"
-            ls -la frontend/dist || true
+            ls -la dist || true
             exit 1
           fi
           echo "Build completed successfully"
