@@ -38,7 +38,6 @@ jobs:
         run: |
           echo "Installing dependencies..."
           npm ci --verbose
-          cd frontend && npm install vite-plugin-pwa --save-dev
           if [ $? -ne 0 ]; then
             echo "::error::Failed to install dependencies"
             exit 1
@@ -75,7 +74,7 @@ jobs:
           echo "VITE_BASE_PATH is set: $([ ! -z "$VITE_BASE_PATH" ] && echo 'yes' || echo 'no')"
           
           echo "Running build command..."
-          npm run build --verbose
+          npm run build:frontend --verbose
           BUILD_EXIT_CODE=$?
           
           if [ $BUILD_EXIT_CODE -ne 0 ]; then
