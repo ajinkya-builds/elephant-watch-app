@@ -37,7 +37,7 @@ jobs:
         id: install
         run: |
           echo "Installing dependencies..."
-          npm ci --verbose
+          npm install --verbose
           if [ $? -ne 0 ]; then
             echo "::error::Failed to install dependencies"
             exit 1
@@ -74,7 +74,7 @@ jobs:
           echo "VITE_BASE_PATH is set: $([ ! -z "$VITE_BASE_PATH" ] && echo 'yes' || echo 'no')"
           
           echo "Running build command..."
-          cd frontend && npm run build --verbose
+          cd frontend && npm install --verbose && npm run build --verbose
           BUILD_EXIT_CODE=$?
           
           if [ $BUILD_EXIT_CODE -ne 0 ]; then
