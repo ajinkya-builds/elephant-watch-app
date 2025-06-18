@@ -55,8 +55,13 @@ jobs:
         env:
           VITE_BASE_PATH: "/elephant-watch-app/"
         run: |
+          echo "Listing files in working directory:"
+          ls -la
+          echo "Contents of package.json:"
+          cat package.json
           npm install --verbose
           npm run build --verbose
+          BUILD_EXIT_CODE=$?
 
       - name: Prepare Deployment
         run: |
