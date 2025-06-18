@@ -236,14 +236,14 @@ export const EnhancedDashboard: React.FC = () => {
         // Fetch divisions
         const { data: divisionsData, error: divError } = await supabase
           .from('divisions')
-          .select('new_id, name')
+          .select('id, name')
           .order('name');
         
         if (divError) throw divError;
         
         // Map to FilterOption type
         const mappedDivisions: FilterOption[] = (divisionsData || []).map(div => ({
-          id: String(div.new_id),
+          id: String(div.id),
           name: String(div.name)
         }));
         
@@ -710,76 +710,55 @@ export const EnhancedDashboard: React.FC = () => {
   // Fetch activity markers from activity_observation
   useEffect(() => {
     async function fetchActivityMarkers() {
-      const { data, error } = await supabase
-        .from('activity_observation')
-        .select(`
-          id,
-          latitude,
-          longitude,
-          observation_type,
-          activity_date,
-          activity_time,
-          total_elephants,
-          male_elephants,
-          female_elephants,
-          unknown_elephants,
-          calves,
-          indirect_sighting_type,
-          loss_type,
-          compass_bearing,
-          photo_url,
-          created_at,
-          updated_at,
-          created_by,
-          updated_by,
-          division_id,
-          range_id,
-          beat_id,
-          division_name,
-          range_name,
-          beat_name
-        `);
-      if (error) {
+      try {
+        const { data: markersData, error: markersError } = await supabase
+          .from('activity_observation')
+          .select('id,latitude,longitude,observation_type,activity_date,activity_time,total_elephants,male_elephants,female_elephants,unknown_elephants,calves,indirect_sighting_type,loss_type,compass_bearing,photo_url,created_at,updated_at,division_id,range_id,beat_id,division_name,range_name,beat_name')
+          .order('created_at', { ascending: false });
+
+        if (markersError) {
+          console.error("Error fetching activity markers:", markersError);
+          throw markersError;
+        }
+
+        // Filter out invalid lat/lng
+        const validMarkers = markersData
+          .filter(marker => 
+            marker.latitude && 
+            marker.longitude && 
+            marker.observation_type
+          )
+          .map(marker => ({
+            id: typeof marker.id === 'string' ? marker.id : marker.id != null ? String(marker.id) : '',
+            latitude: typeof marker.latitude === 'number' ? marker.latitude : marker.latitude != null && !isNaN(Number(marker.latitude)) ? Number(marker.latitude) : 0,
+            longitude: typeof marker.longitude === 'number' ? marker.longitude : marker.longitude != null && !isNaN(Number(marker.longitude)) ? Number(marker.longitude) : 0,
+            observation_type: typeof marker.observation_type === 'string' ? marker.observation_type : marker.observation_type != null ? String(marker.observation_type) : '',
+            activity_date: typeof marker.activity_date === 'string' ? marker.activity_date : marker.activity_date != null ? String(marker.activity_date) : '',
+            activity_time: typeof marker.activity_time === 'string' ? marker.activity_time : marker.activity_time != null ? String(marker.activity_time) : '',
+            total_elephants: typeof marker.total_elephants === 'number' ? marker.total_elephants : marker.total_elephants != null && !isNaN(Number(marker.total_elephants)) ? Number(marker.total_elephants) : 0,
+            male_elephants: typeof marker.male_elephants === 'number' ? marker.male_elephants : marker.male_elephants != null && !isNaN(Number(marker.male_elephants)) ? Number(marker.male_elephants) : 0,
+            female_elephants: typeof marker.female_elephants === 'number' ? marker.female_elephants : marker.female_elephants != null && !isNaN(Number(marker.female_elephants)) ? Number(marker.female_elephants) : 0,
+            unknown_elephants: typeof marker.unknown_elephants === 'number' ? marker.unknown_elephants : marker.unknown_elephants != null && !isNaN(Number(marker.unknown_elephants)) ? Number(marker.unknown_elephants) : 0,
+            calves: typeof marker.calves === 'number' ? marker.calves : marker.calves != null && !isNaN(Number(marker.calves)) ? Number(marker.calves) : 0,
+            indirect_sighting_type: marker.indirect_sighting_type != null ? String(marker.indirect_sighting_type) : undefined,
+            loss_type: marker.loss_type != null ? String(marker.loss_type) : undefined,
+            compass_bearing: marker.compass_bearing != null && !isNaN(Number(marker.compass_bearing)) ? Number(marker.compass_bearing) : undefined,
+            photo_url: marker.photo_url != null ? String(marker.photo_url) : undefined,
+            created_at: typeof marker.created_at === 'string' ? marker.created_at : marker.created_at != null && marker.created_at !== undefined ? String(marker.created_at) : '',
+            updated_at: typeof marker.updated_at === 'string' ? marker.updated_at : marker.updated_at != null && marker.updated_at !== undefined ? String(marker.updated_at) : '',
+            division_id: typeof marker.division_id === 'string' ? marker.division_id : marker.division_id != null && marker.division_id !== undefined ? String(marker.division_id) : '',
+            range_id: typeof marker.range_id === 'string' ? marker.range_id : marker.range_id != null && marker.range_id !== undefined ? String(marker.range_id) : '',
+            beat_id: typeof marker.beat_id === 'string' ? marker.beat_id : marker.beat_id != null && marker.beat_id !== undefined ? String(marker.beat_id) : '',
+            division_name: typeof marker.division_name === 'string' ? marker.division_name : marker.division_name != null && marker.division_name !== undefined ? String(marker.division_name) : '',
+            range_name: typeof marker.range_name === 'string' ? marker.range_name : marker.range_name != null && marker.range_name !== undefined ? String(marker.range_name) : '',
+            beat_name: typeof marker.beat_name === 'string' ? marker.beat_name : marker.beat_name != null && marker.beat_name !== undefined ? String(marker.beat_name) : ''
+          }));
+
+        setActivityMarkers(validMarkers);
+      } catch (error) {
         console.error('Error fetching activity markers:', error);
         setActivityMarkers([]);
-        return;
       }
-      // Filter out invalid lat/lng
-      const validMarkers = data
-        .filter(marker => 
-          marker.latitude && 
-          marker.longitude && 
-          marker.observation_type
-        )
-        .map(marker => ({
-          id: typeof marker.id === 'string' ? marker.id : marker.id != null ? String(marker.id) : '',
-          latitude: typeof marker.latitude === 'number' ? marker.latitude : marker.latitude != null && !isNaN(Number(marker.latitude)) ? Number(marker.latitude) : 0,
-          longitude: typeof marker.longitude === 'number' ? marker.longitude : marker.longitude != null && !isNaN(Number(marker.longitude)) ? Number(marker.longitude) : 0,
-          observation_type: typeof marker.observation_type === 'string' ? marker.observation_type : marker.observation_type != null ? String(marker.observation_type) : '',
-          activity_date: typeof marker.activity_date === 'string' ? marker.activity_date : marker.activity_date != null ? String(marker.activity_date) : '',
-          activity_time: typeof marker.activity_time === 'string' ? marker.activity_time : marker.activity_time != null ? String(marker.activity_time) : '',
-          total_elephants: typeof marker.total_elephants === 'number' ? marker.total_elephants : marker.total_elephants != null && !isNaN(Number(marker.total_elephants)) ? Number(marker.total_elephants) : 0,
-          male_elephants: typeof marker.male_elephants === 'number' ? marker.male_elephants : marker.male_elephants != null && !isNaN(Number(marker.male_elephants)) ? Number(marker.male_elephants) : 0,
-          female_elephants: typeof marker.female_elephants === 'number' ? marker.female_elephants : marker.female_elephants != null && !isNaN(Number(marker.female_elephants)) ? Number(marker.female_elephants) : 0,
-          unknown_elephants: typeof marker.unknown_elephants === 'number' ? marker.unknown_elephants : marker.unknown_elephants != null && !isNaN(Number(marker.unknown_elephants)) ? Number(marker.unknown_elephants) : 0,
-          calves: typeof marker.calves === 'number' ? marker.calves : marker.calves != null && !isNaN(Number(marker.calves)) ? Number(marker.calves) : 0,
-          indirect_sighting_type: marker.indirect_sighting_type != null ? String(marker.indirect_sighting_type) : undefined,
-          loss_type: marker.loss_type != null ? String(marker.loss_type) : undefined,
-          compass_bearing: marker.compass_bearing != null && !isNaN(Number(marker.compass_bearing)) ? Number(marker.compass_bearing) : undefined,
-          photo_url: marker.photo_url != null ? String(marker.photo_url) : undefined,
-          created_at: typeof marker.created_at === 'string' ? marker.created_at : marker.created_at != null && marker.created_at !== undefined ? String(marker.created_at) : '',
-          updated_at: typeof marker.updated_at === 'string' ? marker.updated_at : marker.updated_at != null && marker.updated_at !== undefined ? String(marker.updated_at) : '',
-          created_by: typeof marker.created_by === 'string' ? marker.created_by : marker.created_by != null && marker.created_by !== undefined ? String(marker.created_by) : '',
-          updated_by: typeof marker.updated_by === 'string' ? marker.updated_by : marker.updated_by != null && marker.updated_by !== undefined ? String(marker.updated_by) : '',
-          division_id: typeof marker.division_id === 'string' ? marker.division_id : marker.division_id != null && marker.division_id !== undefined ? String(marker.division_id) : '',
-          range_id: typeof marker.range_id === 'string' ? marker.range_id : marker.range_id != null && marker.range_id !== undefined ? String(marker.range_id) : '',
-          beat_id: typeof marker.beat_id === 'string' ? marker.beat_id : marker.beat_id != null && marker.beat_id !== undefined ? String(marker.beat_id) : '',
-          division_name: typeof marker.division_name === 'string' ? marker.division_name : marker.division_name != null && marker.division_name !== undefined ? String(marker.division_name) : '',
-          range_name: typeof marker.range_name === 'string' ? marker.range_name : marker.range_name != null && marker.range_name !== undefined ? String(marker.range_name) : '',
-          beat_name: typeof marker.beat_name === 'string' ? marker.beat_name : marker.beat_name != null && marker.beat_name !== undefined ? String(marker.beat_name) : ''
-        }));
-
-      setActivityMarkers(validMarkers);
     }
     fetchActivityMarkers();
   }, []);
