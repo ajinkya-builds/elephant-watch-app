@@ -3,17 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useActivityForm } from '@/contexts/ActivityFormContext';
-import { ActivityReport } from '@/types/activity-report';
 import { Camera, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
 export const PhotoStep: React.FC = () => {
-  const { formData, updateFormData } = useActivityForm();
-  const [isUploading, setIsUploading] = useState(false);
+  const { formData, updateFormData, setIsPhotoUploading } = useActivityForm();
+  const [isUploading, setIsUploadingLocal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -29,18 +29,39 @@ export const PhotoStep: React.FC = () => {
       return;
     }
 
-    setIsUploading(true);
+    console.log('handleFileChange: Starting photo upload process');
+    setIsUploadingLocal(true);
+    setIsPhotoUploading(true);
+    console.log('handleFileChange: isUploadingLocal and isPhotoUploading set to true');
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `activity-photos/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const uploadPromise = supabase.storage
         .from('photos')
         .upload(filePath, file);
 
-      if (uploadError) {
-        throw uploadError;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        const id = setTimeout(() => {
+          clearTimeout(id);
+          reject(new Error('Photo upload timed out (30 seconds)'));
+        }, 30000); // 30 seconds
+      });
+
+      const result = await Promise.race([
+        uploadPromise,
+        timeoutPromise
+      ]);
+
+      // Check if the result is an error from the timeout or Supabase
+      if (result && typeof result === 'object' && 'error' in result && result.error) {
+        console.error('handleFileChange: Supabase upload error:', result.error);
+        throw result.error;
+      } else if (result instanceof Error) { // This handles the timeout error
+        console.error('handleFileChange: Timeout error:', result.message);
+        toast.error(result.message); // Display the timeout message to the user
+        throw result; // Re-throw to ensure finally block is reached
       }
 
       const { data: { publicUrl } } = supabase.storage
@@ -48,12 +69,19 @@ export const PhotoStep: React.FC = () => {
         .getPublicUrl(filePath);
 
       updateFormData({ photo_url: publicUrl });
+      console.log('handleFileChange: Photo uploaded successfully. Public URL:', publicUrl);
       toast.success('Photo uploaded successfully');
     } catch (error) {
-      console.error('Error uploading photo:', error);
-      toast.error('Failed to upload photo');
+      console.error('handleFileChange: Caught error during photo upload:', error);
+      // Only show a generic error if it's not the specific timeout error already handled
+      if (!(error instanceof Error && error.message.includes('timed out')))
+      {
+        toast.error('Failed to upload photo. Please try again.');
+      }
     } finally {
-      setIsUploading(false);
+      console.log('handleFileChange: Finally block executed. Setting isUploadingLocal and isPhotoUploading to false');
+      setIsUploadingLocal(false);
+      setIsPhotoUploading(false);
     }
   };
 
@@ -102,7 +130,6 @@ export const PhotoStep: React.FC = () => {
                       ref={fileInputRef}
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       onChange={handleFileChange}
                       className="hidden"
                     />

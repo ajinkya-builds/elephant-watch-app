@@ -75,7 +75,6 @@ interface SupabaseActivityObservation {
   damage_description?: string;
   loss_type?: string;
   compass_bearing?: number;
-  distance?: number;
   created_at: string;
   updated_at: string;
 }
@@ -99,7 +98,6 @@ interface SupabaseActivityReport {
   range_name?: string;
   beat_name?: string;
   compass_bearing?: number;
-  distance?: number;
   indirect_sighting_type?: string;
   damage_done?: string;
   damage_description?: string;
@@ -358,7 +356,6 @@ export default function AdminObservations() {
           range_id: formData.get('range_id'),
           beat_id: formData.get('beat_id'),
           compass_bearing: formData.get('compass_bearing'),
-          distance: formData.get('distance'),
           indirect_sighting_type: formData.get('indirect_sighting_type'),
           damage_done: formData.get('damage_done'),
           damage_description: formData.get('damage_description'),
@@ -883,4 +880,4 @@ export default function AdminObservations() {
       </div>
     </div>
   );
-} 
+}

@@ -28,9 +28,6 @@ const baseReportSchema = z.object({
   // Observation details
   observation_type: z.enum(['direct', 'indirect', 'loss']),
   compass_bearing: z.number().min(0).max(360).optional(),
-  distance: z.number().min(0).optional(),
-  distance_unit: z.enum(['meters', 'feet']).optional(),
-  description: z.string().optional(),
   photo_url: z.string().url().optional(),
   
   // Sync and metadata
@@ -161,11 +158,7 @@ export const activityReportSchema = schemaWithCompassAndPhoto.refine(
 export type ActivityReport = z.infer<typeof activityReportSchema>;
 
 // Type for form data (all fields optional for progressive enhancement)
-export type ActivityReportFormData = Partial<Omit<ActivityReport, 'id' | 'created_at' | 'updated_at' | 'status'>> & {
-  distance?: number;
-  distance_unit?: 'meters' | 'feet';
-  description?: string;
-};
+export type ActivityReportFormData = Partial<Omit<ActivityReport, 'id' | 'created_at' | 'updated_at' | 'status'>>; // Removed distance, distance_unit, description
 
 // Export individual step schemas for component validation
 export const stepSchemas = {
@@ -173,4 +166,4 @@ export const stepSchemas = {
   observationType: observationTypeSchema,
   compassBearing: compassBearingSchema,
   photo: photoSchema,
-} as const; 
+} as const;

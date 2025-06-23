@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ActivityReport, ObservationType, IndirectSightingType, LossType } from '@/types/activity-report';
+import { createContext, useContext, useState, ReactNode } from 'react';
+
 
 export type FormStep = 'dateTimeLocation' | 'observationType' | 'compassBearing' | 'photo';
 
@@ -18,9 +18,6 @@ interface ActivityFormData {
   loss_type: string | null;
   compass_bearing: number | null;
   photo_url: string | null;
-  distance: number | null;
-  distance_unit: 'meters' | 'feet' | null;
-  description: string | null;
 }
 
 interface ActivityFormContextType {
@@ -32,6 +29,8 @@ interface ActivityFormContextType {
   isStepValid: (step: FormStep) => boolean;
   isLastStep: () => boolean;
   resetForm: () => void;
+  isPhotoUploading: boolean;
+  setIsPhotoUploading: (isUploading: boolean) => void;
 }
 
 const initialFormData: ActivityFormData = {
@@ -49,9 +48,6 @@ const initialFormData: ActivityFormData = {
   loss_type: null,
   compass_bearing: null,
   photo_url: null,
-  distance: null,
-  distance_unit: null,
-  description: null,
 };
 
 const ActivityFormContext = createContext<ActivityFormContextType | undefined>(undefined);
@@ -59,6 +55,7 @@ const ActivityFormContext = createContext<ActivityFormContextType | undefined>(u
 export function ActivityFormProvider({ children }: { children: ReactNode }) {
   const [currentStep, setCurrentStep] = useState<FormStep>('dateTimeLocation');
   const [formData, setFormData] = useState<ActivityFormData>(initialFormData);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
 
   const steps: FormStep[] = ['dateTimeLocation', 'observationType', 'compassBearing', 'photo'];
 
@@ -103,6 +100,7 @@ export function ActivityFormProvider({ children }: { children: ReactNode }) {
   const resetForm = () => {
     setFormData(initialFormData);
     setCurrentStep('dateTimeLocation');
+    setIsPhotoUploading(false);
   };
 
   return (
@@ -116,6 +114,8 @@ export function ActivityFormProvider({ children }: { children: ReactNode }) {
         isStepValid,
         isLastStep,
         resetForm,
+        isPhotoUploading,
+        setIsPhotoUploading,
       }}
     >
       {children}
@@ -129,4 +129,4 @@ export function useActivityForm() {
     throw new Error('useActivityForm must be used within an ActivityFormProvider');
   }
   return context;
-} 
+}

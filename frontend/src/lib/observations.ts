@@ -15,7 +15,6 @@ export interface ActivityObservation {
   damage_description?: string;
   loss_type?: string;
   compass_bearing?: number;
-  distance?: number;
   created_at: string;
   updated_at: string;
 }
@@ -39,7 +38,6 @@ export interface ActivityReport {
   range_name?: string;
   beat_name?: string;
   compass_bearing?: number;
-  distance?: number;
   indirect_sighting_type?: string;
   damage_done?: string;
   damage_description?: string;
@@ -157,7 +155,6 @@ function isActivityReport(data: any): data is ActivityReport {
     (data.range_name === undefined || typeof data.range_name === 'string') &&
     (data.beat_name === undefined || typeof data.beat_name === 'string') &&
     (data.compass_bearing === undefined || typeof data.compass_bearing === 'number') &&
-    (data.distance === undefined || typeof data.distance === 'number') &&
     (data.indirect_sighting_type === undefined || typeof data.indirect_sighting_type === 'string') &&
     (data.damage_done === undefined || typeof data.damage_done === 'string') &&
     (data.damage_description === undefined || typeof data.damage_description === 'string') &&
@@ -502,6 +499,9 @@ export function updateDashboardStatsWithNewObservation(
   
   // Add to recent observations
   updatedStats.recentObservations = [newObservation, ...updatedStats.recentObservations].slice(0, 10);
+  
+  return updatedStats;
+}
   
   return updatedStats;
 }

@@ -7,15 +7,12 @@ import { useAuth } from '@/contexts/NewAuthContext';
 import { ActivityReport } from '@/types/activity-report';
 import { Card } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import { useNetworkStatus } from '@/utils/networkStatus';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { isAndroid } from '@/utils/platform';
+
 
 const ReportActivityPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, loading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
-  const isOnline = useNetworkStatus();
 
   // Check authentication status
   React.useEffect(() => {
@@ -63,15 +60,7 @@ const ReportActivityPage = () => {
           </h2>
         </header>
 
-        {!isOnline && (
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Offline Mode</AlertTitle>
-            <AlertDescription>
-              You are currently offline. Your report will be saved locally and synced when you are back online.
-            </AlertDescription>
-          </Alert>
-        )}
+
 
         <Card className="mb-8 overflow-hidden border border-blue-100 bg-white shadow-sm">
           <div className="p-6">

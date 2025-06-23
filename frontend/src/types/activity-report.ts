@@ -1,7 +1,6 @@
 export type ObservationType = 'direct' | 'indirect' | 'loss';
 export type LossType = 'No loss' | 'property' | 'crop' | 'livestock' | 'fencing' | 'solar panels' | 'FD establishment' | 'Other';
 export type IndirectSightingType = 'Pugmark' | 'Dung' | 'Broken Branches' | 'Sound' | 'Eyewitness';
-export type ReportStatus = 'draft' | 'submitted' | 'synced' | 'error';
 
 export interface User {
   id: string;
@@ -26,15 +25,14 @@ export interface ActivityObservation {
   damage_description: string;
   loss_type?: LossType;
   compass_bearing?: number;
-  distance?: number;
   created_at: Date;
   updated_at?: Date;
 }
 
 export interface ActivityReport {
   id: string;
-  status: ReportStatus;
-  is_offline: boolean;
+
+
   user_id: string;
   activity_date: Date;
   activity_time: string;
@@ -52,9 +50,6 @@ export interface ActivityReport {
   photo_url?: string;
   created_at?: Date;
   updated_at?: Date;
-  distance?: number;
-  distance_unit?: 'meters' | 'feet';
-  description?: string;
   synced_at?: Date;
   sync_error?: string;
   users?: User;
@@ -74,4 +69,4 @@ export interface ActivityReport {
 export type ActivityReportInput = Omit<ActivityReport, 'id' | 'created_at' | 'updated_at'>;
 
 export interface ActivityReportCreate extends Omit<ActivityReport, 'id' | 'created_at' | 'updated_at'> {}
-export interface ActivityReportUpdate extends Partial<ActivityReportCreate> {} 
+export interface ActivityReportUpdate extends Partial<ActivityReportCreate> {}

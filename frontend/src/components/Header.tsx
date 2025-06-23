@@ -26,9 +26,9 @@ export function Header() {
     e.stopPropagation();
     console.log('Logout button clicked');
     
-    // Function to perform local cleanup and redirect
-    const performLocalSignOut = () => {
-      console.log('Performing local sign out cleanup...');
+    // Function to perform local cleanup
+    const clearAuthData = () => {
+      console.log('Clearing auth data...');
       
       // Clear all auth-related data
       const authKeys = [
@@ -51,55 +51,36 @@ export function Header() {
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
         }
       });
-      
-      // Force a hard redirect to login with the correct base path
-      console.log('Redirecting to login page...');
-      const basePath = window.location.pathname.split('/').slice(0, 2).join('/');
-      window.location.href = `${basePath}/login`;
     };
     
     try {
-      console.log('1. Starting sign out process...');
+      console.log('Starting sign out process...');
       
-      // Set a timeout for the Supabase sign out (3 seconds)
-      const signOutPromise = supabase.auth.signOut();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign out timed out')), 3000)
-      );
+      // Clear auth data first
+      clearAuthData();
       
-      console.log('2. Calling supabase.auth.signOut() with timeout...');
+      // Try to sign out from Supabase (fire and forget)
+      supabase.auth.signOut().catch(err => {
+        console.warn('Supabase sign out error (non-critical):', err);
+      });
       
-      try {
-        // Race between the sign out and the timeout
-        const { error } = await Promise.race([
-          signOutPromise,
-          timeoutPromise.then(() => ({ error: { message: 'Timeout' } }))
-        ]) as { error?: any };
-        
-        if (error) {
-          console.warn('3a. Warning during Supabase sign out (will continue with local cleanup):', error.message);
-        } else {
-          console.log('3b. Supabase sign out completed successfully');
-        }
-      } catch (signOutError) {
-        console.warn('3c. Supabase sign out failed (will continue with local cleanup):', signOutError);
-      }
+      // Get the current origin and path
+      const origin = window.location.origin;
+      const basePath = window.location.pathname.split('/').slice(0, 2).join('/');
       
-      // Always perform local cleanup, even if Supabase sign out fails
-      performLocalSignOut();
+      // Redirect to login page with full URL
+      const loginUrl = `${origin}${basePath}/login`;
+      console.log('Redirecting to login page:', loginUrl);
+      window.location.href = loginUrl;
       
     } catch (error) {
-      console.error('Unexpected error during sign out (will attempt local cleanup):', error);
-      
-      // Still try to perform local cleanup even if something else fails
-      try {
-        performLocalSignOut();
-      } catch (cleanupError) {
-        console.error('Error during local cleanup:', cleanupError);
-        // Last resort: force a hard refresh with correct base path
-        const basePath = window.location.pathname.split('/').slice(0, 2).join('/');
-        window.location.href = `${basePath}/login`;
-      }
+      console.error('Error during sign out:', error);
+      // If we're here, something went wrong with the redirect, force a hard refresh
+      const origin = window.location.origin;
+      const basePath = window.location.pathname.split('/').slice(0, 2).join('/');
+      const loginUrl = `${origin}${basePath}/login`;
+      console.error('Forcing redirect to login page:', loginUrl);
+      window.location.href = loginUrl;
     }
   };
 

@@ -3,12 +3,9 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createHashRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
+import { createHashRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/NewAuthContext';
-import { checkSupabaseConnection } from '@/lib/supabaseClient';
 import { Footer } from '@/components/Footer';
-import { useNetworkStatus } from '@/utils/networkStatus';
-import { isAndroid } from '@/utils/platform';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FullPageLoader } from './components/ui/FullPageLoader';
 import { Header } from '@/components/Header';
@@ -85,15 +82,27 @@ const router = createHashRouter([
           )},
           {
             path: 'admin',
-            element: <Suspense fallback={<FullPageLoader />}><Admin /></Suspense>,
-            children: [
-              { index: true, element: <Navigate to="users" replace /> },
-              { path: 'users', element: <Suspense fallback={<FullPageLoader />}><AdminUsers /></Suspense> },
-              { path: 'observations', element: <Suspense fallback={<FullPageLoader />}><AdminObservations /></Suspense> },
-              { path: 'statistics', element: <Suspense fallback={<FullPageLoader />}><AdminStatistics /></Suspense> },
-              { path: 'settings', element: <Suspense fallback={<FullPageLoader />}><AdminSettings /></Suspense> },
-              { path: 'notifications', element: <Suspense fallback={<FullPageLoader />}><AdminNotifications /></Suspense> },
-            ],
+            element: <Suspense fallback={<FullPageLoader />}><Admin /></Suspense>
+          },
+          {
+            path: 'admin/users',
+            element: <Suspense fallback={<FullPageLoader />}><AdminUsers /></Suspense>
+          },
+          {
+            path: 'admin/observations',
+            element: <Suspense fallback={<FullPageLoader />}><AdminObservations /></Suspense>
+          },
+          {
+            path: 'admin/statistics',
+            element: <Suspense fallback={<FullPageLoader />}><AdminStatistics /></Suspense>
+          },
+          {
+            path: 'admin/settings',
+            element: <Suspense fallback={<FullPageLoader />}><AdminSettings /></Suspense>
+          },
+          {
+            path: 'admin/notifications',
+            element: <Suspense fallback={<FullPageLoader />}><AdminNotifications /></Suspense>
           },
         ],
       },

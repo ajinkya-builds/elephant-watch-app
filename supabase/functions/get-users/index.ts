@@ -27,27 +27,40 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Log the request for debugging
+    console.log('Fetching users from database...');
+
     const { data: users, error } = await supabaseAdmin
       .from('users')
       .select(`
-        *,
-        user_region_assignments!left (
-          division:divisions!inner(id, name),
-          range:ranges!inner(id, name),
-          beat:beats!inner(id, name)
-        )
+        id,
+        first_name,
+        last_name,
+        email,
+        mobile,
+        role,
+        created_at,
+        updated_at
       `);
 
     if (error) {
+      console.error('Database error:', error);
       throw error;
     }
+
+    // Log success
+    console.log(`Successfully fetched ${users?.length || 0} users`);
 
     return new Response(JSON.stringify({ users }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Error in get-users function:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.details || null
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });

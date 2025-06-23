@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: process.env.PORT || 3000,
+  port: process.env.PORT || 3001, // Changed default port to 3001
   nodeEnv: process.env.NODE_ENV || 'development',
   supabase: {
     url: process.env.SUPABASE_URL,

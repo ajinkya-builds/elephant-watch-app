@@ -510,7 +510,18 @@ export const EnhancedDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    // Add error boundary to prevent crashes
+    const loadData = async () => {
+      try {
+        await fetchData();
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        setError('Failed to load dashboard data. Some features may not be available.');
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
 
   const handleFilterChange = (key: keyof DashboardFilters, value: string) => {

@@ -1,7 +1,6 @@
-import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate, Outlet } from "react-router-dom";
-import { Users, FileText, Settings, Activity, AlertCircle, Database } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Users, FileText, Settings, Activity, AlertCircle } from "lucide-react";
 
 const adminCards = [
   {
@@ -86,7 +85,6 @@ export default function Admin() {
           ))}
         </div>
       </div>
-      <Outlet />
     </div>
   );
 }

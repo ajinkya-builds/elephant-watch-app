@@ -12,9 +12,7 @@ import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/NewAuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { useNetworkStatus } from '@/utils/networkStatus';
-import { SyncStatus } from '@/components/SyncStatus';
-import { ActivityReport, ActivityReportInput, ObservationType, IndirectSightingType, LossType } from '@/types/activity-report';
+import { ActivityReport, ObservationType, IndirectSightingType, LossType } from '@/types/activity-report';
 
 interface StepConfig {
   type: FormStep;
@@ -59,9 +57,6 @@ interface ActivityFormData {
   observation_type: ObservationType;
   latitude: string | number;
   longitude: string | number;
-  distance?: number;
-  distance_unit?: 'meters' | 'feet';
-  description?: string;
   photo_url?: string | null;
   indirect_sighting_type?: IndirectSightingType | null;
   loss_type?: LossType | null;
@@ -76,22 +71,21 @@ const formatDate = (date: Date | string | undefined): string => {
 };
 
 const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubmitting: externalIsSubmitting }) => {
-  const { currentStep, formData, goToNextStep, goToPreviousStep, isStepValid, isLastStep, resetForm } = useActivityForm();
+  const { currentStep, formData, goToNextStep, goToPreviousStep, isStepValid, isLastStep, resetForm, isPhotoUploading } = useActivityForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isOnline = useNetworkStatus();
   const currentStepIndex = steps.findIndex(step => step.type === currentStep);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+
   
   const isActuallySubmitting = isSubmitting || externalIsSubmitting;
 
   const handleSubmit = useCallback(async () => {
+    console.log('handleSubmit: Starting form submission.');
     try {
       setIsSubmitting(true);
-      setError(null);
-      setSuccess(null);
+      console.log('handleSubmit: isSubmitting set to true.');
+
       
       if (!formData.activity_date || !formData.activity_time || !formData.observation_type) {
         toast.error('Please fill in all required fields');
@@ -100,7 +94,7 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
 
       let userId = user?.id || null;
       
-      if (isOnline && !userId) {
+      if (!userId) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           userId = session.user.id;
@@ -114,13 +108,13 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
       const reportData: Partial<ActivityReport> = {
         // Required fields
         user_id: userId || '',
-        status: 'draft',
+
         activity_date: new Date(formattedDate),
         activity_time: formattedTime,
         observation_type: formData.observation_type as ObservationType,
         latitude: String(formData.latitude || '0'),
         longitude: String(formData.longitude || '0'),
-        is_offline: !isOnline,
+
         
         // Optional fields with type conversion
         total_elephants: formData.total_elephants ? Number(formData.total_elephants) : undefined,
@@ -129,9 +123,6 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
         unknown_elephants: formData.unknown_elephants ? Number(formData.unknown_elephants) : undefined,
         calves: formData.calves ? Number(formData.calves) : undefined,
         compass_bearing: formData.compass_bearing ? Number(formData.compass_bearing) : undefined,
-        distance: formData.distance != null ? Number(formData.distance) : undefined,
-        distance_unit: formData.distance_unit || undefined,
-        description: formData.description || undefined,
         photo_url: formData.photo_url || undefined,
         indirect_sighting_type: formData.indirect_sighting_type as IndirectSightingType | undefined,
         loss_type: formData.loss_type as LossType | undefined
@@ -145,40 +136,32 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
         throw new Error('Location is required');
       }
       
-      if (isOnline) {
-        try {
-          await onSubmit(reportData);
-          toast.success('Activity report submitted successfully');
-          resetForm();
-          navigate('/');
-        } catch (error) {
-          toast.error('Online submission failed. Report saved offline.');
-        }
-      } else {
-        toast.success('You are offline. Report saved locally and will be synced when online.');
+      try {
+        await onSubmit(reportData);
+        toast.success('Activity report submitted successfully');
         resetForm();
         navigate('/');
+      } catch (error) {
+        console.error('handleSubmit: Error submitting report:', error);
+        toast.error('Failed to submit report');
+      } finally {
+        // Ensure isSubmitting is set to false even if onSubmit throws an error
+        // This is already handled by the outer finally, but adding here for clarity/redundancy
+        setIsSubmitting(false);
+        console.log('handleSubmit: Inner try-catch finally block. isSubmitting set to false.');
       }
     } catch (error: any) {
       console.error('Error submitting activity report:', error);
       toast.error(error.message || 'Failed to submit report');
     } finally {
       setIsSubmitting(false);
+      console.log('handleSubmit: Outer finally block. isSubmitting set to false.');
     }
-  }, [formData, isOnline, navigate, onSubmit, resetForm, user]);
+  }, [formData, navigate, onSubmit, resetForm, user]);
 
   const CurrentStepComponent = steps.find(step => step.type === currentStep)?.component || null;
 
-  if (!isOnline) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">No Internet Connection</h2>
-          <p className="text-gray-600">Please check your internet connection and try again.</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="container mx-auto p-2 sm:p-4">
@@ -232,15 +215,19 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
             {isLastStep() ? (
               <Button
                 onClick={handleSubmit}
-                disabled={!isStepValid(currentStep) || isActuallySubmitting}
+                disabled={(() => {
+                  const isDisabled = !isStepValid(currentStep) || isActuallySubmitting || isPhotoUploading;
+                  console.log(`Submit button disabled check: isStepValid(${currentStep})=${isStepValid(currentStep)}, isActuallySubmitting=${isActuallySubmitting}, isPhotoUploading=${isPhotoUploading}. Result: ${isDisabled}`);
+                  return isDisabled;
+                })()}
                 className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
               >
-                {isActuallySubmitting ? 'Submitting...' : 'Submit Report'}
+                {isPhotoUploading ? 'Uploading Photo...' : (isActuallySubmitting ? 'Submitting...' : 'Submit Report')}
               </Button>
             ) : (
               <Button
                 onClick={goToNextStep}
-                disabled={!isStepValid(currentStep) || isActuallySubmitting}
+                disabled={!isStepValid(currentStep) || isActuallySubmitting || isPhotoUploading}
                 className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
               >
                 Next
@@ -249,7 +236,6 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
           </div>
         </CardContent>
       </Card>
-      <SyncStatus />
     </div>
   );
 };
@@ -257,9 +243,9 @@ const StepperContent: React.FC<ActivityReportStepperProps> = ({ onSubmit, isSubm
 export const ActivityReportStepper: React.FC<ActivityReportStepperProps> = (props) => {
   return (
     <ActivityFormProvider>
-      <StepperContent {...props} />
+      <>
+        <StepperContent {...props} />
+      </>
     </ActivityFormProvider>
   );
 };
-
-export default ActivityReportStepper;

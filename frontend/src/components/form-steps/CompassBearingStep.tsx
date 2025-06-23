@@ -24,8 +24,6 @@ const ERRATIC_THRESHOLD = 45; // degrees
 const SMOOTHING_WINDOW = 5; // number of readings to average
 const GPS_ACCURACY_THRESHOLD = 10; // meters
 
-type DistanceUnit = 'meters' | 'feet';
-
 export function CompassBearingStep() {
   const { formData, updateFormData } = useActivityForm();
   const [isTracking, setIsTracking] = useState(false);
@@ -115,15 +113,6 @@ export function CompassBearingStep() {
     if (!isNaN(value) && value >= 0 && value <= 360) {
       updateFormData({ compass_bearing: value });
     }
-  };
-
-  const handleDistanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    updateFormData({ distance: isNaN(value) ? null : value });
-  };
-
-  const handleDistanceUnitChange = (value: DistanceUnit) => {
-    updateFormData({ distance_unit: value });
   };
 
   const startCalibration = () => {
@@ -472,38 +461,6 @@ export function CompassBearingStep() {
           </div>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="distance">Distance</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="distance"
-                  type="number"
-                  min="0"
-                  value={formData.distance ?? ''}
-                  onChange={handleDistanceChange}
-                  placeholder="Enter distance"
-                />
-                <Select
-                  value={formData.distance_unit ?? 'meters'}
-                  onValueChange={handleDistanceUnitChange}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="meters">Meters</SelectItem>
-                    <SelectItem value="feet">Feet</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
-} 
+}

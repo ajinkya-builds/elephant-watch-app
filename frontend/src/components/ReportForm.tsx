@@ -17,8 +17,8 @@ import { toast } from "sonner";
 import { useState, useEffect, useCallback } from "react";
 
 import { supabase } from "@/lib/supabaseClient";
-import { StoredReportData, savePendingReport, getPendingReports, removePendingReport, updatePendingReportRetry, getReportsReadyForRetry, hasExceededMaxRetries } from "@/lib/localStorageUtils";
-import { findBeatForCoordinates } from '../lib/utils/shapefileImporter';
+import { savePendingReport, getPendingReports, removePendingReport, updatePendingReportRetry, getReportsReadyForRetry, hasExceededMaxRetries } from "@/lib/localStorageUtils";
+import { createActivityReport } from '@/services/activity-report.service';
 
 import { AdministrativeDetailsSection } from "./form-sections/AdministrativeDetailsSection";
 import { DamageAssessmentSection } from "./form-sections/DamageAssessmentSection";
@@ -38,7 +38,7 @@ const reportFormSchema = z.object({
   beatName: z.string().min(1, "Beat Name is required / बीट का नाम आवश्यक है"),
   compartmentNo: z.string().min(1, "Compartment Number is required / कक्ष क्रमांक आवश्यक है"),
   damageDone: z.string().min(1, "Damage information is required / हानि की जानकारी आवश्यक है"),
-  damageDescription: z.string().optional(),
+
   totalElephants: z.coerce.number({ invalid_type_error: "Must be a number / संख्या होनी चाहिए" })
     .min(0, "Total elephants cannot be negative / हाथियों की कुल संख्या नकारात्मक नहीं हो सकती")
     .int("Must be a whole number / पूर्णांक होना चाहिए"),
@@ -66,34 +66,8 @@ type ReportFormValues = z.infer<typeof reportFormSchema>;
 
 export function ReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isFetchingData, setIsFetchingData] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-
-  const steps = [
-    'Administrative Details',
-    'Damage Assessment',
-    'Elephant Sighting',
-    'Location & Time',
-    'Additional Info',
-    'Reporter Details'
-  ];
-
-  const isFirstStep = currentStep === 0;
-  const isLastStep = currentStep === steps.length - 1;
-
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
 
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
@@ -103,7 +77,7 @@ export function ReportForm() {
       rangeName: "",
       beatName: "",
       compartmentNo: "",
-      damageDescription: "",
+
       totalElephants: 0,
       maleElephants: null,
       femaleElephants: null,
@@ -145,19 +119,27 @@ export function ReportForm() {
     let failedSyncs = 0;
     let maxRetriesExceeded = 0;
 
+    // Fetch user_id for all offline reports
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      toast.error("User not authenticated. Please log in again.");
+      setIsSyncing(false);
+      return;
+    }
+
     for (const storedReport of reportsToSync) {
       try {
-        const { error } = await supabase.from("activity_reports").insert([storedReport.data]);
-        
-        if (error) {
-          throw error;
-        }
-        
+        const payload = {
+          ...storedReport.data,
+          user_id: user.id,
+          latitude: Number(storedReport.data.latitude),
+          longitude: Number(storedReport.data.longitude),
+        };
+        const result = await createActivityReport(payload);
+        if (!result) throw new Error('RPC returned null');
         removePendingReport(storedReport.id);
         successfulSyncs++;
       } catch (error: any) {
-        console.error("Failed to sync report:", storedReport.id, error);
-        
         if (hasExceededMaxRetries(storedReport)) {
           maxRetriesExceeded++;
           toast.error(`Report ${storedReport.id} failed after ${storedReport.retryCount} attempts. Please try submitting again.`);
@@ -170,171 +152,151 @@ export function ReportForm() {
     }
 
     toast.dismiss(syncToastId);
-    
-    if (successfulSyncs > 0) {
-      toast.success(`${successfulSyncs} report(s) synced successfully!`);
-    }
-    if (failedSyncs > 0) {
-      toast.error(`${failedSyncs} report(s) failed to sync. Will retry automatically.`);
-    }
-    if (maxRetriesExceeded > 0) {
-      toast.error(`${maxRetriesExceeded} report(s) exceeded maximum retry attempts.`);
-    }
-
+    if (successfulSyncs > 0) toast.success(`${successfulSyncs} report(s) synced successfully!`);
+    if (failedSyncs > 0) toast.error(`${failedSyncs} report(s) failed to sync. Will retry automatically.`);
+    if (maxRetriesExceeded > 0) toast.error(`${maxRetriesExceeded} report(s) exceeded maximum retry attempts.`);
     setIsSyncing(false);
   }, [isOnline, isSyncing]);
 
-  // Monitor online status
+  const handleOnline = useCallback(() => {
+    setIsOnline(true);
+  }, []);
+
+  const handleOffline = useCallback(() => {
+    setIsOnline(false);
+  }, []);
+
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncPendingReports();
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [syncPendingReports]);
+  }, [handleOnline, handleOffline]);
 
-  // Periodically attempt to sync pending reports
   useEffect(() => {
     if (!isOnline) return;
+    setIsSubmitting(false);
+  }, [isOnline]);
 
+  // Set up periodic sync when online
+  useEffect(() => {
+    if (!isOnline) return;
     const syncInterval = setInterval(() => {
       syncPendingReports();
     }, 30000); // Try to sync every 30 seconds when online
-
     return () => clearInterval(syncInterval);
   }, [isOnline, syncPendingReports]);
 
-  const handleFetchData = () => {
-    // ... (keep existing handleFetchData logic)
-    if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser. / आपके ब्राउज़र द्वारा जियोलोकेशन समर्थित नहीं है।");
-      return;
-    }
+  // --- DATA FETCHING STATE ---
+  const [isFetchingData, setIsFetchingData] = useState(false);
+
+  // --- FETCH LOCATION, DATE, TIME HANDLER ---
+  const handleFetchData = async () => {
     setIsFetchingData(true);
-    toast.info("Fetching location, date, and time... / स्थान, दिनांक और समय प्राप्त किया जा रहा है...");
-    const now = new Date();
-    form.setValue("activityDate", now.toISOString().split('T')[0], { shouldValidate: true });
-    form.setValue("activityTime", now.toTimeString().split(' ')[0].substring(0,5), { shouldValidate: true });
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude.toFixed(6);
-        const lon = position.coords.longitude.toFixed(6);
-        form.setValue("latitude", lat, { shouldValidate: true });
-        form.setValue("longitude", lon, { shouldValidate: true });
-        toast.success("Location, Date & Time fetched successfully! / स्थान, दिनांक और समय सफलतापूर्वक प्राप्त हुआ!");
-        setIsFetchingData(false);
-      },
-      (error) => {
-        let errorMessage = "Could not get location. Date & Time were set.";
-        if (error.code === error.PERMISSION_DENIED) errorMessage = "Location permission denied. Date & Time were set.";
-        else if (error.code === error.POSITION_UNAVAILABLE) errorMessage = "Location information is unavailable. Date & Time were set.";
-        else if (error.code === error.TIMEOUT) errorMessage = "Location request timed out. Date & Time were set.";
-        toast.error(errorMessage);
-        setIsFetchingData(false);
-      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  };
-
-  async function onSubmit(data: ReportFormValues) {
-    setIsSubmitting(true);
-
     try {
-      // Find beat for coordinates
-      const beatInfo = await findBeatForCoordinates(
-        parseFloat(data.latitude),
-        parseFloat(data.longitude)
-      );
-
-      if (!beatInfo) {
-        throw new Error('Could not determine beat for the given coordinates');
-      }
-
-      const reportData = { 
-        email: data.email,
-        division_name: beatInfo.division_name,
-        range_name: beatInfo.range_name,
-        land_type: data.landType,
-        beat_name: beatInfo.beat_name,
-        compartment_no: data.compartmentNo,
-        damage_done: data.damageDone,
-        damage_description: data.damageDescription || null,
-        total_elephants: data.totalElephants,
-        male_elephants: data.maleElephants,
-        female_elephants: data.femaleElephants,
-        unknown_elephants: data.unknownElephants,
-        activity_date: data.activityDate,
-        activity_time: data.activityTime,
-        latitude: parseFloat(data.latitude), 
-        longitude: parseFloat(data.longitude), 
-        heading_towards: data.headingTowards || null,
-        local_name: data.localName || null,
-        identification_marks: data.identificationMarks || null,
-        reporter_name: data.reporterName,
-        reporter_mobile: data.reporterMobile,
-      };
-
-      if (isOnline) {
-        const submissionToastId = toast.loading("Submitting report online...");
-        try {
-          const { error } = await supabase.from("activity_reports").insert([reportData]);
-          if (error) {
-            console.error("Supabase submission error:", error);
-            toast.error(`Online submission failed: ${error.message}. Report saved locally.`);
-            savePendingReport(reportData); // Save locally if online submission fails
-          } else {
-            toast.success("Report submitted successfully online!");
-            form.reset();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            form.setValue("latitude", latitude.toString());
+            form.setValue("longitude", longitude.toString());
+            const now = new Date();
+            form.setValue("activityDate", now.toISOString().split('T')[0]);
+            form.setValue("activityTime", now.toTimeString().slice(0, 5));
+            setIsFetchingData(false);
+          },
+          (err) => {
+            toast.error("Failed to fetch location: " + err.message);
+            setIsFetchingData(false);
           }
-        } catch (error: any) {
-          console.error("Unexpected error during online submission:", error);
-          toast.error(`An unexpected error occurred: ${error.message}. Report saved locally.`);
-          savePendingReport(reportData); // Save locally on unexpected error
-        } finally {
-          toast.dismiss(submissionToastId);
-          setIsSubmitting(false);
-        }
+        );
       } else {
-        // Offline: Save to localStorage
-        savePendingReport(reportData); 
-        toast.success("You are offline. Report saved locally and will be synced when online.");
-        form.reset(); 
-        setIsSubmitting(false);
-        console.log("Current pending reports:", getPendingReports().length);
+        toast.error("Geolocation is not supported by this browser.");
+        setIsFetchingData(false);
       }
     } catch (error: any) {
-      console.error("Error during onSubmit:", error);
-      toast.error(`An error occurred: ${error.message}`);
+      toast.error("Failed to fetch location: " + (error?.message || error));
+      setIsFetchingData(false);
+    }
+  };
+
+  // --- SUBMIT HANDLER ---
+  const onSubmit = async (reportData: ReportFormValues) => {
+    try {
+      setIsSubmitting(true);
+      // Fetch user_id from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        toast.error("User not authenticated. Please log in again.");
+        setIsSubmitting(false);
+        return;
+      }
+      // Prepare payload for DB/RPC, mapping only the fields that exist in the DB
+      const payload: any = {
+        user_id: user.id,
+        email: reportData.email,
+        division_name: reportData.divisionName,
+        range_name: reportData.rangeName,
+        beat_name: reportData.beatName,
+        compartment_no: reportData.compartmentNo,
+
+        total_elephants: reportData.totalElephants ?? null,
+        male_elephants: reportData.maleElephants ?? null,
+        female_elephants: reportData.femaleElephants ?? null,
+        unknown_elephants: reportData.unknownElephants ?? null,
+        activity_date: reportData.activityDate,
+        activity_time: reportData.activityTime,
+        latitude: Number(reportData.latitude),
+        longitude: Number(reportData.longitude),
+        heading_towards: reportData.headingTowards,
+        local_name: reportData.localName,
+        identification_marks: reportData.identificationMarks,
+        reporter_name: reportData.reporterName,
+        reporter_mobile: reportData.reporterMobile,
+        // DO NOT include '' or '' fields in the payload
+      };
+
+      if (!isOnline) {
+        savePendingReport(payload);
+        toast.success("You are offline. Report saved locally and will be synced when online.");
+        form.reset();
+        setIsSubmitting(false);
+      } else {
+        const result = await createActivityReport(payload);
+        if (!result) {
+          toast.error("Failed to submit report. Please check your data and try again.");
+          setIsSubmitting(false);
+          return;
+        }
+        toast.success("Report submitted successfully!");
+        form.reset();
+        setIsSubmitting(false);
+      }
+    } catch (error: any) {
+      toast.error("An error occurred during submission: " + (error?.message || error));
       setIsSubmitting(false);
     }
-  }
+  };
 
+  // --- COMPONENT RETURN ---
   return (
     <>
+      {!isOnline && (
+        <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
+          <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
+          Currently {getPendingReports().length} report(s) pending sync.
+        </div>
+      )}
+      {isOnline && getPendingReports().length > 0 && !isSyncing && (
+        <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
+          <span className="font-medium">{getPendingReports().length} report(s) pending sync.</span>
+          <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300 text-xs sm:text-sm" onClick={syncPendingReports}>Sync Now</Button>
+        </div>
+      )}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8 w-full max-w-full sm:max-w-2xl mx-auto p-2 sm:p-4">
-          {!isOnline && (
-            <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300" role="alert">
-              <span className="font-medium">You are currently offline.</span> Reports will be saved locally and synced when you reconnect.
-              Currently {getPendingReports().length} report(s) pending sync.
-            </div>
-          )}
-          {isOnline && getPendingReports().length > 0 && !isSyncing && (
-            <div className="p-2 sm:p-3 mb-3 sm:mb-4 text-xs sm:text-sm text-blue-800 bg-blue-100 rounded-lg dark:bg-blue-900 dark:text-blue-300" role="alert">
-              <span className="font-medium">{getPendingReports().length} report(s) pending sync.</span>
-              <Button type="button" variant="link" className="ml-2 p-0 h-auto text-blue-800 dark:text-blue-300 text-xs sm:text-sm" onClick={syncPendingReports}>Sync Now</Button>
-            </div>
-          )}
+        <form onSubmit={form.handleSubmit(onSubmit)}>
           <FormField
             control={form.control}
             name="email"
@@ -348,7 +310,6 @@ export function ReportForm() {
               </FormItem>
             )}
           />
-          
           <AdministrativeDetailsSection control={form.control} />
           <DamageAssessmentSection control={form.control} />
           <ElephantSightingSection control={form.control} />
@@ -359,13 +320,9 @@ export function ReportForm() {
           />
           <AdditionalInfoSection control={form.control} />
           <ReporterDetailsSection control={form.control} />
-          
           <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 mt-4 sm:mt-8 pt-2 sm:pt-6 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={handlePrevious} disabled={isFirstStep || isSubmitting} className="w-full sm:w-auto border-gray-200 text-gray-600 hover:bg-gray-50">
-              Previous
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
-              {isSubmitting ? 'Submitting...' : isLastStep ? 'Submit Report' : 'Next'}
+            <Button type="submit" disabled={isSubmitting || isSyncing} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+              {isSubmitting ? 'Submitting...' : 'Submit Report'}
             </Button>
           </div>
         </form>

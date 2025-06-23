@@ -1,15 +1,15 @@
 import React, { useCallback, useMemo } from 'react';
 import { useActivityForm } from '@/contexts/ActivityFormContext';
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import debounce from 'lodash/debounce';
-import { CrossPlatformSelect } from "@/components/ui/CrossPlatformSelect";
-import { StepperSelect, OptionType } from "@/components/ui/StepperSelect";
-import { isAndroid } from '@/lib/isAndroidWebView';
+
+
+
 import { ObservationType, IndirectSightingType, LossType } from '@/types/activity-report';
 
 const observationTypes: { value: ObservationType; label: string }[] = [
@@ -42,14 +42,6 @@ export const ObservationTypeStep: React.FC = () => {
 
   const handleObservationTypeChange = (value: ObservationType) => {
     updateFormData({ observation_type: value });
-  };
-
-  const handleIndirectSightingTypeChange = (value: IndirectSightingType) => {
-    updateFormData({ indirect_sighting_type: value });
-  };
-
-  const handleLossTypeChange = (value: LossType) => {
-    updateFormData({ loss_type: value });
   };
 
   // Debounced handlers for number inputs
@@ -93,40 +85,42 @@ export const ObservationTypeStep: React.FC = () => {
             </div>
 
             {formData.observation_type === 'indirect' && (
-              <div>
-                <Label>Indirect Sighting Type</Label>
-                <RadioGroup
-                  value={formData.indirect_sighting_type}
-                  onValueChange={handleIndirectSightingTypeChange}
-                  className="mt-2"
-                >
-                  {indirectSightingTypes.map((type) => (
-                    <div key={type.value} className="flex items-center space-x-2">
-                      <RadioGroupItem value={type.value} id={type.value} />
-                      <Label htmlFor={type.value}>{type.label}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-            )}
+  <div>
+    <Label>Indirect Sighting Type</Label>
+    <Select
+      value={formData.indirect_sighting_type || ''}
+      onValueChange={value => handleSelectChange('indirect_sighting_type', value)}
+    >
+      <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors">
+        <SelectValue placeholder="Select type of indirect sighting" />
+      </SelectTrigger>
+      <SelectContent>
+        {indirectSightingTypes.map((type) => (
+          <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+)}
 
             {formData.observation_type === 'loss' && (
-              <div>
-                <Label>Loss Type</Label>
-                <RadioGroup
-                  value={formData.loss_type}
-                  onValueChange={handleLossTypeChange}
-                  className="mt-2"
-                >
-                  {lossTypes.map((type) => (
-                    <div key={type.value} className="flex items-center space-x-2">
-                      <RadioGroupItem value={type.value} id={type.value} />
-                      <Label htmlFor={type.value}>{type.label}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-            )}
+  <div>
+    <Label>Loss Type</Label>
+    <Select
+      value={formData.loss_type || ''}
+      onValueChange={value => handleSelectChange('loss_type', value)}
+    >
+      <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors">
+        <SelectValue placeholder="Select type of loss" />
+      </SelectTrigger>
+      <SelectContent>
+        {lossTypes.map((type) => (
+          <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+)}
           </div>
         </CardContent>
       </Card>
@@ -194,75 +188,9 @@ export const ObservationTypeStep: React.FC = () => {
         </Card>
       )}
 
-      {formData.observation_type === 'indirect' && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Label htmlFor="indirect_sighting_type">Type of Indirect Sighting</Label>
-              <Select
-                value={formData.indirect_sighting_type || ''}
-                onValueChange={value => handleSelectChange('indirect_sighting_type', value)}
-              >
-                <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm hover:border-blue-500 transition-colors">
-                  <SelectValue placeholder="Select type of indirect sighting" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pugmark">Pugmark</SelectItem>
-                  <SelectItem value="Dung">Dung</SelectItem>
-                  <SelectItem value="Broken Branches">Broken Branches</SelectItem>
-                  <SelectItem value="Sound">Sound</SelectItem>
-                  <SelectItem value="Eyewitness">Eyewitness</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      
 
-      {formData.observation_type === 'loss' && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Label htmlFor="loss_type">Type of Loss</Label>
-              {isAndroid() ? (
-                <select
-                  id="loss_type"
-                  value={formData.loss_type ?? undefined}
-                  onChange={e => handleSelectChange('loss_type', e.target.value)}
-                  className="w-full h-12 text-base border rounded"
-                >
-                  <option value="">Select type of loss</option>
-                  <option value="No loss">No loss</option>
-                  <option value="crop">Crop</option>
-                  <option value="livestock">Livestock</option>
-                  <option value="property">Property</option>
-                  <option value="fencing">Fencing</option>
-                  <option value="solar panels">Solar Panels</option>
-                  <option value="FD establishment">FD Establishment</option>
-                  <option value="Other">Other</option>
-                </select>
-              ) : (
-                <StepperSelect
-                  value={formData.loss_type ?? ''}
-                  onChange={value => handleSelectChange('loss_type', value)}
-                  options={[
-                    { value: "No loss", label: "No loss" },
-                    { value: "crop", label: "Crop" },
-                    { value: "livestock", label: "Livestock" },
-                    { value: "property", label: "Property" },
-                    { value: "fencing", label: "Fencing" },
-                    { value: "solar panels", label: "Solar Panels" },
-                    { value: "FD establishment", label: "FD Establishment" },
-                    { value: "Other", label: "Other" },
-                  ]}
-                  placeholder="Select type of loss"
-                  className="w-full h-12 text-base"
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      
     </div>
   );
 }; 
