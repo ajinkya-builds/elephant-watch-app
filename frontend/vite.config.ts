@@ -97,7 +97,7 @@ export default defineConfig(({ mode }) => {
             }
           },
         },
-        external: ['@capacitor/network']
+        external: ['@capacitor/network', '@capacitor/device']
       },
       commonjsOptions: {
         include: [/node_modules/],
