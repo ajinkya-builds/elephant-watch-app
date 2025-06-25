@@ -96,7 +96,8 @@ export default defineConfig(({ mode }) => {
               return 'vendor';
             }
           },
-        }
+        },
+        external: ['@capacitor/network']
       },
       commonjsOptions: {
         include: [/node_modules/],
