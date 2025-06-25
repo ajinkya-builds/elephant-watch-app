@@ -52,6 +52,7 @@
     "@types/localforage": "^0.0.33",
     "@types/react-router-dom": "^5.3.3",
     "@types/shapefile": "^0.6.4",
+    "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -80,6 +81,7 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "uuid": "^11.1.0",
     "vaul": "^0.9.3",
     "zod": "^3.23.8"
   },
