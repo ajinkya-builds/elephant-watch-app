@@ -1,25 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityReportStepper } from "@/components/ActivityReportStepper";
-import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
 import { useAuth } from '@/contexts/NewAuthContext';
 import { ActivityReport } from '@/types/activity-report';
 import { Card } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CloudOff, Wifi } from "lucide-react";
+import { submitActivityReport, syncPendingReports } from '@/utils/offlineStorage';
+import { isOnline, initNetworkMonitoring } from '@/utils/networkUtils';
+import { logger } from '@/utils/loggerService';
 
 
 const ReportActivityPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [networkStatus, setNetworkStatus] = useState<boolean | null>(null);
+  const [pendingReports, setPendingReports] = useState<number>(0);
   const { user, loading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
 
   // Check authentication status
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isAuthLoading && !user) {
       navigate('/login');
     }
   }, [user, isAuthLoading, navigate]);
+
+  // Initialize network monitoring
+  useEffect(() => {
+    const initialize = async () => {
+      // Init network monitoring
+      const status = await initNetworkMonitoring();
+      setNetworkStatus(status.connected);
+
+      // Check for pending reports to sync
+      syncPendingReports().then(result => {
+        setPendingReports(result.remaining);
+        if (result.success > 0) {
+          toast.success(`Successfully synced ${result.success} pending reports`);
+        }
+      });
+    };
+    
+    initialize();
+
+    // Set up interval to check for network changes and sync reports
+    const intervalId = setInterval(async () => {
+      const online = await isOnline();
+      setNetworkStatus(online);
+      
+      if (online) {
+        const result = await syncPendingReports();
+        setPendingReports(result.remaining);
+      }
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   if (isAuthLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -32,17 +68,30 @@ const ReportActivityPage = () => {
   const handleSubmit = async (reportData: Partial<ActivityReport>) => {
     setIsSubmitting(true);
     try {
-      const { error: insertError } = await supabase
-        .from('activity_reports')
-        .insert([reportData]);
-
-      if (insertError) throw insertError;
-
-      toast.success('Activity report submitted successfully');
-      navigate('/activities');
+      // Log submission attempt
+      logger.info('Submitting activity report', {
+        type: reportData.observation_type,
+        location: `${reportData.latitude},${reportData.longitude}`
+      });
+      
+      // Use offline-aware submission
+      const result = await submitActivityReport(reportData);
+      
+      if (result.success) {
+        if (result.offline) {
+          toast.success('Report saved locally and will be submitted when online');
+          setPendingReports(prev => prev + 1);
+        } else {
+          toast.success('Activity report submitted successfully');
+        }
+        navigate('/activities');
+      } else {
+        logger.error('Error submitting report', result.error);
+        toast.error(result.message);
+      }
     } catch (err) {
-      console.error('Error submitting report:', err);
-      toast.error('Failed to submit report');
+      logger.error('Unexpected error submitting report:', err);
+      toast.error(`Failed to submit report: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -58,6 +107,31 @@ const ReportActivityPage = () => {
           <h2 className="mt-2 text-2xl font-semibold text-gray-600">
             जंगली हाथी निगरानी प्रणाली (2025)
           </h2>
+          
+          {/* Network Status Indicator */}
+          <div className="mt-2 flex items-center">
+            {networkStatus === null ? (
+              <span className="inline-flex items-center text-gray-500">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                <span className="text-sm">Checking network status...</span>
+              </span>
+            ) : networkStatus ? (
+              <span className="inline-flex items-center text-green-600">
+                <Wifi className="h-4 w-4 mr-1" />
+                <span className="text-sm">Online Mode</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center text-amber-600">
+                <CloudOff className="h-4 w-4 mr-1" />
+                <span className="text-sm">Offline Mode</span>
+                {pendingReports > 0 && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                    {pendingReports} pending
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
         </header>
 
 

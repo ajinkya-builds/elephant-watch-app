@@ -116,16 +116,29 @@ export const supabase = getSupabaseClient();
 // Helper function to check Supabase connection
 export const checkSupabaseConnection = async () => {
   try {
-    console.log('Checking Supabase connection...');
+    console.log('Checking Supabase connection (offline operation will still work)...');
 
-    /*
-     * We make a harmless request that will succeed if the Supabase backend is
-     * reachable.  It might still return a 401/403 (because RLS denies access
-     * when the user is not signed-in).  That is perfectly fine – the goal of
-     * this probe is ONLY to detect whether the network/API is up, not whether
-     * the current user is authorised.
-     */
-    const { error } = await supabase.from('users').select('id').limit(1);
+    // Check if we have a locally stored session first
+    let hasLocalSession = false;
+    try {
+      const storedSession = localStorage.getItem(STORAGE_KEY);
+      hasLocalSession = !!storedSession;
+    } catch (storageError) {
+      console.warn('Error checking local storage for session:', storageError);
+    }
+
+    // Set a timeout to prevent hanging too long on network requests when offline
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Connection check timed out')), 3000); // 3 second timeout
+    });
+
+    const connectionPromise = supabase.from('users').select('id').limit(1);
+    
+    // Race between timeout and actual request
+    const { error } = await Promise.race([
+      connectionPromise,
+      timeoutPromise
+    ]) as { error?: { status?: number } };
 
     if (!error) {
       console.log('Supabase connection successful');
@@ -134,15 +147,32 @@ export const checkSupabaseConnection = async () => {
 
     // Treat auth/permission errors as "still connected" because they prove
     // the backend responded.
-    const statusCode = (error as { status?: number }).status;
+    const statusCode = error?.status;
     if (statusCode === 401 || statusCode === 403) {
       console.warn('Supabase reachable but access denied (expected for unauthenticated request).');
       return true;
     }
 
+    if (hasLocalSession) {
+      console.log('Supabase connection failed, but local session exists. App will work offline.');
+      return true; // Return true to prevent logout when operating offline with cached session
+    }
+
     console.error('Supabase connection error:', error);
     return false;
   } catch (error) {
+    // Even if connection check fails with an exception, as long as we have a local session, 
+    // we should return true to enable offline operation
+    try {
+      const storedSession = localStorage.getItem(STORAGE_KEY);
+      if (storedSession) {
+        console.log('Supabase connection check failed, but local session exists. Will work offline.');
+        return true; 
+      }
+    } catch (storageError) {
+      console.warn('Error checking local storage for session:', storageError);
+    }
+    
     console.error('Supabase connection error:', error);
     return false;
   }

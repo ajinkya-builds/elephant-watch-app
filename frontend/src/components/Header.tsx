@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, UserCircle, Settings, User, PawPrint, Menu, X } from "lucide-react";
+import { LogOut, UserCircle, Settings, User, PawPrint, Menu, X, WifiOff } from "lucide-react";
+import { useNetworkStatus } from '@/utils/networkStatus';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,67 +21,33 @@ export function Header() {
   const { user, signOut, isAdmin, canManageUsers, canViewReports, canEditReports } = useAuth();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isOnline } = useNetworkStatus();
 
   const handleSignOut = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     console.log('Logout button clicked');
     
-    // Function to perform local cleanup
-    const clearAuthData = () => {
-      console.log('Clearing auth data...');
-      
-      // Clear all auth-related data
-      const authKeys = [
-        'sb-vfsyjvjghftfebvxyjba-auth-token',
-        'sb-vfsyjvjghftfebvxyjba-auth-token-expires-at',
-        'sb-vfsyjvjghftfebvxyjba-auth-refresh-token',
-        'sb-vfsyjvjghftfebvxyjba-auth-user',
-        'sb-vfsyjvjghftfebvxyjba-auth-session',
-      ];
-      
-      // Clear all auth data from localStorage
-      authKeys.forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      // Clear all cookies
-      document.cookie.split(';').forEach(cookie => {
-        const [name] = cookie.trim().split('=');
-        if (name.startsWith('sb-')) {
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
-        }
-      });
-    };
-    
     try {
+      if (!isOnline) {
+        toast.warning("Cannot log out while offline. Please reconnect to the internet and try again.", {
+          duration: 5000
+        });
+        return;
+      }
+      
       console.log('Starting sign out process...');
       
-      // Clear auth data first
-      clearAuthData();
+      // Use the signOut method from the auth context
+      // which handles navigation and toast messages internally
+      await signOut();
       
-      // Try to sign out from Supabase (fire and forget)
-      supabase.auth.signOut().catch(err => {
-        console.warn('Supabase sign out error (non-critical):', err);
-      });
-      
-      // Get the current origin and path
-      const origin = window.location.origin;
-      const basePath = window.location.pathname.split('/').slice(0, 2).join('/');
-      
-      // Redirect to login page with full URL
-      const loginUrl = `${origin}${basePath}/login`;
-      console.log('Redirecting to login page:', loginUrl);
-      window.location.href = loginUrl;
+      // The signOut function from useAuth already handles navigation to /login
+      // No need to navigate again here
       
     } catch (error) {
       console.error('Error during sign out:', error);
-      // If we're here, something went wrong with the redirect, force a hard refresh
-      const origin = window.location.origin;
-      const basePath = window.location.pathname.split('/').slice(0, 2).join('/');
-      const loginUrl = `${origin}${basePath}/login`;
-      console.error('Forcing redirect to login page:', loginUrl);
-      window.location.href = loginUrl;
+      toast.error("Sign out failed. Please try again.");
     }
   };
 
@@ -165,6 +132,12 @@ export function Header() {
 
         {/* User Menu Section */}
         <div className="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-0 w-full sm:w-auto justify-end">
+          {!isOnline && (
+            <div className="flex items-center text-sm text-amber-600 mr-2">
+              <WifiOff className="h-4 w-4 mr-1" />
+              <span>Offline</span>
+            </div>
+          )}
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -13,6 +13,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/cli": "^7.4.0",
+    "@capacitor/core": "^7.4.0",
+    "@capacitor/preferences": "^7.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.10",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -84,7 +88,6 @@
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
-    "@testing-library/react-hooks": "^8.0.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/lodash": "^4.17.17",
     "@types/node": "^22.15.31",
@@ -104,4 +107,4 @@
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^3.2.3"
   }
-} 
+}

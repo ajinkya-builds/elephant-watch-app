@@ -1,463 +1,554 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useActivityForm } from '@/contexts/ActivityFormContext';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Compass, Lock, Unlock, RefreshCw, AlertCircle, Camera, Navigation } from "lucide-react";
+import { Compass, RefreshCw, Navigation, MapPin, ArrowRight, XCircle, Lock as LockClosed, Unlock as LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ActivityReport } from '@/types/activity-report';
+import * as compassService from '@/utils/compassService';
+import { logger } from '@/utils/loggerService';
+import { Capacitor } from '@capacitor/core';
 
-interface CompassState {
-  heading: number;
-  accuracy: number;
-  isGPSBased: boolean;
-  isErratic: boolean;
-  speed: number;
+interface GeoPosition {
+  latitude: number;
+  longitude: number;
 }
 
-const VELOCITY_THRESHOLD = 1; // meters per second
-const ERRATIC_THRESHOLD = 45; // degrees
-const SMOOTHING_WINDOW = 5; // number of readings to average
-const GPS_ACCURACY_THRESHOLD = 10; // meters
+interface CompassState {
+  heading: number | null;
+  accuracy: number; // 0-1 where 1 is most accurate
+  isGPSBased: boolean;
+  isValid: boolean;
+  lastUpdated: number;
+  currentPosition: GeoPosition | null;
+  targetPosition: GeoPosition | null;
+}
 
 export function CompassBearingStep() {
   const { formData, updateFormData } = useActivityForm();
   const [isTracking, setIsTracking] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [calibrationSamples, setCalibrationSamples] = useState<number[]>([]);
-  const [calibrationOffset, setCalibrationOffset] = useState(0);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
-  const [compassMode, setCompassMode] = useState<'gps' | 'manual' | 'visual'>('gps');
+  const [isPointingMode, setIsPointingMode] = useState(false);
   const [compassState, setCompassState] = useState<CompassState>({
-    heading: 0,
+    heading: null,
     accuracy: 0,
     isGPSBased: false,
-    isErratic: false,
-    speed: 0
+    isValid: false,
+    lastUpdated: 0,
+    currentPosition: null,
+    targetPosition: null
   });
   
-  const headingHistory = useRef<number[]>([]);
-  const lastPosition = useRef<GeolocationPosition | null>(null);
   const lastHeading = useRef<number | null>(null);
   const watchId = useRef<number | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Initialize compass and get initial position on component mount
   useEffect(() => {
-    // Check if device is iOS
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(isIOSDevice);
+    // Log platform information
+    logger.info(`Device platform: ${Capacitor.getPlatform()}`);
 
-    // Load saved calibration offset
-    const savedOffset = localStorage.getItem('compassCalibrationOffset');
-    if (savedOffset) {
-      setCalibrationOffset(parseFloat(savedOffset));
-    }
-
-    // Load saved compass mode
-    const savedMode = localStorage.getItem('compassMode');
-    if (savedMode) {
-      setCompassMode(savedMode as 'gps' | 'manual' | 'visual');
-    }
-
-    // Check if device orientation is supported
-    if (window.DeviceOrientationEvent) {
-      if (isIOSDevice) {
-        setHasPermission(false);
-      } else {
-        setHasPermission(true);
+    // Initialize compass and get initial position
+    const initialize = async () => {
+      try {
+        // Check if compass is available
+        if (!compassService.isCompassAvailable()) {
+          toast.error("Compass is not available on this device");
+          return;
+        }
+        
+        // Request permissions and initialize compass
+        if (await compassService.requestCompassPermission()) {
+          logger.info("Compass permission granted");
+          await compassService.initCompass();
+          toast.success("Compass initialized successfully");
+          
+          // Get initial position
+          const position = await compassService.getCurrentPosition();
+          if (position && position.coords) {
+            setCompassState(prev => ({
+              ...prev,
+              currentPosition: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              }
+            }));
+            logger.info("Initial position acquired", {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+          }
+        } else {
+          logger.warn("Compass permission denied");
+          toast.error("Compass access denied");
+        }
+      } catch (error) {
+        logger.error("Error initializing compass:", error);
+        toast.error("Failed to initialize compass");
       }
-    } else {
-      toast.error("Device orientation is not supported on this device");
-      setHasPermission(false);
-    }
+    };
+    
+    initialize();
 
     return () => {
+      // Clean up resources
+      compassService.cleanupCompass();
+      
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
-      }
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach(track => track.stop());
       }
     };
   }, []);
 
-  const requestPermission = async () => {
-    try {
-      if (isIOS && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-        const permission = await (DeviceOrientationEvent as any).requestPermission();
-        if (permission === 'granted') {
-          setHasPermission(true);
-          toast.success("Compass access granted");
-        } else {
-          setHasPermission(false);
-          toast.error("Compass access denied");
-        }
-      }
-    } catch (error) {
-      console.error('Error requesting permission:', error);
-      toast.error("Failed to get compass access");
-      setHasPermission(false);
-    }
-  };
-
+  // Handle manual compass bearing entry
   const handleCompassBearingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
     if (!isNaN(value) && value >= 0 && value <= 360) {
       updateFormData({ compass_bearing: value });
-    }
-  };
-
-  const startCalibration = () => {
-    if (compassMode === 'visual') {
-      startVisualCalibration();
-    } else {
-      startManualCalibration();
-    }
-  };
-
-  const startManualCalibration = () => {
-    setIsCalibrating(true);
-    toast.info("Point your device north and tap 'Set North' when ready");
-  };
-
-  const setNorth = () => {
-    if (lastHeading.current !== null) {
-      const offset = (360 - lastHeading.current) % 360;
-      setCalibrationOffset(offset);
-      localStorage.setItem('compassCalibrationOffset', offset.toString());
-      setIsCalibrating(false);
-      toast.success("North direction set successfully");
-    }
-  };
-
-  const startVisualCalibration = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsCalibrating(true);
-        toast.info("Align the camera with a known landmark and tap 'Set Direction'");
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast.error("Failed to access camera");
-    }
-  };
-
-  const setVisualDirection = () => {
-    if (canvasRef.current && videoRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      const context = canvas.getContext('2d');
-      
-      if (context) {
-        // Draw the current frame
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Get the image data for analysis
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        
-        // Here you would implement image analysis to determine direction
-        // For now, we'll use a placeholder value
-        const visualHeading = 0; // Replace with actual image analysis
-        
-        setCalibrationOffset(visualHeading);
-        localStorage.setItem('compassCalibrationOffset', visualHeading.toString());
-        setIsCalibrating(false);
-        toast.success("Direction set from visual reference");
-      }
-    }
-  };
-
-  const handleGPSUpdate = useCallback((position: GeolocationPosition) => {
-    if (!isTracking || isLocked || !lastPosition.current) {
-      lastPosition.current = position;
-      return;
-    }
-
-    const { speed, accuracy } = position.coords;
-    const prevPos = lastPosition.current.coords;
-    const currPos = position.coords;
-
-    // Update compass state with speed
-    setCompassState(prev => ({
-      ...prev,
-      speed: speed || 0,
-      accuracy: accuracy <= GPS_ACCURACY_THRESHOLD ? 1 : 0.5
-    }));
-
-    // Use GPS heading when moving fast enough
-    if (speed && speed > VELOCITY_THRESHOLD) {
-      const heading = Math.round(
-        (Math.atan2(
-          currPos.longitude - prevPos.longitude,
-          currPos.latitude - prevPos.latitude
-        ) * 180 / Math.PI + 360) % 360
-      );
-
       setCompassState(prev => ({
         ...prev,
-        heading,
-        isGPSBased: true,
-        isErratic: false
+        heading: value,
+        isGPSBased: false,
+        isValid: true,
+        lastUpdated: Date.now()
       }));
+    }
+  };
 
+  // Get bearing to the target position (elephant location)
+  const calculateBearingToTarget = useCallback(async (targetLat: number, targetLng: number) => {
+    if (!isTracking) return;
+    
+    try {
+      // Save the target position
+      const targetPosition = {
+        latitude: targetLat,
+        longitude: targetLng
+      };
+      
+      setCompassState(prev => ({
+        ...prev,
+        targetPosition
+      }));
+      
+      // Calculate bearing using the service
+      const result = await compassService.getBearingToPosition(targetPosition);
+      
+      if (result.bearing !== null) {
+        // Round to nearest whole degree
+        const roundedBearing = Math.round(result.bearing);
+        
+        setCompassState(prev => ({
+          ...prev,
+          heading: roundedBearing,
+          accuracy: result.accuracy,
+          isGPSBased: true,
+          isValid: true,
+          currentPosition: result.currentPosition?.coords ? {
+            latitude: result.currentPosition.coords.latitude,
+            longitude: result.currentPosition.coords.longitude
+          } : prev.currentPosition,
+          lastUpdated: Date.now()
+        }));
+        
+        // Update the form with the new bearing value
+        if (!isLocked) {
+          updateFormData({ compass_bearing: roundedBearing });
+          toast.success(`Bearing calculated: ${roundedBearing}°`);
+        }
+        
+        return roundedBearing;
+      } else {
+        toast.error("Could not calculate bearing. Please try again");
+        return null;
+      }
+    } catch (error) {
+      logger.error("Error calculating bearing:", error);
+      toast.error("Failed to calculate bearing");
+      return null;
+    }
+  }, [isTracking, isLocked, updateFormData]);
+
+  // Handle device orientation events from compass service
+  const handleCompassReading = useCallback((reading: {
+    alpha: number;
+    beta: number;
+    gamma: number;
+    trueBearing?: number;
+    timestamp: number;
+    accuracy?: number;
+    source?: 'device' | 'gps' | 'manual';
+  }) => {
+    if (!isTracking || isLocked) return;
+    
+    // Get the most accurate heading available
+    let heading = 0;
+    if (reading.trueBearing !== undefined) {
+      // Use true bearing if available (from iOS webkitCompassHeading)
+      heading = Math.round(reading.trueBearing);
+    } else {
+      // Fall back to alpha with conversion for standard deviceorientation
+      heading = Math.round((360 - reading.alpha) % 360);
+    }
+    
+    // Store the raw heading
+    lastHeading.current = heading;
+    
+    // Log compass data for debugging
+    logger.debug('Compass reading', { 
+      heading: heading,
+      source: reading.source || 'device',
+      accuracy: reading.accuracy || 'unknown',
+      beta: reading.beta,
+      gamma: reading.gamma
+    });
+    
+    // Only update if not using GPS-based bearing
+    if (!compassState.isGPSBased) {
+      setCompassState(prev => ({
+        ...prev,
+        heading: heading,
+        accuracy: reading.accuracy || 0.7,
+        isGPSBased: false,
+        isValid: true,
+        lastUpdated: Date.now()
+      }));
+      
       if (!isLocked) {
         updateFormData({ compass_bearing: heading });
       }
-    } else if (compassMode === 'manual' && lastHeading.current !== null) {
-      // Use manual calibration when not moving
-      const calibratedHeading = (lastHeading.current + calibrationOffset) % 360;
-      setCompassState(prev => ({
-        ...prev,
-        heading: calibratedHeading,
-        isGPSBased: false,
-        isErratic: false
-      }));
-
-      if (!isLocked) {
-        updateFormData({ compass_bearing: calibratedHeading });
-      }
     }
-
-    lastPosition.current = position;
-  }, [isTracking, isLocked, updateFormData, compassMode, calibrationOffset]);
-
-  const handleDeviceOrientation = useCallback((event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
-    if (!isTracking || isLocked) return;
-
-    let heading = 0;
-    if (isIOS && event.webkitCompassHeading) {
-      heading = event.webkitCompassHeading;
-    } else if (event.alpha !== null) {
-      heading = Math.round((360 - event.alpha) % 360);
-    }
-
-    lastHeading.current = heading;
-
-    // Only use device orientation in manual mode when not moving
-    if (compassMode === 'manual' && compassState.speed <= VELOCITY_THRESHOLD) {
-      const calibratedHeading = (heading + calibrationOffset) % 360;
-      
-      // Update heading history for smoothing
-      headingHistory.current = [...headingHistory.current.slice(-SMOOTHING_WINDOW + 1), calibratedHeading];
-      
-      // Calculate smoothed heading
-      const smoothedHeading = Math.round(
-        headingHistory.current.reduce((a, b) => a + b, 0) / headingHistory.current.length
-      );
-
-      setCompassState(prev => ({
-        ...prev,
-        heading: smoothedHeading,
-        accuracy: 0.8,
-        isGPSBased: false,
-        isErratic: false
-      }));
-
-      if (!isLocked) {
-        updateFormData({ compass_bearing: smoothedHeading });
-      }
-    }
-  }, [isTracking, isLocked, calibrationOffset, updateFormData, compassMode, compassState.speed]);
+  }, [isTracking, isLocked, updateFormData, compassState.isGPSBased]);
 
   useEffect(() => {
     if (isTracking) {
-      // Start GPS tracking
+      // Subscribe to compass readings from device orientation
+      const compassIndex = compassService.subscribeToCompass(handleCompassReading);
+      
+      // Start location watching for accurate position updates
       watchId.current = navigator.geolocation.watchPosition(
-        handleGPSUpdate,
-        (error) => console.error('GPS Error:', error),
-        { enableHighAccuracy: true }
+        (position) => {
+          // Update the current position in state
+          if (position && position.coords) {
+            setCompassState(prev => ({
+              ...prev,
+              currentPosition: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              },
+              lastUpdated: Date.now()
+            }));
+            
+            // If we have a target position, recalculate the bearing
+            if (compassState.targetPosition) {
+              calculateBearingToTarget(
+                compassState.targetPosition.latitude,
+                compassState.targetPosition.longitude
+              );
+            }
+          }
+        },
+        (error) => {
+          logger.error('GPS Error:', error);
+          toast.error(`GPS error: ${error.message}`);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
       );
-
-      // Add device orientation listener for manual mode
-      if (compassMode === 'manual') {
-        window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
-      }
+      
+      // Return cleanup function
+      return () => {
+        compassService.unsubscribeFromCompass(compassIndex);
+        if (watchId.current !== null) {
+          navigator.geolocation.clearWatch(watchId.current);
+        }
+      };
     }
+    
     return () => {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
       }
-      window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
     };
-  }, [isTracking, handleGPSUpdate, handleDeviceOrientation, compassMode]);
+  }, [isTracking, handleCompassReading, calculateBearingToTarget, compassState.targetPosition]);
 
-  const toggleTracking = () => {
-    setIsTracking(!isTracking);
+  const toggleTracking = async () => {
+    // If starting tracking, ensure compass service is initialized
     if (!isTracking) {
-      toast.info("Compass tracking started");
+      try {
+        // Make sure compass is initialized
+        if (!await compassService.initCompass()) {
+          toast.error("Could not initialize compass service");
+          return;
+        }
+        
+        // Start tracking
+        setIsTracking(true);
+        toast.success("Bearing tracking started");
+      } catch (error) {
+        logger.error("Error starting compass tracking:", error);
+        toast.error("Failed to start bearing tracking");
+      }
     } else {
-      toast.info("Compass tracking stopped");
+      // Stop tracking
+      setIsTracking(false);
+      setIsLocked(false);
+      toast.info("Bearing tracking stopped");
     }
   };
 
   const toggleLock = () => {
     setIsLocked(!isLocked);
     if (!isLocked) {
-      toast.info("Compass bearing locked");
+      toast.info("Bearing locked");
     } else {
-      toast.info("Compass bearing unlocked");
+      toast.info("Bearing unlocked");
+    }
+  };
+  
+  const getTargetLocation = async () => {
+    try {
+      setIsPointingMode(true);
+      toast.info("Point your device at the elephant's location and tap 'Set Target'.");
+    } catch (error) {
+      logger.error("Error setting pointing mode:", error);
+      toast.error("Failed to enter pointing mode");
+      setIsPointingMode(false);
+    }
+  };
+  
+  const setTarget = async () => {
+    // Get the current position as the target for the elephant
+    const position = await compassService.getCurrentPosition();
+    if (!position || !position.coords) {
+      toast.error("Could not get current position. Please try again.");
+      return;
+    }
+    
+    const targetPosition = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude
+    };
+    
+    setCompassState(prev => ({
+      ...prev,
+      targetPosition
+    }));
+    
+    toast.success("Target position set successfully");
+    setIsPointingMode(false);
+    
+    // If we have current position, calculate bearing immediately
+    if (compassState.currentPosition) {
+      calculateBearingToTarget(targetPosition.latitude, targetPosition.longitude);
     }
   };
 
-  const handleModeChange = (mode: 'gps' | 'manual' | 'visual') => {
-    setCompassMode(mode);
-    localStorage.setItem('compassMode', mode);
-    toast.info(`Switched to ${mode} mode`);
+  const getAccuracyColor = (accuracy: number) => {
+    if (accuracy > 0.8) return 'text-green-500';
+    if (accuracy > 0.5) return 'text-amber-500';
+    return 'text-red-500';
   };
 
-  const getAccuracyColor = (accuracy: number) => {
-    if (accuracy >= 0.8) return "bg-green-500";
-    if (accuracy >= 0.5) return "bg-yellow-500";
-    return "bg-red-500";
+  // Removed unused getAccuracyClass function
+
+  const getAccuracyLabel = (accuracy: number) => {
+    if (accuracy > 0.8) return 'High';
+    if (accuracy > 0.5) return 'Medium';
+    return 'Low';
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col items-center space-y-4">
-            <Tabs defaultValue={compassMode} onValueChange={(v) => handleModeChange(v as 'gps' | 'manual' | 'visual')}>
-              <TabsList>
-                <TabsTrigger value="gps">
-                  <Navigation className="w-4 h-4 mr-2" />
-                  GPS
-                </TabsTrigger>
-                <TabsTrigger value="manual">
-                  <Compass className="w-4 h-4 mr-2" />
-                  Manual
-                </TabsTrigger>
-                <TabsTrigger value="visual">
-                  <Camera className="w-4 h-4 mr-2" />
-                  Visual
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="text-lg font-medium">Compass Bearing</h3>
+                <div className="flex items-center gap-2">
+                  {isTracking ? (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={toggleTracking}
+                        className="gap-1"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Stop
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={toggleLock}
+                        className="gap-1"
+                      >
+                        {isLocked ? (
+                          <>
+                            <LockOpen className="h-4 w-4" />
+                            Unlock
+                          </>
+                        ) : (
+                          <>
+                            <LockClosed className="h-4 w-4" />
+                            Lock
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      onClick={toggleTracking}
+                      className="gap-1"
+                    >
+                      <Compass className="h-4 w-4" />
+                      Start Tracking
+                    </Button>
+                  )}
+                </div>
+              </div>
 
-            <div className="flex items-center space-x-4">
-              <Button
-                variant={isTracking ? "destructive" : "default"}
-                onClick={toggleTracking}
-                className="flex items-center space-x-2"
-              >
-                <Compass className={`w-4 h-4 ${isTracking ? 'animate-spin' : ''}`} />
-                <span>{isTracking ? 'Stop Tracking' : 'Start Tracking'}</span>
-              </Button>
-
-              <Button
-                variant={isLocked ? "default" : "outline"}
-                onClick={toggleLock}
-                className="flex items-center space-x-2"
-                disabled={!isTracking}
-              >
-                {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                <span>{isLocked ? 'Unlock' : 'Lock'}</span>
-              </Button>
-
-              {isCalibrating ? (
-                <Button
-                  variant="default"
-                  onClick={compassMode === 'visual' ? setVisualDirection : setNorth}
-                  className="flex items-center space-x-2"
+              {/* Main compass UI */}
+              <div className="flex flex-col items-center space-y-4">
+                {/* Compass rose visualization */}
+                <div 
+                  className="relative w-48 h-48 rounded-full border-2 border-gray-300 flex items-center justify-center"
+                  style={{
+                    transform: `rotate(${compassState.heading || 0}deg)`
+                  }}
                 >
-                  <Navigation className="w-4 h-4" />
-                  <span>Set {compassMode === 'visual' ? 'Direction' : 'North'}</span>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  onClick={startCalibration}
-                  className="flex items-center space-x-2"
-                  disabled={!isTracking}
-                >
-                  <RefreshCw className={`w-4 h-4 ${isCalibrating ? 'animate-spin' : ''}`} />
-                  <span>Calibrate</span>
-                </Button>
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-primary rounded-full" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Navigation className="h-12 w-12 text-primary" />
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-3xl font-bold">
+                    {compassState.heading !== null ? `${compassState.heading}°` : "--°"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {compassState.isGPSBased ? "GPS-calculated bearing" : "Device orientation"}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Target position controls */}
+              {isTracking && (
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium">Target Position</span>
+                    <span className="text-sm text-muted-foreground">
+                      {compassState.targetPosition ? 
+                        `${compassState.targetPosition.latitude.toFixed(6)}, ${compassState.targetPosition.longitude.toFixed(6)}` : 
+                        "Not set"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={getTargetLocation}
+                      className="flex-1 gap-1"
+                      disabled={isPointingMode}
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Set Target
+                    </Button>
+                    {compassState.currentPosition && compassState.targetPosition && (
+                      <Button
+                        onClick={() => calculateBearingToTarget(
+                          compassState.targetPosition!.latitude,
+                          compassState.targetPosition!.longitude
+                        )}
+                        className="flex-1 gap-1"
+                        disabled={!compassState.currentPosition || !compassState.targetPosition}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                        Calculate Bearing
+                      </Button>
+                    )}
+                  </div>
+                  {isPointingMode && (
+                    <div className="mt-2 flex justify-between gap-2">
+                      <Button 
+                        variant="default" 
+                        onClick={setTarget} 
+                        className="flex-1"
+                      >
+                        Confirm Target
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsPointingMode(false)} 
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
 
-            <div className="text-center space-y-2">
-              <Label htmlFor="compass_bearing" className="text-lg">
-                Compass Bearing (0-360°)
-              </Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="number"
-                  id="compass_bearing"
-                  min="0"
-                  max="360"
-                  value={formData.compass_bearing || ''}
-                  onChange={handleCompassBearingChange}
-                  className="w-32 text-center"
-                  disabled={isTracking && !isLocked}
-                />
-                <span className="text-lg">°</span>
+              {/* Accuracy indicator */}
+              {isTracking && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Accuracy</span>
+                    <span className="font-medium" style={{ color: getAccuracyColor(compassState.accuracy) }}>
+                      {getAccuracyLabel(compassState.accuracy)}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={compassState.accuracy * 100} 
+                    className={`h-2 bg-${getAccuracyColor(compassState.accuracy).replace('text-', '')}`} 
+                  />
+                </div>
+              )}
+
+              {/* Manual input */}
+              <div className="space-y-2">
+                <Label htmlFor="compass-bearing">Bearing Value (0-360°)</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="compass-bearing"
+                    type="number" 
+                    min={0} 
+                    max={360} 
+                    step={1}
+                    value={formData.compass_bearing || ''} 
+                    onChange={handleCompassBearingChange}
+                    className="flex-1"
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      if (!isTracking) {
+                        toggleTracking();
+                      } else if (compassState.heading !== null) {
+                        updateFormData({ compass_bearing: compassState.heading });
+                      }
+                    }}
+                    className="gap-1"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Get Current
+                  </Button>
+                </div>
               </div>
             </div>
 
+            {/* Help text */}
             {isTracking && (
-              <div className="w-full space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Accuracy:</span>
-                  <div className="flex items-center space-x-2">
-                    <Progress value={compassState.accuracy * 100} className="w-24" />
-                    <span className={`w-3 h-3 rounded-full ${getAccuracyColor(compassState.accuracy)}`} />
-                  </div>
-                </div>
-                {compassState.isGPSBased && (
-                  <div className="text-sm text-blue-500">
-                    Using GPS-based heading (Speed: {compassState.speed.toFixed(1)} m/s)
-                  </div>
-                )}
-                {compassState.isErratic && (
-                  <div className="flex items-center space-x-2 text-sm text-red-500">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Compass readings are erratic. Please calibrate or use manual mode.</span>
-                  </div>
-                )}
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  For best results, hold your device flat and point it in the direction of the elephant. 
+                  The bearing will be calculated automatically.
+                </p>
               </div>
             )}
-
-            {compassMode === 'visual' && isCalibrating && (
-              <div className="relative w-full aspect-video">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover rounded-lg"
-                />
-                <canvas
-                  ref={canvasRef}
-                  className="hidden"
-                  width={640}
-                  height={480}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-32 h-32 border-2 border-white rounded-full opacity-50" />
-                </div>
-              </div>
-            )}
-
-            <div className="text-sm text-gray-500 text-center max-w-md">
-              Enter the compass bearing in degrees, where:
-              <ul className="mt-2 space-y-1">
-                <li>0° or 360° = North</li>
-                <li>90° = East</li>
-                <li>180° = South</li>
-                <li>270° = West</li>
-              </ul>
-            </div>
           </div>
         </CardContent>
       </Card>

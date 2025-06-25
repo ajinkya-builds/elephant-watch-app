@@ -6,23 +6,30 @@ import {
   useCallback,
   useMemo,
   ReactNode,
-  useRef,
 } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
-import { toast } from '@/components/ui/use-toast';
+import { Profile } from '../types/supabase';
 import { supabase } from '@/lib/supabaseClient';
-import { useNetworkStatus } from '@/utils/networkStatus';
+import { Preferences } from '@capacitor/preferences';
+import { useNetworkStatus } from '../utils/networkStatus';
+import { getCurrentPosition, requestLocationPermission } from '../utils/locationService';
 import { FullPageLoader } from '@/components/ui/FullPageLoader';
+
 
 // Storage key for session persistence
 const STORAGE_KEY = 'sb-vfsyjvjghftfebvxyjba-auth-token';
+
+// Session expiration duration (30 days in milliseconds)
+const SESSION_EXPIRATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // User roles
 export type UserRole = 'admin' | 'manager' | 'data_collector' | 'viewer';
 
 // User positions
 export type UserPosition = 'Ranger' | 'DFO' | 'Officer' | 'Guard' | 'Manager' | 'Admin';
+
+// User status
+export type UserStatus = 'active' | 'inactive' | 'pending';
 
 // Permission types
 export type Permission = 
@@ -61,6 +68,7 @@ export interface ExtendedUser {
   avatar_url: string;
   metadata: Record<string, any>;
   permissions?: string[];
+  cached_at?: string; // Timestamp for cache management
 }
 
 // Auth state type
@@ -84,9 +92,9 @@ const initialState: AuthState = {
 // Authentication context type
 export interface AuthContextType extends AuthState {
   // Authentication methods
-  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ 
-    user: ExtendedUser | null; 
-    error: Error | null 
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{
+    user: ExtendedUser | null;
+    error: Error | null
   }>;
   signOut: () => Promise<{ error: Error | null }>;
   refreshUser: () => Promise<void>;
@@ -109,7 +117,7 @@ export interface AuthContextType extends AuthState {
   
   // Auth state
   initialized: boolean;
-}
+};
 
 // Create the auth context with default values
 const AuthContext = createContext<AuthContextType>({
@@ -130,74 +138,6 @@ const AuthContext = createContext<AuthContextType>({
   initialized: false,
 });
 
-// Fetch user profile from auth.users and public.users
-const fetchUserProfile = async (
-  userId: string
-): Promise<ExtendedUser | null> => {
-  try {
-    // Get user data from auth.users
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-    if (authError) throw authError;
-    if (!authUser) return null;
-
-    // Try to fetch from public.users using auth_id
-    const { data: dbUser, error: dbError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authUser.id)
-      .single();
-
-    if (dbError && dbError.code !== 'PGRST116') { // PGRST116: No rows found
-      console.error('Error fetching user from public.users:', dbError);
-    }
-
-    // Use DB user if found, otherwise fallback to auth user
-    const user: ExtendedUser = dbUser
-      ? {
-          id: String(dbUser.id),
-          auth_id: String(dbUser.auth_id),
-          first_name: dbUser.first_name || authUser.user_metadata?.first_name || '',
-          last_name: dbUser.last_name || authUser.user_metadata?.last_name || '',
-          email: typeof dbUser.email === 'string' ? dbUser.email : (typeof authUser.email === 'string' ? authUser.email : null),
-          phone: typeof dbUser.phone === 'string' ? dbUser.phone : (typeof authUser.phone === 'string' ? authUser.phone : null),
-          role: (dbUser.role as UserRole) || (authUser.user_metadata?.role as UserRole) || 'viewer',
-          position: (dbUser.position as UserPosition) || (authUser.user_metadata?.position as UserPosition) || 'field_agent',
-          status: (dbUser.status === 'active' || dbUser.status === 'inactive' || dbUser.status === 'pending') ? dbUser.status : 'active',
-          created_at: dbUser.created_at ? String(dbUser.created_at) : (authUser.created_at ? String(authUser.created_at) : new Date().toISOString()),
-          updated_at: dbUser.updated_at ? String(dbUser.updated_at) : (authUser.updated_at ? String(authUser.updated_at) : new Date().toISOString()),
-          last_login_at: dbUser.last_login_at ? String(dbUser.last_login_at) : (authUser.last_sign_in_at ? String(authUser.last_sign_in_at) : null),
-          avatar_url: dbUser.avatar_url || authUser.user_metadata?.avatar_url || '',
-          metadata: {
-            ...(typeof dbUser.metadata === 'object' && dbUser.metadata ? dbUser.metadata : {}),
-            ...(authUser.user_metadata || {})
-          },
-          permissions: Array.isArray(dbUser.permissions) ? dbUser.permissions : undefined,
-        }
-      : {
-          id: authUser.id,
-          auth_id: authUser.id,
-          first_name: authUser.user_metadata?.first_name || '',
-          last_name: authUser.user_metadata?.last_name || '',
-          email: typeof authUser.email === 'string' ? authUser.email : null,
-          phone: typeof authUser.phone === 'string' ? authUser.phone : null,
-          role: (authUser.user_metadata?.role as UserRole) || 'viewer',
-          position: (authUser.user_metadata?.position as UserPosition) || 'field_agent',
-          status: 'active',
-          created_at: authUser.created_at ? String(authUser.created_at) : new Date().toISOString(),
-          updated_at: authUser.updated_at ? String(authUser.updated_at) : new Date().toISOString(),
-          last_login_at: authUser.last_sign_in_at ? authUser.last_sign_in_at : null,
-          avatar_url: authUser.user_metadata?.avatar_url || '',
-          metadata: authUser.user_metadata || {},
-          permissions: Array.isArray(authUser.user_metadata?.permissions) ? authUser.user_metadata?.permissions : undefined,
-        };
-
-    return user;
-  } catch (error) {
-    console.error('Error fetching user profile:', error);
-    throw error;
-  }
-};
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>(initialState);
   const [navigate, setNavigate] = useState<((to: string) => void) | null>(() => {
@@ -205,218 +145,684 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.warn('Navigation not yet initialized. Attempted to navigate to:', to);
     };
   });
+  const { isOnline } = useNetworkStatus();
+  
+  // Memoized fetchUserProfile to avoid re-renders - properly moved inside component
+
+  // Function to create a timeout for any promise
+  const promiseWithTimeout = async (promise: Promise<any>, timeoutMs: number, errorMessage: string) => {
+    // Create a promise that rejects in <timeoutMs> milliseconds
+    const timeoutPromise = new Promise((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        reject(new Error(`Timeout after ${timeoutMs}ms: ${errorMessage}`));
+      }, timeoutMs);
+    });
+  
+    // Returns a race between our timeout and the passed in promise
+    return Promise.race([
+      promise,
+      timeoutPromise
+    ]);
+  };
+
+  const fetchUserProfile = useCallback(async (userId: string): Promise<ExtendedUser> => {
+    console.log("Checking Supabase connection (will continue offline if unavailable)...", userId);
+    console.log("fetchUserProfile: Checking for cached user data first...");
+    
+    // No valid cached data, fetch from API
+    console.log("fetchUserProfile: Calling supabase.auth.getUser()...");
+    let supabaseUser: User | null = null;
+    let profileData: Profile | null = null;
+
+    try {
+      // Use timeout to prevent indefinite hang
+      let result;
+      try {
+        result = await promiseWithTimeout(
+          supabase.auth.getUser(),
+          10000, // 10 second timeout
+          "supabase.auth.getUser() call timed out"
+        );
+      } catch (timeoutError) {
+        console.error("fetchUserProfile: Timeout error:", timeoutError);
+        throw new Error("Could not get authentication data: network request timed out");
+      }
+      
+      const { data: { user }, error: userError } = result;
+      supabaseUser = user;
+
+      console.log("fetchUserProfile: supabase.auth.getUser() completed. User error:", userError, "User exists:", !!supabaseUser);
+      console.log("DEBUG: supabaseUser object:", supabaseUser);
+
+      if (userError) {
+        console.error("fetchUserProfile: Error from supabase.auth.getUser():", userError);
+        throw userError;
+      }
+      if (!supabaseUser) {
+        console.warn("fetchUserProfile: No user returned from supabase.auth.getUser().");
+        throw new Error("No user returned from Supabase auth.");
+      }
+
+      // Fetch profile data with timeout
+      let profileResult;
+      try {
+        // Convert PostgrestBuilder to Promise for TypeScript compatibility
+        const fetchProfile = async () => {
+          // Make sure supabaseUser exists before trying to use it
+          if (!supabaseUser) {
+            throw new Error("Cannot fetch profile: user is null");
+          }
+          
+          return await supabase
+            .from('users')
+            .select(`id, first_name, last_name, email, phone, role, position`)
+            .eq('auth_id', supabaseUser.id)
+            .single();
+        };
+        
+        profileResult = await promiseWithTimeout(
+          fetchProfile(),
+          10000, // 10 second timeout
+          "Profile fetch from Supabase timed out"
+        );
+      } catch (timeoutError) {
+        console.error("fetchUserProfile: Profile fetch timeout:", timeoutError);
+        throw new Error("Could not get profile data: network request timed out");
+      }
+      
+      const { data: profile, error: profileError } = profileResult;
+      profileData = profile;
+
+      console.log("DEBUG: Profile data from 'profiles' table:", profileData);
+      console.log("DEBUG: Profile fetch error:", profileError);
+      console.log("DEBUG: Role from profileData:", profileData?.role);
+
+      if (profileError) {
+        console.error("fetchUserProfile: Error fetching profile from 'profiles' table:", profileError);
+        throw profileError;
+      }
+
+      if (!profileData) {
+        console.warn("fetchUserProfile: No profile data found for user:", supabaseUser.id);
+        throw new Error("No profile data found.");
+      }
+
+    } catch (error) {
+      console.error("fetchUserProfile: An unexpected error occurred during user profile fetch:", error);
+      throw error;
+    }
+
+    // Correctly construct ExtendedUser from supabaseUser and profileData
+    const extendedUser = {
+      id: supabaseUser.id,
+      auth_id: supabaseUser.id,
+      first_name: profileData?.first_name || '',
+      last_name: profileData?.last_name || '',
+      email: supabaseUser.email || null,
+      phone: supabaseUser.phone || null,
+      role: (profileData?.role || 'viewer') as UserRole, // Use role from profileData
+      position: (supabaseUser.user_metadata?.position || 'field_agent') as UserPosition,
+      status: (supabaseUser.user_metadata?.status || 'active') as UserStatus,
+      created_at: supabaseUser.created_at || new Date().toISOString(),
+      updated_at: supabaseUser.updated_at || new Date().toISOString(),
+      last_login_at: supabaseUser.last_sign_in_at || null,
+      avatar_url: '', // Removed avatar_url as it's not in the 'users' table
+      metadata: supabaseUser.user_metadata || {},
+      permissions: supabaseUser.user_metadata?.permissions || [],
+      cached_at: new Date().toISOString() // Add timestamp for cache invalidation
+    };
+
+    console.log("DEBUG: Final extendedUser object before return:", extendedUser);
+    console.log("DEBUG: Role in final extendedUser object:", extendedUser.role);
+    
+
+    
+    return extendedUser;
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    let isMounted = true; // Declare isMounted here
+
     console.log("AuthProvider: Running initialization effect.");
 
-    const initializeAuth = async () => {
+    const initializeAuth = async (onlineStatus: boolean) => {
+      console.log("AuthProvider: Starting initializeAuth.");
+      let session: Session | null = null; // Declare session here
+      let userProfile: ExtendedUser | null = null; // Declare userProfile here
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
-        
-        console.log("AuthProvider: Initial getSession resolved.");
-        const userProfile = session?.user ? await fetchUserProfile(session.user.id) : null;
-        
+        // Try to load session from Capacitor Preferences first
+        console.log("AuthProvider: Attempting to load session from preferences...");
+        const { value: storedSession } = await Preferences.get({ key: STORAGE_KEY });
+        console.log("AuthProvider: Preferences.get completed. Stored session exists:", !!storedSession);
+
+        if (storedSession) {
+          try {
+            const parsedSession = JSON.parse(storedSession);
+            
+            // Check if the session is still within our 30-day validity period
+            const sessionTimestamp = parsedSession.created_at || parsedSession.expires_at;
+            const sessionDate = new Date(sessionTimestamp).getTime();
+            const currentDate = new Date().getTime();
+            const isSessionValid = (currentDate - sessionDate) < SESSION_EXPIRATION;
+            
+            if (isSessionValid) {
+              // When offline, just use the stored session without validation
+              if (!onlineStatus) {
+                session = parsedSession;
+                console.log("AuthProvider: Offline mode - using stored session without validation.");
+              } else {
+                // Online mode - try to validate with Supabase
+                try {
+                  await supabase.auth.setSession(parsedSession);
+                  session = parsedSession; // Assign to the outer-scoped session
+                  console.log("AuthProvider: Session restored and validated with Supabase.");
+                } catch (validationError) {
+                  // Even if online validation fails, keep the session if within 30 days
+                  console.log("AuthProvider: Online validation failed, but session is within 30 days. Keeping session.");
+                  session = parsedSession;
+                }
+              }
+            } else {
+              console.log("AuthProvider: Stored session expired (older than 30 days). Clearing.");
+              await Preferences.remove({ key: STORAGE_KEY });
+            }
+          } catch (parseError) {
+            console.error("AuthProvider: Failed to parse stored session.", parseError);
+            await Preferences.remove({ key: STORAGE_KEY });
+            console.log("AuthProvider: Invalid session format. Clearing.");
+          }
+        }
+
+        // If no session from preferences, and we are online, try to get it from Supabase
+        if (!session && onlineStatus) {
+          console.log("AuthProvider: No session from preferences, attempting to get from Supabase...");
+          try {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            console.log("AuthProvider: supabase.auth.getSession completed. Session exists:", !!currentSession);
+            session = currentSession;
+            console.log("AuthProvider: Fetched session from Supabase.");
+          } catch (error) {
+            console.warn("AuthProvider: Failed to get session from Supabase (possibly network issue):");
+          }
+        }
+
+        if (session?.user) {
+          console.log("AuthProvider: Session user found, attempting to fetch user profile.");
+          // Attempt to fetch full profile only if online, otherwise use minimal user data from session
+          if (onlineStatus) {
+            try {
+              userProfile = await fetchUserProfile(session.user.id);
+              console.log("AuthProvider: fetchUserProfile completed.");
+            } catch (profileError) {
+              console.warn("AuthProvider: Failed to fetch user profile during initialization (possibly offline or error).", profileError);
+              // Fallback to minimal user if online fetch fails
+              userProfile = {
+                id: session.user.id,
+                auth_id: session.user.id,
+                first_name: session.user.user_metadata?.first_name || '',
+                last_name: session.user.user_metadata?.last_name || '',
+                email: session.user.email || null,
+                phone: session.user.phone || null,
+                role: (session.user.user_metadata?.role || 'viewer') as UserRole,
+                position: (session.user.user_metadata?.position || 'field_agent') as UserPosition,
+                status: (session.user.user_metadata?.status || 'active') as UserStatus,
+                created_at: session.user.created_at || new Date().toISOString(),
+                updated_at: session.user.updated_at || new Date().toISOString(),
+                last_login_at: session.user.last_sign_in_at || new Date().toISOString(),
+                avatar_url: session.user.user_metadata?.avatar_url || '',
+                metadata: session.user.user_metadata || {},
+                permissions: session.user.user_metadata?.permissions || [],
+              };
+            }
+          } else {
+            // If offline, use the session's user data directly
+            userProfile = {
+              id: session.user.id,
+              auth_id: session.user.id,
+              first_name: session.user.user_metadata?.first_name || '',
+              last_name: session.user.user_metadata?.last_name || '',
+              email: session.user.email || null,
+              phone: session.user.phone || null,
+              role: (session.user.user_metadata?.role || 'viewer') as UserRole,
+              position: (session.user.user_metadata?.position || 'field_agent') as UserPosition,
+              status: (session.user.user_metadata?.status || 'active') as UserStatus,
+              created_at: session.user.created_at || new Date().toISOString(),
+              updated_at: session.user.updated_at || new Date().toISOString(),
+              last_login_at: session.user.last_sign_in_at || new Date().toISOString(),
+              avatar_url: session.user.user_metadata?.avatar_url || '',
+              metadata: session.user.user_metadata || {},
+              permissions: session.user.user_metadata?.permissions || [],
+              cached_at: new Date().toISOString(), // Add timestamp for cache invalidation
+            };
+            
+            // Try to retrieve cached profile first, even when offline
+            try {
+              const { value: cachedProfileStr } = await Preferences.get({ key: `user_profile_${session.user.id}` });
+              if (cachedProfileStr) {
+                const cachedProfile = JSON.parse(cachedProfileStr);
+                // Use cached profile if it's more complete than the basic one
+                if (cachedProfile.avatar_url && !userProfile.avatar_url) {
+                  userProfile.avatar_url = cachedProfile.avatar_url;
+                }
+                // Any other cached properties we want to use can be added here
+              }
+            } catch (cacheError) {
+              console.warn('AuthProvider: Error retrieving cached profile:', cacheError);
+            }
+            console.log("AuthProvider: Offline, using session user for profile.");
+          }
+        }
+      } catch (mainError) {
+        console.error("AuthProvider: Error during main initialization process:", mainError);
+      } finally {
+        console.log("AuthProvider: initializeAuth finally block reached. isMounted:", isMounted);
         if (isMounted) {
-          console.log("AuthProvider: Initialization complete. Setting initialized = true.");
-          setState({
+          setState(prevState => ({
+            ...prevState,
             user: userProfile,
             session,
-            initialized: true,
-            loading: false,
             error: null,
-          });
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error("AuthProvider: Initialization failed.", error);
-          setState({
-            user: null, 
-            session: null, 
-            initialized: true, 
             loading: false,
-            error: error instanceof Error ? error.message : "Initialization failed."
-          });
+            initialized: true, // Ensure initialized is set to true
+          }));
         }
       }
     };
 
-    initializeAuth();
-      
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    initializeAuth(isOnline); // Call initializeAuth with the current online status
+  }, [isOnline, fetchUserProfile]);
 
-  useEffect(() => {
-    if (!state.initialized) {
-      console.log("AuthProvider: Skipping auth state change listener until initialized.");
-      return;
+  // Refresh user data
+  // Sign in handler - with offline support and login tracking
+  const handleSignIn = useCallback(async (email: string, password: string, rememberMe: boolean = true): Promise<{
+    user: ExtendedUser | null;
+    error: Error | null
+  }> => {
+    console.log("handleSignIn: Attempting to sign in user:", email);
+    setState(prevState => ({ ...prevState, loading: true, error: null }));
+    
+    // Record login attempt with device information and location if available
+    const loginAttempt: any = {
+      email,
+      timestamp: new Date().toISOString(),
+      success: false,
+      online: isOnline,
+      deviceInfo: {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        screenSize: `${window.screen.width}x${window.screen.height}`,
+      }
+    };
+    
+    // Try to get geolocation data through the Capacitor Geolocation plugin
+    try {
+      // Request location permissions first
+      await requestLocationPermission();
+      
+      // Then try to get the current position
+      try {
+        const locationData = await getCurrentPosition();
+        
+        // When position is available, update the login record
+        loginAttempt.location = locationData;
+        
+        // Update the stored login history with location
+        try {
+          const { value } = await Preferences.get({ key: 'login_history' });
+          let history = value ? JSON.parse(value) : [];
+          
+          // Find and update the most recent login attempt
+          if (history.length > 0) {
+            const lastIndex = history.length - 1;
+            if (history[lastIndex].email === email) {
+              history[lastIndex].location = loginAttempt.location;
+              await Preferences.set({
+                key: 'login_history',
+                value: JSON.stringify(history)
+              });
+              console.log("Location data added to login history");
+            }
+          }
+        } catch (err) {
+          console.warn("Failed to update location in login history:", err);
+        }
+      } catch (locationError) {
+        console.warn("Error getting location:", locationError);
+      }
+    } catch (permissionError) {
+      console.warn("Location permission error:", permissionError);
+    }
+      
+    // Try to get device orientation (compass) if available
+    try {
+      if (window.DeviceOrientationEvent) {
+        const handleOrientation = (event: DeviceOrientationEvent) => {
+          // Only capture orientation once
+          window.removeEventListener('deviceorientation', handleOrientation);
+          
+          if (event.alpha !== null) {
+            loginAttempt.orientation = {
+              alpha: event.alpha, // compass direction (0-360)
+              beta: event.beta,   // front-to-back tilt
+              gamma: event.gamma  // left-to-right tilt
+            };
+            
+            // Update stored login history with orientation data
+            Preferences.get({ key: 'login_history' }).then(({ value }) => {
+              let history = value ? JSON.parse(value) : [];
+              if (history.length > 0) {
+                const lastIndex = history.length - 1;
+                if (history[lastIndex].email === email) {
+                  history[lastIndex].orientation = loginAttempt.orientation;
+                  Preferences.set({
+                    key: 'login_history',
+                    value: JSON.stringify(history)
+                  });
+                  console.log("Orientation data added to login history");
+                }
+              }
+            }).catch(err => {
+              console.warn("Failed to update orientation in login history:", err);
+            });
+          }
+        };
+        
+        // Request device orientation permission and data
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+    } catch (sensorError) {
+      console.warn("Error accessing device sensors:", sensorError);
     }
     
-    let isMounted = true;
-    console.log("AuthProvider: Setting up auth state change listener.");
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
-        console.log(`AuthProvider: Auth event received - ${event}`);
-        
-        try {
-          const userProfile = session?.user ? await fetchUserProfile(session.user.id) : null;
-          if (isMounted) {
-            setState(prevState => ({ 
-              ...prevState, 
-              user: userProfile, 
-              session, 
-              error: null,
-              loading: false 
-            }));
-          }
-        } catch (error) {
-          if (isMounted) {
-            console.error("AuthProvider: Error handling auth state change:", error);
-            setState(prevState => ({
-              ...prevState,
-              error: error instanceof Error ? error.message : "Failed to handle auth state change",
-              loading: false
-            }));
-          }
-        }
-      }
-    );
-
-    return () => {
-      isMounted = false;
-      console.log("AuthProvider: Unsubscribing from auth state changes.");
-      subscription?.unsubscribe();
-    };
-  }, [state.initialized]);
-
-  const setNavigation = useCallback((nav: (to: string) => void) => {
-    setNavigate(() => nav);
-    return () => {
-      setNavigate(null);
-    };
-  }, []);
-
-  // Handle sign in
-  const handleSignIn = useCallback(async (
-    identifier: string, 
-    password: string, 
-    rememberMe: boolean = false
-  ) => {
     try {
-      setState((prev: AuthState) => ({ ...prev, loading: true, error: null }));
-
-      // Check if identifier is email or phone
-      const isEmail = identifier.includes('@');
-      
-      // Sign in with email/password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: identifier,
-        password,
+      // Store login attempt in Preferences
+      const { value: loginHistoryStr } = await Preferences.get({ key: 'login_history' });
+      const loginHistory = loginHistoryStr ? JSON.parse(loginHistoryStr) : [];
+      loginHistory.push(loginAttempt);
+      await Preferences.set({
+        key: 'login_history',
+        value: JSON.stringify(loginHistory)
       });
       
-      if (error) throw error;
-      if (!data.session) throw new Error('No session returned');
+      // If offline, check for cached credentials
+      if (!isOnline) {
+        console.log("handleSignIn: Offline mode, checking cached session");
+        try {
+          const { value: storedSessionStr } = await Preferences.get({ key: STORAGE_KEY });
+          if (storedSessionStr) {
+            const storedSession = JSON.parse(storedSessionStr);
+            
+            // Also load cached user profile
+            const { value: cachedUserStr } = await Preferences.get({
+              key: `user_profile_${storedSession.user.id}`
+            });
+            
+            if (cachedUserStr) {
+              const cachedUser = JSON.parse(cachedUserStr);
+              const cachedEmail = cachedUser.email;
+              
+              // Basic offline validation - just check if emails match
+              // In a real app, we'd want more secure offline auth
+              if (cachedEmail === email) {
+                console.log("handleSignIn: Offline login successful with cached credentials");
+                
+                // Update login history to mark success
+                loginHistory[loginHistory.length - 1].success = true;
+                await Preferences.set({
+                  key: 'login_history',
+                  value: JSON.stringify(loginHistory)
+                });
+                
+                setState(prevState => ({
+                  ...prevState,
+                  user: cachedUser,
+                  session: storedSession,
+                  loading: false,
+                  error: null,
+                }));
+                
+                return {
+                  user: cachedUser,
+                  error: null
+                };
+              }
+            }
+            
+            // If we reach here, offline login failed
+            const offlineError = new Error("Offline login failed. Please ensure you've logged in at least once with internet connection.");
+            setState(prevState => ({ ...prevState, loading: false, error: offlineError.message }));
+            return { user: null, error: offlineError };
+          }
+        } catch (offlineError) {
+          console.error("handleSignIn: Error during offline login:", offlineError);
+          setState(prevState => ({
+            ...prevState,
+            loading: false,
+            error: "Offline login failed. No cached session available."
+          }));
+          return {
+            user: null,
+            error: offlineError instanceof Error
+              ? offlineError
+              : new Error("Offline login failed")
+          };
+        }
+      }
       
-      // Get the user profile
-      const user = await fetchUserProfile(data.user.id);
+      // Online login with Supabase
+      console.log("handleSignIn: Online mode, calling Supabase auth");
+      const authResponse = await promiseWithTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15000, // 15 second timeout
+        "Supabase auth login request timed out"
+      );
       
-      // Update state with the new session and user
-      setState((prev: AuthState) => ({
-        ...prev,
-        user,
+      const { data, error } = authResponse;
+      
+      if (error) {
+        console.error("handleSignIn: Error signing in with Supabase:", error);
+        setState(prevState => ({ ...prevState, loading: false, error: error.message }));
+        return { user: null, error };
+      }
+      
+      if (!data.user || !data.session) {
+        const noUserError = new Error("No user or session returned from Supabase auth");
+        console.error("handleSignIn: No user returned in auth response");
+        setState(prevState => ({ ...prevState, loading: false, error: noUserError.message }));
+        return { user: null, error: noUserError };
+      }
+      
+      console.log("handleSignIn: Supabase auth successful, getting full user profile");
+      
+      // Update login history to mark success
+      loginHistory[loginHistory.length - 1].success = true;
+      await Preferences.set({
+        key: 'login_history',
+        value: JSON.stringify(loginHistory)
+      });
+      
+      // Store session in Preferences for offline use if rememberMe is true
+      if (rememberMe) {
+        // Add timestamp information to ensure we can track the 30-day expiration
+        const sessionWithMetadata = {
+          ...data.session,
+          created_at: new Date().toISOString(),
+          local_expiry: new Date(Date.now() + SESSION_EXPIRATION).toISOString()
+        };
+        
+        await Preferences.set({
+          key: STORAGE_KEY,
+          value: JSON.stringify(sessionWithMetadata)
+        });
+        
+        console.log("handleSignIn: Session stored with 30-day local expiration date:", sessionWithMetadata.local_expiry);
+      }
+      
+      // Get full user profile with location data and permissions
+      let userProfile: ExtendedUser;
+      try {
+        userProfile = await fetchUserProfile(data.user.id);
+        
+        // Store user profile for offline use
+        await Preferences.set({
+          key: `user_profile_${data.user.id}`,
+          value: JSON.stringify({
+            ...userProfile,
+            cached_at: new Date().toISOString()
+          })
+        });
+        
+        console.log("handleSignIn: User profile fetched and cached successfully");
+      } catch (profileError) {
+        console.warn("handleSignIn: Error fetching full profile, using basic user data", profileError);
+        // Still continue with basic user info if profile fetch fails
+        userProfile = {
+          id: data.user.id,
+          auth_id: data.user.id,
+          first_name: data.user.user_metadata?.first_name || '',
+          last_name: data.user.user_metadata?.last_name || '',
+          email: data.user.email || null,
+          phone: data.user.phone || null,
+          role: (data.user.user_metadata?.role || 'viewer') as UserRole,
+          position: (data.user.user_metadata?.position || 'field_agent') as UserPosition,
+          status: (data.user.user_metadata?.status || 'active') as UserStatus,
+          created_at: data.user.created_at || new Date().toISOString(),
+          updated_at: data.user.updated_at || new Date().toISOString(),
+          last_login_at: data.user.last_sign_in_at || new Date().toISOString(),
+          avatar_url: data.user.user_metadata?.avatar_url || '',
+          metadata: data.user.user_metadata || {},
+          permissions: data.user.user_metadata?.permissions || [],
+          cached_at: new Date().toISOString()
+        };
+        
+        // Still cache the basic user profile
+        await Preferences.set({
+          key: `user_profile_${data.user.id}`,
+          value: JSON.stringify(userProfile)
+        });
+      }
+      
+      setState(prevState => ({
+        ...prevState,
+        user: userProfile,
         session: data.session,
         loading: false,
         error: null,
       }));
       
-      return { 
-        user,
-        error: null 
-      };
-    } catch (error) {
-      console.error('Sign in error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
-      setState((prev: AuthState) => ({
-        ...prev,
+      return { user: userProfile, error: null };
+      
+    } catch (unexpectedError) {
+      console.error("handleSignIn: Unexpected error during sign in:", unexpectedError);
+      setState(prevState => ({
+        ...prevState,
         loading: false,
-        error: errorMessage,
+        error: unexpectedError instanceof Error ? unexpectedError.message : "An unexpected error occurred"
       }));
-      return { 
-        user: null, 
-        error: error instanceof Error ? error : new Error(errorMessage) 
+      return {
+        user: null,
+        error: unexpectedError instanceof Error ? unexpectedError : new Error("Unknown error during sign in")
       };
     }
-  }, [setState]);
-
-  // Handle sign out
-  const handleSignOut = useCallback(async () => {
+  }, [setState, isOnline, fetchUserProfile]);
+  
+  // Sign out handler
+  const handleSignOut = useCallback(async (): Promise<{ error: Error | null }> => {
+    console.log("handleSignOut: Signing out user");
+    setState(prevState => ({ ...prevState, loading: true, error: null }));
+    
     try {
-      setState((prev: AuthState) => ({ ...prev, loading: true, error: null }));
+      // Record sign out in login history
+      const { value: loginHistoryStr } = await Preferences.get({ key: 'login_history' });
+      const loginHistory = loginHistoryStr ? JSON.parse(loginHistoryStr) : [];
       
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      loginHistory.push({
+        timestamp: new Date().toISOString(),
+        event: 'signout',
+        online: isOnline,
+        userId: state.user?.id || null
+      });
       
-      setState((prev: AuthState) => ({
-        ...prev,
+      await Preferences.set({
+        key: 'login_history',
+        value: JSON.stringify(loginHistory)
+      });
+      
+      // If online, sign out from Supabase
+      if (isOnline) {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      }
+      
+      // Always remove cached session
+      await Preferences.remove({ key: STORAGE_KEY });
+      
+      // Don't remove cached user profiles to allow offline login later
+      
+      setState({
         user: null,
         session: null,
         loading: false,
-      }));
+        error: null,
+        initialized: true,
+      });
       
       return { error: null };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
-      setState((prev: AuthState) => ({
-        ...prev,
+      console.error('Error signing out:', error);
+      
+      setState(prevState => ({
+        ...prevState,
         loading: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : "Error signing out"
       }));
-      return { 
-        error: error instanceof Error ? error : new Error(errorMessage) 
-      };
+      
+      return { error: error instanceof Error ? error : new Error("Error signing out") };
     }
-  }, []);
-
-  // Handle password reset
-  const handleResetPassword = useCallback(async (email: string) => {
+  }, [setState, isOnline, state.user]);
+  
+  // Reset password
+  const handleResetPassword = useCallback(async (email: string): Promise<{ error: Error | null }> => {
+    console.log("handleResetPassword: Requesting password reset for:", email);
+    setState(prevState => ({ ...prevState, loading: true, error: null }));
+    
     try {
-      setState((prev: AuthState) => ({ ...prev, loading: true, error: null }));
+      if (!isOnline) {
+        throw new Error("Cannot reset password while offline");
+      }
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: window.location.origin + '/reset-password',
       });
       
       if (error) throw error;
       
-      setState((prev: AuthState) => ({
-        ...prev,
-        loading: false,
-        error: null,
-      }));
-      
+      setState(prevState => ({ ...prevState, loading: false }));
       return { error: null };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to reset password';
-      setState((prev: AuthState) => ({
-        ...prev,
+      console.error('Error resetting password:', error);
+      
+      setState(prevState => ({
+        ...prevState,
         loading: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : "Error resetting password"
       }));
-      return { 
-        error: error instanceof Error ? error : new Error(errorMessage) 
-      };
+      
+      return { error: error instanceof Error ? error : new Error("Error resetting password") };
     }
-  }, []);
-
-  // Handle password update
-  const handleUpdatePassword = useCallback(async (newPassword: string) => {
+  }, [setState, isOnline]);
+  
+  // Update password
+  const handleUpdatePassword = useCallback(async (newPassword: string): Promise<{ error: Error | null }> => {
+    console.log("handleUpdatePassword: Updating password");
+    setState(prevState => ({ ...prevState, loading: true, error: null }));
+    
     try {
-      setState((prev: AuthState) => ({ ...prev, loading: true, error: null }));
+      if (!isOnline) {
+        throw new Error("Cannot update password while offline");
+      }
       
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
@@ -424,26 +830,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (error) throw error;
       
-      setState((prev: AuthState) => ({
-        ...prev,
-        loading: false,
-        error: null,
-      }));
-      
+      setState(prevState => ({ ...prevState, loading: false }));
       return { error: null };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update password';
-      setState((prev: AuthState) => ({
-        ...prev,
+      console.error('Error updating password:', error);
+      
+      setState(prevState => ({
+        ...prevState,
         loading: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : "Error updating password"
       }));
-      return { 
-        error: error instanceof Error ? error : new Error(errorMessage) 
-      };
+      
+      return { error: error instanceof Error ? error : new Error("Error updating password") };
     }
+  }, [setState, isOnline]);
+  
+  // Navigation setter
+  const setNavigation = useCallback((nav: (to: string) => void) => {
+    setNavigate(() => nav);
   }, []);
-
+  
   // Refresh user data
   const refreshUser = useCallback(async () => {
     try {
@@ -460,13 +866,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Error refreshing user:', error);
       throw error;
     }
-  }, [setState]);
+  }, [setState, fetchUserProfile]);
 
   // Permission checks
   const isAdmin = useMemo(() => state.user?.role === 'admin', [state.user]);
   const isManager = useMemo(() => state.user?.role === 'manager', [state.user]);
   const isDataCollector = useMemo(() => state.user?.role === 'data_collector', [state.user]);
-  const isViewer = useMemo(() => state.user?.role === 'viewer', [state.user]);
 
   const canCreateUserWithRole = useCallback((role: UserRole): boolean => {
     if (!state.user) return false;
@@ -544,6 +949,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     canEditReports,
     hasPermission,
     navigate,
+    setNavigation
   ]);
 
   if (!state.initialized) {

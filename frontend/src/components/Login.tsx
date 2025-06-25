@@ -37,6 +37,7 @@ const logLoginAttempt = async (identifier: string, status: 'success' | 'failed')
     const ip = ipInfo && typeof ipInfo === 'object' && ipInfo !== null && 'ip' in ipInfo ? ipInfo.ip : null;
     const userAgent = browserInfo && typeof browserInfo === 'object' && browserInfo !== null && 'user_agent' in browserInfo ? browserInfo.user_agent : null;
     const loginData = {
+      user_identifier: identifier,
       email: isEmail ? identifier : null,
       phone: !isEmail ? identifier : null,
       login_type: isEmail ? 'email' : 'phone',
@@ -69,13 +70,18 @@ export default function Login() {
   const { signIn, error: authError } = useAuth();
 
   useEffect(() => {
-    // Only check connection to show error if connection fails
+    // Only check connection for informational purposes
     const checkConnection = async () => {
-      const isConnected = await checkSupabaseConnection();
-      if (!isConnected) {
-        toast.error("Failed to connect to Supabase. Please check your configuration.");
+      try {
+        const isConnected = await checkSupabaseConnection();
+        // Don't show any errors about connectivity - app will work offline
+        if (!isConnected) {
+          console.log("Working in offline mode");
+        }
+      } catch (error) {
+        // Silently handle connection errors
+        console.log("Connection check error, continuing in offline mode if possible");
       }
-      // Success message removed to prevent showing on every refresh
     };
     checkConnection();
   }, []);
@@ -104,9 +110,12 @@ export default function Login() {
 
       console.log('Starting login process for:', identifier);
 
+      // Always set the rememberMe flag to true for 30-day persistence
+      const shouldRemember = true; // Force remember me to be true for offline support
+      
       // Attempt to sign in
-      console.log('Calling signIn with:', { identifier });
-      const { user, error } = await signIn(identifier, password, rememberMe);
+      console.log('Calling signIn with:', { identifier, shouldRemember });
+      const { user, error } = await signIn(identifier, password, shouldRemember);
       console.log('Sign in result:', { user, error });
       
       if (error) {
@@ -117,8 +126,12 @@ export default function Login() {
         throw new Error('No user data received after login');
       }
 
-      // Log successful login attempt
-      await logLoginAttempt(identifier, 'success');
+      // Try to log successful login attempt - don't fail if this doesn't work offline
+      try {
+        await logLoginAttempt(identifier, 'success');
+      } catch (logError) {
+        console.log('Unable to log login attempt (possibly offline)');
+      }
       
       // Always redirect to home page after login regardless of previous location
       const redirectPath = '/';

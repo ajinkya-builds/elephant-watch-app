@@ -1,0 +1,5 @@
+{
+  "appId": "com.elephantwatch.app",
+  "appName": "ElephantWatchApp",
+  "webDir": "frontend/dist"
+}

@@ -36,7 +36,7 @@ config/database.config.js
 *.json
 
 # Android build files (removed but keeping in .gitignore for reference)
-android/
+# android/
 
 # iOS build files (removed but keeping in .gitignore for reference)
 ios/
@@ -76,3 +76,7 @@ yarn-error.log
 .DS_Store
 Thumbs.db
 node_modules
+
+# Capacitor
+!capacitor.config.json
+!capacitor.config.ts

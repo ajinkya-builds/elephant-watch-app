@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
   }
   console.log('All required environment variables are present');
 
-  const base = mode === 'production' ? '/elephant-watch-app/' : '/';
+  const base = '/';
 
   return {
     base,
@@ -38,8 +38,8 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'Elephant Watch',
-          short_name: 'Elephant Watch',
-          description: 'Track and report elephant activities',
+          short_name: 'EWatch',
+          description: 'Elephant Watch Application',
           theme_color: '#ffffff',
           start_url: base,
           scope: base,
@@ -61,6 +61,24 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+        'react': path.resolve(__dirname, '../node_modules/react'),
+        'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
+      },
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        '@emotion/react',
+        '@emotion/styled',
+        '@radix-ui/react-*',
+      ],
+      esbuildOptions: {
+        // Ensure JSX is handled properly
+        loader: {
+          '.js': 'jsx',
+        },
       },
     },
     build: {
@@ -70,14 +88,20 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor': ['react', 'react-dom', 'react-router-dom'],
-            'ui': ['@radix-ui/react-icons', '@radix-ui/react-slot', 'class-variance-authority', 'clsx', 'tailwind-merge'],
-            'charts': ['recharts'],
-            'supabase': ['@supabase/supabase-js']
-          }
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              if (id.includes('@radix-ui')) {
+                return 'radix';
+              }
+              return 'vendor';
+            }
+          },
         }
-      }
+      },
+      commonjsOptions: {
+        include: [/node_modules/],
+        transformMixedEsModules: true,
+      },
     },
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
