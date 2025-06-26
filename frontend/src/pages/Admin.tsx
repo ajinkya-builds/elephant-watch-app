@@ -1,6 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Users, FileText, Settings, Activity, AlertCircle } from "lucide-react";
+import { AndroidCard } from "@/components/ui/android-card";
+import { useAndroidTheme } from "@/theme/AndroidThemeProvider";
+import { applyThemeClasses } from "@/theme/AndroidThemeUtils";
+import { cn } from "@/lib/utils";
 
 const adminCards = [
   {
@@ -8,80 +11,95 @@ const adminCards = [
     description: "Add, edit, or remove users. Assign roles and manage permissions.",
     icon: <Users className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('users'),
-    color: "from-blue-600 to-green-600",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
+    color: "primary",
   },
   {
     title: "Observation & Report Management",
     description: "View, edit, or delete observations and reports submitted by users.",
     icon: <FileText className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('observations'),
-    color: "from-blue-600 to-green-600",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
+    color: "secondary",
   },
   {
     title: "System Settings",
     description: "Configure system settings, notifications, and maintenance.",
     icon: <Settings className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('settings'),
-    color: "from-blue-600 to-green-600",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
+    color: "tertiary",
   },
   {
     title: "Activity Dashboard",
     description: "View detailed statistics and activity reports.",
     icon: <Activity className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('statistics'),
-    color: "from-blue-600 to-green-600",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
+    color: "primary",
   },
   {
     title: "Alerts & Notifications",
     description: "Manage system alerts and notification settings.",
     icon: <AlertCircle className="h-6 w-6" />,
     onClick: (navigate: any) => navigate('notifications'),
-    color: "from-blue-600 to-green-600",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
+    color: "secondary",
   },
 ];
 
 export default function Admin() {
   const navigate = useNavigate();
+  const { theme } = useAndroidTheme();
+  
+  // Apply Android theme styling
+  const containerClasses = applyThemeClasses(theme, 'bg-background text-onBackground');
+  const headerClasses = applyThemeClasses(theme, 'text-onSurface');
+  const subtitleClasses = applyThemeClasses(theme, 'text-onSurfaceVariant');
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 py-12">
-      <div className="container mx-auto p-2 sm:p-4">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent tracking-tight mb-3">Admin Panel</h1>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+    <div className={cn("min-h-screen py-8 bg-gradient-to-b from-[#f8fafc] to-[#e8f1fe]/30", containerClasses)}>
+      <div className="container mx-auto px-4">
+        <div className="mb-12">
+          <h1 className={cn(theme.typography.displaySmall, headerClasses, "mb-3 font-light tracking-tight")}>
+            Admin Panel
+          </h1>
+          <p className={cn(theme.typography.bodyLarge, subtitleClasses, "max-w-2xl opacity-80 text-gray-700 dark:text-gray-300")}>
             Manage your application's core functions and monitor system performance
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {adminCards.map((card) => (
-            <Card
+            <AndroidCard
               key={card.title}
-              className="group cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-blue-100"
+              variant="elevated"
+              className={cn(
+                "cursor-pointer transition-all duration-300 hover:shadow-lg border-0 shadow-md overflow-hidden",
+                applyThemeClasses(theme, 'bg-surface text-onSurface')
+              )}
               onClick={() => card.onClick(navigate)}
             >
-              <CardHeader className="pb-4">
+              <AndroidCard.Header className="pb-2">
                 <div className="flex items-center gap-4">
-                  <div className={`${card.iconBg} p-3 rounded-xl`}>
-                    <div className={card.iconColor}>{card.icon}</div>
+                  <div className={cn(
+                    "p-3.5 rounded-full bg-white/80 shadow-sm", 
+                    `border border-${card.color}/10 text-${card.color}`
+                  )}>
+                    {card.icon}
                   </div>
-                  <CardTitle className="text-xl font-semibold text-gray-900">{card.title}</CardTitle>
+                  <AndroidCard.Title className={theme.typography.titleLarge}>
+                    {card.title}
+                  </AndroidCard.Title>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">{card.description}</p>
-                <div className={`mt-4 h-1 w-full bg-gradient-to-r ${card.color} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-              </CardContent>
-            </Card>
+              </AndroidCard.Header>
+              <AndroidCard.Content>
+                <AndroidCard.Description className="text-gray-600 dark:text-gray-300 mb-4">
+                  {card.description}
+                </AndroidCard.Description>
+              </AndroidCard.Content>
+              <AndroidCard.Footer>
+                <div className={cn(
+                  "h-1.5 w-full rounded-full", 
+                  `bg-${card.color} bg-opacity-80`
+                )} />
+              </AndroidCard.Footer>
+            </AndroidCard>
           ))}
         </div>
       </div>

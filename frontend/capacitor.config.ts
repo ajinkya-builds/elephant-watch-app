@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.elephantwatch.app',
-  appName: 'ElephantWatchApp',
+  appId: 'com.eravat.app',
+  appName: 'Eravat',
   webDir: 'dist',
   // Use bundled assets instead of trying to load from localhost
   // This ensures the app works offline and doesn't try to make network requests during startup

@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ActivityReportStepper } from "@/components/ActivityReportStepper";
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
 import { useAuth } from '@/contexts/NewAuthContext';
 import { ActivityReport } from '@/types/activity-report';
-import { Card } from "@/components/ui/card";
 import { AlertCircle, CloudOff, Wifi } from "lucide-react";
 import { submitActivityReport, syncPendingReports } from '@/utils/offlineStorage';
 import { isOnline, initNetworkMonitoring } from '@/utils/networkUtils';
 import { logger } from '@/utils/loggerService';
+import { AndroidCard } from '@/components/ui/android-card';
+import { useAndroidTheme } from '@/theme/AndroidThemeProvider';
+import { applyThemeClasses } from '@/theme/AndroidThemeUtils';
+import { cn } from '@/lib/utils';
 
 
 const ReportActivityPage = () => {
@@ -17,6 +20,7 @@ const ReportActivityPage = () => {
   const [pendingReports, setPendingReports] = useState<number>(0);
   const { user, loading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
+  const { theme } = useAndroidTheme();
 
   // Check authentication status
   useEffect(() => {
@@ -97,92 +101,130 @@ const ReportActivityPage = () => {
     }
   };
 
+  // Apply Android theme classes
+  const containerClasses = applyThemeClasses(theme, 'bg-background text-onBackground');
+  const headerClasses = applyThemeClasses(theme, 'text-onSurface');
+  const subtitleClasses = applyThemeClasses(theme, 'text-onSurfaceVariant');
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto p-2 sm:p-4">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
+    <div className={cn("min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e8f1fe]/30", containerClasses)}>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header className="mb-10 sm:mb-12">
+          <h1 className={cn("font-light tracking-tight", headerClasses, theme.typography.headlineLarge)}>
             Wild Elephant Monitoring System
           </h1>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-600">
+          <h2 className={cn("mt-2 opacity-80", subtitleClasses, theme.typography.titleLarge)}>
             जंगली हाथी निगरानी प्रणाली (2025)
           </h2>
           
-          {/* Network Status Indicator */}
-          <div className="mt-2 flex items-center">
+          {/* Network Status Indicator - Android style chip */}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             {networkStatus === null ? (
-              <span className="inline-flex items-center text-gray-500">
-                <AlertCircle className="h-4 w-4 mr-1" />
-                <span className="text-sm">Checking network status...</span>
-              </span>
+              <div className={cn(
+                "inline-flex items-center px-4 py-1.5 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 backdrop-blur-sm", 
+                applyThemeClasses(theme, 'bg-surfaceVariant/50 text-onSurfaceVariant')
+              )}>
+                <AlertCircle className="h-4 w-4 mr-2" />
+                <span className={theme.typography.labelLarge}>Checking network status...</span>
+              </div>
             ) : networkStatus ? (
-              <span className="inline-flex items-center text-green-600">
-                <Wifi className="h-4 w-4 mr-1" />
-                <span className="text-sm">Online Mode</span>
-              </span>
+              <div className={cn(
+                "inline-flex items-center px-4 py-1.5 rounded-full shadow-sm border border-green-100 dark:border-green-800 backdrop-blur-sm", 
+                "bg-green-50/80 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+              )}>
+                <Wifi className="h-4 w-4 mr-2" />
+                <span className={theme.typography.labelLarge}>Online Mode</span>
+              </div>
             ) : (
-              <span className="inline-flex items-center text-amber-600">
-                <CloudOff className="h-4 w-4 mr-1" />
-                <span className="text-sm">Offline Mode</span>
+              <div className="flex flex-wrap gap-3">
+                <div className={cn(
+                  "inline-flex items-center px-4 py-1.5 rounded-full shadow-sm border border-amber-100 dark:border-amber-800 backdrop-blur-sm", 
+                  "bg-amber-50/80 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+                )}>
+                  <CloudOff className="h-4 w-4 mr-2" />
+                  <span className={theme.typography.labelLarge}>Offline Mode</span>
+                </div>
                 {pendingReports > 0 && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                    {pendingReports} pending
-                  </span>
+                  <div className={cn(
+                    "inline-flex items-center px-4 py-1.5 rounded-full shadow-sm border border-blue-100 dark:border-blue-800 backdrop-blur-sm", 
+                    "bg-blue-50/80 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                  )}>
+                    <span className={theme.typography.labelLarge}>{pendingReports} pending</span>
+                  </div>
                 )}
-              </span>
+              </div>
             )}
           </div>
         </header>
 
-
-
-        <Card className="mb-8 overflow-hidden border border-blue-100 bg-white shadow-sm">
-          <div className="p-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">निर्देश / Instructions:</h3>
-                <ul className="space-y-3 text-gray-600">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600">•</span>
-                    <span>
-                      इस फॉर्म को चार चरणों में पूरा करें: तारीख/समय और स्थान, अवलोकन का प्रकार, कम्पास बेयरिंग, और फोटो।
-                      <br />
-                      <span className="text-gray-500">Complete this form in four steps: Date/Time & Location, Type of Observation, Compass Bearing, and Photo.</span>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600">•</span>
-                    <span>
-                      प्रत्येक चरण में आवश्यक जानकारी भरें और 'Next' बटन पर क्लिक करें। पिछले चरण पर जाने के लिए 'Previous' बटन का उपयोग करें।
-                      <br />
-                      <span className="text-gray-500">Fill in the required information in each step and click 'Next'. Use 'Previous' to go back to earlier steps.</span>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600">•</span>
-                    <span>
-                      GPS लोकेशन को Degree Decimal फॉर्मेट में भरें (उदाहरण: 23.4536 81.4763)। सटीक स्थान महत्वपूर्ण है।
-                      <br />
-                      <span className="text-gray-500">Enter GPS location in Degree Decimal format (Example: 23.4536 81.4763). Accurate location is crucial.</span>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600">•</span>
-                    <span>
-                      अवलोकन के प्रकार के अनुसार, हाथियों की संख्या या अप्रत्यक्ष साक्ष्य का विवरण दें।
-                      <br />
-                      <span className="text-gray-500">Based on observation type, provide elephant count or indirect evidence details.</span>
-                    </span>
-                  </li>
-                </ul>
+        <AndroidCard 
+          variant="elevated" 
+          className="mb-10 overflow-hidden shadow-md border border-slate-100 dark:border-slate-800 transition-all duration-300 hover:shadow-lg"
+        >
+          <AndroidCard.Header className="border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800">
+                <AlertCircle className={cn("h-5 w-5 flex-shrink-0", applyThemeClasses(theme, 'text-primary'))} />
               </div>
+              <AndroidCard.Title className={cn(theme.typography.titleLarge, "font-light tracking-tight")}>
+                निर्देश / Instructions
+              </AndroidCard.Title>
             </div>
-          </div>
-        </Card>
+          </AndroidCard.Header>
+          <AndroidCard.Content className="pt-5">
+            <ul className={cn("space-y-5", applyThemeClasses(theme, 'text-onSurfaceVariant'))}>  
+              <li className="flex items-start gap-3">
+                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-sm", applyThemeClasses(theme, 'bg-primary text-onPrimary'))}>1</span>
+                <div>
+                  <p className={cn(theme.typography.bodyLarge, "mb-1 text-gray-800 dark:text-gray-200")}>
+                    इस फॉर्म को चार चरणों में पूरा करें: तारीख/समय और स्थान, अवलोकन का प्रकार, कम्पास बेयरिंग, और फोटो।
+                  </p>
+                  <p className={cn(theme.typography.bodyMedium, "opacity-80", applyThemeClasses(theme, 'text-onSurfaceVariant'))}>
+                    Complete this form in four steps: Date/Time & Location, Type of Observation, Compass Bearing, and Photo.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-sm", applyThemeClasses(theme, 'bg-primary text-onPrimary'))}>2</span>
+                <div>
+                  <p className={cn(theme.typography.bodyLarge, "mb-1 text-gray-800 dark:text-gray-200")}>
+                    प्रत्येक चरण में आवश्यक जानकारी भरें और 'Next' बटन पर क्लिक करें। पिछले चरण पर जाने के लिए 'Previous' बटन का उपयोग करें।
+                  </p>
+                  <p className={cn(theme.typography.bodyMedium, "opacity-80", applyThemeClasses(theme, 'text-onSurfaceVariant'))}>
+                    Fill in the required information in each step and click 'Next'. Use 'Previous' to go back to earlier steps.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-sm", applyThemeClasses(theme, 'bg-primary text-onPrimary'))}>3</span>
+                <div>
+                  <p className={cn(theme.typography.bodyLarge, "mb-1 text-gray-800 dark:text-gray-200")}>
+                    GPS लोकेशन को Degree Decimal फॉर्मेट में भरें (उदाहरण: 23.4536 81.4763)। सटीक स्थान महत्वपूर्ण है।
+                  </p>
+                  <p className={cn(theme.typography.bodyMedium, "opacity-80", applyThemeClasses(theme, 'text-onSurfaceVariant'))}>
+                    Enter GPS location in Degree Decimal format (Example: 23.4536 81.4763). Accurate location is crucial.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-sm", applyThemeClasses(theme, 'bg-primary text-onPrimary'))}>4</span>
+                <div>
+                  <p className={cn(theme.typography.bodyLarge, "mb-1 text-gray-800 dark:text-gray-200")}>
+                    अवलोकन के प्रकार के अनुसार, हाथियों की संख्या या अप्रत्यक्ष साक्ष्य का विवरण दें।
+                  </p>
+                  <p className={cn(theme.typography.bodyMedium, applyThemeClasses(theme, 'text-onSurfaceVariant'))}>
+                    Based on the type of observation, provide details on the number of elephants or indirect evidence.
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </AndroidCard.Content>
+        </AndroidCard>
 
         <main className="max-w-4xl mx-auto">
-          <ActivityReportStepper onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-lg p-5 shadow-md border border-slate-100 dark:border-slate-800 transition-all duration-300">
+            <ActivityReportStepper onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+          </div>
         </main>
       </div>
     </div>

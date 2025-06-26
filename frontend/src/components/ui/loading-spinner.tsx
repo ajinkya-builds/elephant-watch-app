@@ -17,8 +17,8 @@ export function LoadingSpinner({
   const sizeMap = {
     sm: "h-4 w-4",
     md: "h-6 w-6",
-    lg: "h-8 w-8",
-    xl: "h-12 w-12",
+    lg: "h-10 w-10",
+    xl: "h-16 w-16",
   }
 
   const textSizeMap = {
@@ -38,12 +38,12 @@ export function LoadingSpinner({
     >
       <Loader2
         className={cn(
-          "animate-spin text-primary",
+          "animate-spin text-blue-500 drop-shadow-sm",
           sizeMap[size]
         )}
       />
       {text && (
-        <p className={cn("text-muted-foreground", textSizeMap[size])}>
+        <p className={cn("text-gray-600 font-medium", textSizeMap[size])}>
           {text}
         </p>
       )}

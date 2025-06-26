@@ -166,7 +166,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     ]);
   };
 
-  const fetchUserProfile = useCallback(async (userId: string): Promise<ExtendedUser> => {
+  const fetchUserProfile = useCallback(async (userId: string): Promise<ExtendedUser | null> => {
     console.log("Checking Supabase connection (will continue offline if unavailable)...", userId);
     console.log("fetchUserProfile: Checking for cached user data first...");
     
@@ -197,11 +197,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (userError) {
         console.error("fetchUserProfile: Error from supabase.auth.getUser():", userError);
-        throw userError;
+        // If it's an AuthSessionMissingError, treat it as no user logged in
+        if (userError.name === 'AuthSessionMissingError') {
+          console.warn("fetchUserProfile: Auth session missing. Treating as no user logged in.");
+          return null; // Return null to indicate no active user
+        } else {
+          throw userError; // Re-throw other unexpected errors
+        }
       }
       if (!supabaseUser) {
-        console.warn("fetchUserProfile: No user returned from supabase.auth.getUser().");
-        throw new Error("No user returned from Supabase auth.");
+        console.warn("fetchUserProfile: No user returned from supabase.auth.getUser(). Treating as no user logged in.");
+        return null; // Return null to indicate no active user
       }
 
       // Fetch profile data with timeout
@@ -315,13 +321,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               } else {
                 // Online mode - try to validate with Supabase
                 try {
-                  await supabase.auth.setSession(parsedSession);
-                  session = parsedSession; // Assign to the outer-scoped session
-                  console.log("AuthProvider: Session restored and validated with Supabase.");
+                  // Only attempt to set session if it's not null and has an access_token
+                  if (parsedSession && parsedSession.access_token) {
+                    await supabase.auth.setSession(parsedSession);
+                    session = parsedSession; // Assign to the outer-scoped session
+                    console.log("AuthProvider: Session restored and validated with Supabase.");
+                  } else {
+                    console.warn("AuthProvider: Parsed session is invalid or missing access_token. Not setting session.");
+                    await Preferences.remove({ key: STORAGE_KEY });
+                  }
                 } catch (validationError) {
-                  // Even if online validation fails, keep the session if within 30 days
-                  console.log("AuthProvider: Online validation failed, but session is within 30 days. Keeping session.");
-                  session = parsedSession;
+                  console.error("AuthProvider: Error validating session with Supabase:", validationError);
+                  if (validationError instanceof Error && validationError.name === 'AuthSessionMissingError') {
+                    console.log("AuthProvider: AuthSessionMissingError during validation. Clearing session.");
+                    await Preferences.remove({ key: STORAGE_KEY });
+                    session = null; // Explicitly clear session
+                  } else {
+                    // Even if online validation fails, keep the session if within 30 days
+                    console.log("AuthProvider: Online validation failed, but session is within 30 days. Keeping session.");
+                    session = parsedSession;
+                  }
                 }
               }
             } else {
@@ -339,12 +358,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!session && onlineStatus) {
           console.log("AuthProvider: No session from preferences, attempting to get from Supabase...");
           try {
-            const { data: { session: currentSession } } = await supabase.auth.getSession();
-            console.log("AuthProvider: supabase.auth.getSession completed. Session exists:", !!currentSession);
-            session = currentSession;
-            console.log("AuthProvider: Fetched session from Supabase.");
+            const { data: { session: currentSession }, error: getSessionError } = await supabase.auth.getSession();
+            if (getSessionError) {
+              console.error("AuthProvider: Error getting session from Supabase:", getSessionError);
+              if (getSessionError.name === 'AuthSessionMissingError') {
+                console.log("AuthProvider: AuthSessionMissingError when getting session. Clearing session.");
+                await Preferences.remove({ key: STORAGE_KEY });
+                session = null; // Explicitly clear session
+              }
+            } else {
+              console.log("AuthProvider: supabase.auth.getSession completed. Session exists:", !!currentSession);
+              session = currentSession;
+              console.log("AuthProvider: Fetched session from Supabase.");
+            }
           } catch (error) {
-            console.warn("AuthProvider: Failed to get session from Supabase (possibly network issue):");
+            console.warn("AuthProvider: Failed to get session from Supabase (possibly network issue or unexpected error):");
           }
         }
 
@@ -661,10 +689,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       
       // Get full user profile with location data and permissions
-      let userProfile: ExtendedUser;
+      let userProfile: ExtendedUser | null = null;
       try {
         userProfile = await fetchUserProfile(data.user.id);
         
+        if (!userProfile) {
+          console.warn("handleSignIn: fetchUserProfile returned null. User profile not found or session invalid.");
+          // If userProfile is null, it means there's no active user or session.
+          // We should clear any potentially lingering session and return an error.
+          await Preferences.remove({ key: STORAGE_KEY });
+          setState(prevState => ({ ...prevState, loading: false, user: null, session: null, error: "User profile not found or session invalid." }));
+          return { user: null, error: new Error("User profile not found or session invalid.") };
+        }
+
         // Store user profile for offline use
         await Preferences.set({
           key: `user_profile_${data.user.id}`,

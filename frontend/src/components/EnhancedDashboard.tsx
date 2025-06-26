@@ -722,9 +722,11 @@ export const EnhancedDashboard: React.FC = () => {
   useEffect(() => {
     async function fetchActivityMarkers() {
       try {
+        // Note: activity_reports table doesn't have a beat_id column
+        // Using activity_observation view which maps to the correct columns
         const { data: markersData, error: markersError } = await supabase
           .from('activity_observation')
-          .select('id,latitude,longitude,observation_type,activity_date,activity_time,total_elephants,male_elephants,female_elephants,unknown_elephants,calves,indirect_sighting_type,loss_type,compass_bearing,photo_url,created_at,updated_at,division_id,range_id,beat_id,division_name,range_name,beat_name')
+          .select('id,latitude,longitude,observation_type,activity_date,activity_time,total_elephants,male_elephants,female_elephants,unknown_elephants,calves,indirect_sighting_type,loss_type,compass_bearing,photo_url,created_at,updated_at,division_id,range_id,division_name,range_name,beat_name')
           .order('created_at', { ascending: false });
 
         if (markersError) {
@@ -759,7 +761,7 @@ export const EnhancedDashboard: React.FC = () => {
             updated_at: typeof marker.updated_at === 'string' ? marker.updated_at : marker.updated_at != null && marker.updated_at !== undefined ? String(marker.updated_at) : '',
             division_id: typeof marker.division_id === 'string' ? marker.division_id : marker.division_id != null && marker.division_id !== undefined ? String(marker.division_id) : '',
             range_id: typeof marker.range_id === 'string' ? marker.range_id : marker.range_id != null && marker.range_id !== undefined ? String(marker.range_id) : '',
-            beat_id: typeof marker.beat_id === 'string' ? marker.beat_id : marker.beat_id != null && marker.beat_id !== undefined ? String(marker.beat_id) : '',
+            // Note: beat_id is not included as it doesn't exist in the activity_reports table
             division_name: typeof marker.division_name === 'string' ? marker.division_name : marker.division_name != null && marker.division_name !== undefined ? String(marker.division_name) : '',
             range_name: typeof marker.range_name === 'string' ? marker.range_name : marker.range_name != null && marker.range_name !== undefined ? String(marker.range_name) : '',
             beat_name: typeof marker.beat_name === 'string' ? marker.beat_name : marker.beat_name != null && marker.beat_name !== undefined ? String(marker.beat_name) : ''

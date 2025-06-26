@@ -162,9 +162,10 @@ export default function AdminObservations() {
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Location</TableHead>
+              <TableHead>Beat</TableHead>
+              <TableHead>Range</TableHead>
+              <TableHead>Division</TableHead>
               <TableHead>Count</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead>Created At</TableHead>
               <TableHead>Updated At</TableHead>
             </TableRow>
@@ -175,9 +176,10 @@ export default function AdminObservations() {
                 <TableCell>{observation.activity_date.toLocaleDateString()}</TableCell>
                 <TableCell>{observation.activity_time}</TableCell>
                 <TableCell>{observation.observation_type}</TableCell>
-                <TableCell>{`${observation.latitude}, ${observation.longitude}`}</TableCell>
+                <TableCell>{observation.beat_name || 'N/A'}</TableCell>
+                <TableCell>{observation.range_name || 'N/A'}</TableCell>
+                <TableCell>{observation.division_name || 'N/A'}</TableCell>
                 <TableCell>{observation.total_elephants || 0}</TableCell>
-                <TableCell>{observation.status}</TableCell>
                 <TableCell>{observation.created_at?.toLocaleString()}</TableCell>
                 <TableCell>{observation.updated_at?.toLocaleString()}</TableCell>
               </TableRow>

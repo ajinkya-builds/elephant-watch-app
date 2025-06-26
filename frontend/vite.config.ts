@@ -3,6 +3,52 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import type { Plugin } from 'vite';
+
+// Define Capacitor plugin names
+const capacitorPlugins = [
+  'app',
+  'camera',
+  'device',
+  'filesystem',
+  'geolocation',
+  'network',
+  'preferences',
+  'share',
+  'splash-screen',
+  'status-bar',
+  'storage',
+];
+
+// Create a Vite plugin to handle Capacitor imports
+function capacitorPlugin(): Plugin {
+  return {
+    name: 'vite-plugin-capacitor',
+    config() {
+      return {
+        optimizeDeps: {
+          exclude: capacitorPlugins.map(pkg => `@capacitor/${pkg}`),
+        },
+        ssr: {
+          noExternal: true,
+        },
+      };
+    },
+    resolveId(id: string) {
+      if (capacitorPlugins.some(pkg => id.startsWith(`@capacitor/${pkg}`))) {
+        return id;
+      }
+      return null;
+    },
+    load(id: string) {
+      if (capacitorPlugins.some(pkg => id.startsWith(`@capacitor/${pkg}`))) {
+        const pluginName = id.split('/').pop()?.replace('@', '');
+        return `export default window.Capacitor?.Plugins?.${pluginName} || {};`;
+      }
+      return null;
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   console.log('Starting Vite configuration...');
@@ -32,6 +78,7 @@ export default defineConfig(({ mode }) => {
   return {
     base,
     plugins: [
+      capacitorPlugin(),
       react(),
       VitePWA({
         registerType: 'autoUpdate',
@@ -97,7 +144,7 @@ export default defineConfig(({ mode }) => {
             }
           },
         },
-        external: ['@capacitor/network', '@capacitor/device']
+        external: []
       },
       commonjsOptions: {
         include: [/node_modules/],

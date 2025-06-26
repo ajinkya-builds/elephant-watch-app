@@ -24,7 +24,9 @@ The project is organized into two main directories:
 ## Technology Stack
 
 - **Frontend**: React with TypeScript
-- **UI Framework**: Tailwind CSS with shadcn/ui components
+- **UI Framework**: 
+  - Tailwind CSS with shadcn/ui components
+  - Material Design 3 theming for Android
 - **Routing**: React Router
 - **Form Management**: React Hook Form with Zod validation
 - **Database**: Supabase (PostgreSQL)
@@ -94,6 +96,75 @@ To run the backend development server:
 ```bash
 npm run dev:backend
 ```
+
+## Android UI Components
+
+The application includes a set of Material Design 3 compliant components specifically designed for Android devices:
+
+### AndroidCard
+
+A flexible card component that follows Material Design 3 guidelines with support for different variants and interactive states.
+
+#### Features
+- **Variants**: Elevated, Filled, and Outlined styles
+- **Interactive States**: Hover, active, and focus states
+- **Dark Mode**: Built-in dark mode support
+- **Responsive**: Adapts to different screen sizes
+- **Accessible**: Proper ARIA attributes and keyboard navigation
+
+#### Usage
+
+```tsx
+import { AndroidCard } from '@/components/ui/android-card';
+
+// Basic usage
+<AndroidCard variant="elevated" interactive>
+  <AndroidCard.Image src="/path/to/image.jpg" alt="Card image" />
+  <AndroidCard.Header>
+    <AndroidCard.Title>Card Title</AndroidCard.Title>
+    <AndroidCard.Description>Card description</AndroidCard.Description>
+  </AndroidCard.Header>
+  <AndroidCard.Content>
+    <p>Card content goes here</p>
+  </AndroidCard.Content>
+  <AndroidCard.Footer>
+    <button>Action</button>
+  </AndroidCard.Footer>
+</AndroidCard>
+```
+
+#### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| variant | 'elevated' \| 'filled' \| 'outlined' | 'elevated' | Card style variant |
+| padded | boolean | true | Whether to add padding to the card |
+| rounded | boolean | true | Whether to round the card corners |
+| interactive | boolean | false | Whether the card is interactive (adds hover/active states) |
+| className | string | - | Additional CSS classes |
+
+### AndroidButton
+
+A customizable button component that follows Material Design 3 guidelines.
+
+#### Features
+- **Variants**: Filled, Outlined, Text, Elevated, Tonal
+- **States**: Hover, active, focus, and disabled states
+- **Icons**: Support for start and end icons
+- **Full-width**: Option to span full container width
+- **Loading State**: Built-in loading indicator
+
+### AndroidAppBar
+
+A top app bar component for navigation and actions.
+
+### AndroidBottomNavigation
+
+A bottom navigation bar for primary navigation in the app.
+
+## Theming
+
+The application uses a custom Material Design 3 theme that can be customized through the theme configuration files in `src/theme/`.
 
 ## Testing
 

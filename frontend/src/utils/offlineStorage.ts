@@ -134,6 +134,45 @@ export const updateSyncAttempt = async (reportId: string): Promise<void> => {
 };
 
 /**
+ * Clean any existing pending reports by removing the beat_id field
+ * This ensures data compatibility with the current database schema
+ */
+export const cleanPendingReports = async (): Promise<void> => {
+  try {
+    const { value: reportsJSON } = await Preferences.get({ key: PENDING_REPORTS_KEY });
+    if (!reportsJSON) {
+      return;
+    }
+    
+    const reports: PendingReport[] = JSON.parse(reportsJSON);
+    
+    // Remove beat_id from all reports
+    const sanitizedReports = reports.map(report => {
+      // Create a shallow copy of the report
+      const sanitizedReport = { ...report };
+      
+      // Remove beat_id from reportData if it exists
+      if (sanitizedReport.reportData && (sanitizedReport.reportData as any).beat_id !== undefined) {
+        const { beat_id, ...restOfData } = sanitizedReport.reportData as any;
+        sanitizedReport.reportData = restOfData;
+      }
+      
+      return sanitizedReport;
+    });
+    
+    // Save the sanitized reports back
+    await Preferences.set({
+      key: PENDING_REPORTS_KEY,
+      value: JSON.stringify(sanitizedReports)
+    });
+    
+    logger.info(`Cleaned ${sanitizedReports.length} pending reports to ensure DB compatibility`);
+  } catch (error) {
+    logger.error('Error cleaning pending reports:', error);
+  }
+};
+
+/**
  * Attempts to synchronize all pending reports with the server
  * @returns Object containing stats about the sync operation
  */
@@ -142,6 +181,9 @@ export const syncPendingReports = async (): Promise<{
   failed: number, 
   remaining: number 
 }> => {
+  // Clean all pending reports first to ensure beat_id is removed
+  await cleanPendingReports();
+  
   // Check if we're online first
   const online = await isOnline();
   if (!online) {
@@ -184,9 +226,39 @@ export const syncPendingReports = async (): Promise<{
         
         // Attempt to submit to Supabase
         report.reportData.user_id = userIdFromDb;
+        
+        // Create a clean object with only the columns we know exist in the database
+        // This ensures we don't try to insert any fields that don't exist in the DB schema
+        const cleanReportData = {
+          user_id: report.reportData.user_id,
+          activity_date: report.reportData.activity_date,
+          activity_time: report.reportData.activity_time,
+          observation_type: report.reportData.observation_type,
+          latitude: report.reportData.latitude,
+          longitude: report.reportData.longitude,
+          compass_bearing: report.reportData.compass_bearing,
+          indirect_sighting_type: report.reportData.indirect_sighting_type,
+          loss_type: report.reportData.loss_type
+        };
+        
+        // Add optional fields only if they exist in the report data
+        const optionalFields = [
+          'total_elephants', 'male_elephants', 'female_elephants', 'unknown_elephants',
+          'calves', 'photo_url', 'damage_done', 'damage_description',
+          'reporter_mobile', 'associated_division', 'associated_range', 'associated_beat'
+        ];
+        
+        optionalFields.forEach(field => {
+          if (report.reportData[field as keyof typeof report.reportData] !== undefined) {
+            (cleanReportData as any)[field] = report.reportData[field as keyof typeof report.reportData];
+          }
+        });
+        
+        // Use a specific columns approach to avoid any database triggers or RLS policies
+        // that might reference non-existent columns
         const { error } = await supabase
           .from('activity_reports')
-          .insert([report.reportData]);
+          .insert([cleanReportData]);
         
         if (error) {
           logger.error(`Error syncing report ${report.id}:`, error);
@@ -255,14 +327,42 @@ export const submitActivityReport = async (reportData: Partial<ActivityReport>):
     }
     
     reportData.user_id = userIdFromDb;
+
+    // Create a clean object with only the columns we know exist in the database
+    const cleanReportData = {
+      user_id: reportData.user_id,
+      activity_date: reportData.activity_date,
+      activity_time: reportData.activity_time,
+      observation_type: reportData.observation_type,
+      latitude: reportData.latitude,
+      longitude: reportData.longitude,
+      compass_bearing: reportData.compass_bearing,
+      indirect_sighting_type: reportData.indirect_sighting_type,
+      loss_type: reportData.loss_type
+    };
+    
+    // Add optional fields only if they exist
+    const optionalFields = [
+      'total_elephants', 'male_elephants', 'female_elephants', 'unknown_elephants',
+      'calves', 'photo_url', 'damage_done', 'damage_description',
+      'reporter_mobile', 'associated_division', 'associated_range', 'associated_beat'
+    ];
+    
+    optionalFields.forEach(field => {
+      if ((reportData as any)[field] !== undefined) {
+        (cleanReportData as any)[field] = (reportData as any)[field];
+      }
+    });
+
     const { error } = await supabase
       .from('activity_reports')
-      .insert([reportData]);
+      .insert([cleanReportData]);
     
     if (error) {
       // Even though we're online, the submission failed
       // Save it for later and return the error
-      await saveReportForLaterSync(reportData);
+      // We save `cleanReportData` which doesn't have `beat_id`
+      await saveReportForLaterSync(cleanReportData);
       return {
         success: false,
         offline: false,
@@ -279,8 +379,33 @@ export const submitActivityReport = async (reportData: Partial<ActivityReport>):
     };
   } catch (error: any) {
     // Error during the submission process
-    // Save locally as fallback
-    await saveReportForLaterSync(reportData);
+    // Save a clean version locally as fallback
+    const cleanReportData: Partial<ActivityReport> = {
+      user_id: reportData.user_id,
+      activity_date: reportData.activity_date,
+      activity_time: reportData.activity_time,
+      observation_type: reportData.observation_type,
+      latitude: reportData.latitude,
+      longitude: reportData.longitude,
+      compass_bearing: reportData.compass_bearing,
+      indirect_sighting_type: reportData.indirect_sighting_type,
+      loss_type: reportData.loss_type
+    };
+    
+    // Add optional fields only if they exist
+    const optionalFields = [
+      'total_elephants', 'male_elephants', 'female_elephants', 'unknown_elephants',
+      'calves', 'photo_url', 'damage_done', 'damage_description',
+      'reporter_mobile', 'associated_division', 'associated_range', 'associated_beat'
+    ];
+    
+    optionalFields.forEach(field => {
+      if ((reportData as any)[field] !== undefined) {
+        (cleanReportData as any)[field] = (reportData as any)[field];
+      }
+    });
+    
+    await saveReportForLaterSync(cleanReportData);
     return {
       success: false,
       offline: false,

@@ -6,27 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from '@/hooks/useAuth';
 import { checkSupabaseConnection } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 
-// Helper to get browser info
-function getBrowserInfo() {
-  return navigator.userAgent;
-}
-
-// Helper to get IP address
-async function getIpAddress() {
-  try {
-    const res = await fetch('https://api.ipify.org?format=json');
-    const data = await res.json();
-    return data.ip;
-  } catch {
-    return '';
-  }
-}
+// Note: These helpers are used by logLoginAttempt function via Supabase RPCs
 
 const logLoginAttempt = async (identifier: string, status: 'success' | 'failed') => {
   try {
@@ -66,8 +52,16 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const location = useLocation();
-  const { signIn, error: authError } = useAuth();
+  const { signIn } = useAuth();
+
+  // Set the page title
+  useEffect(() => {
+    document.title = 'Wild Elephant Monitoring System - Login';
+    // Restore the original title when component unmounts
+    return () => {
+      document.title = 'Wild Elephant Monitoring System';
+    };
+  }, []);
 
   useEffect(() => {
     // Only check connection for informational purposes
@@ -103,6 +97,7 @@ export default function Login() {
     try {
       // Validate identifier
       if (!validateIdentifier(identifier)) {
+        toast.error("Please enter a valid email or phone number");
         setError("Please enter a valid email or phone number");
         setIsLoading(false);
         return;
@@ -159,29 +154,22 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
-      <div className="container mx-auto py-12 px-4">
+    <div className="min-h-screen flex flex-col justify-center py-12 bg-gradient-to-b from-[#f8fafc] to-[#e8f1fe]/50 backdrop-blur-sm">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="flex flex-col items-center"
         >
-          <div className="flex items-center justify-center mb-8">
-            <img
-              src={`${import.meta.env.BASE_URL}elephant_photo.png`}
-              alt="Elephant Logo"
-              className="w-24 h-24 object-contain"
-            />
-          </div>
-          <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent"
-          >
-            Eravat
-          </motion.h1>
+          <motion.img
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            src="/elephant_photo.png"
+            alt="Elephant Watch Logo"
+            className="h-24 w-auto drop-shadow-sm"
+          />
           <motion.p 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -206,17 +194,17 @@ export default function Login() {
           transition={{ duration: 0.5, delay: 0.6 }}
           className="max-w-md mx-auto"
         >
-          <Card className="bg-white shadow-lg border-0 rounded-2xl overflow-hidden">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl font-bold text-gray-900">Welcome back</CardTitle>
+          <Card className="bg-white shadow-md border-0 rounded-xl overflow-hidden backdrop-blur-sm bg-opacity-95">
+            <CardHeader className="space-y-1 pb-3">
+              <CardTitle className="text-2xl font-light tracking-tight text-primary">Welcome back</CardTitle>
               <CardDescription className="text-gray-600">
                 Enter your email or phone number to access the system
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
+            <CardContent className="pt-3">
+              <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="identifier" className="text-gray-700">Email or Phone Number</Label>
+                  <Label htmlFor="identifier" className="text-sm font-medium text-gray-700">Email or Phone Number</Label>
                   <Input
                     id="identifier"
                     type="text"
@@ -224,19 +212,20 @@ export default function Login() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required
-                    className="focus:ring-blue-600 border-gray-200"
+                    className="rounded-lg border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm"
                     disabled={isLoading}
                   />
+                  {error && <p className="text-sm text-error mt-1">{error}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-700">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="focus:ring-blue-600 border-gray-200"
+                    className="rounded-lg border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm"
                     disabled={isLoading}
                   />
                 </div>
@@ -246,24 +235,24 @@ export default function Login() {
                     checked={rememberMe}
                     onCheckedChange={(checked) => setRememberMe(checked as boolean)}
                     disabled={isLoading}
-                    className="border-gray-200"
+                    className="border-gray-200 text-primary focus:ring-primary/20"
                   />
-                  <Label htmlFor="remember" className="text-sm font-normal text-gray-600">
+                  <Label htmlFor="remember" className="text-sm font-normal text-gray-600 select-none">
                     Remember me
                   </Label>
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white rounded-xl py-6 text-lg font-semibold transition-all duration-300" 
+                  className="w-full bg-primary hover:bg-primary/90 text-white rounded-lg py-5 text-base font-medium transition-all duration-200 shadow-sm hover:shadow" 
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Logging in...
+                      Signing in...
                     </>
                   ) : (
-                    "Login"
+                    "Sign in"
                   )}
                 </Button>
               </form>

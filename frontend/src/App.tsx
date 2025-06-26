@@ -3,13 +3,14 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createHashRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { createHashRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/NewAuthContext';
-import { Footer } from '@/components/Footer';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FullPageLoader } from './components/ui/FullPageLoader';
-import { Header } from '@/components/Header';
-import { NavigationSetup } from '@/components/NavigationSetup';
+
+// Import our Android Material Design layout component
+import { AndroidMaterialLayout } from './layouts/AndroidMaterialLayout';
+import { AndroidThemeProvider } from './theme/AndroidThemeProvider';
 
 // Lazy load pages
 const Index = lazy(() => import('./pages/Index'));
@@ -23,6 +24,7 @@ const AdminObservations = lazy(() => import('./pages/AdminObservations'));
 const AdminStatistics = lazy(() => import('./pages/AdminStatistics'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const AdminNotifications = lazy(() => import('./pages/AdminNotifications'));
+const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 
 class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode, fallback: ReactNode }) {
@@ -48,17 +50,7 @@ class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode
 
 const queryClient = new QueryClient();
 
-const ProtectedLayout = () => (
-  <div className="flex flex-col min-h-screen">
-    <Header />
-    <NavigationSetup />
-    <main className="flex-grow container mx-auto p-4">
-      <Outlet />
-    </main>
-    <Footer />
-  </div>
-);
-
+// Replace traditional ProtectedLayout with Material Design layout
 const router = createHashRouter([
   {
     path: '/login',
@@ -69,7 +61,8 @@ const router = createHashRouter([
     element: <ProtectedRoute />,
     children: [
       {
-        element: <ProtectedLayout />,
+        // Use our Android Material Design layout
+        element: <AndroidMaterialLayout />,
         children: [
           { index: true, element: <Suspense fallback={<FullPageLoader />}><Index /></Suspense> },
           { path: 'report-activity', element: <Suspense fallback={<FullPageLoader />}><ReportActivityPage /></Suspense> },
@@ -104,6 +97,10 @@ const router = createHashRouter([
             path: 'admin/notifications',
             element: <Suspense fallback={<FullPageLoader />}><AdminNotifications /></Suspense>
           },
+          {
+            path: 'user-profile',
+            element: <Suspense fallback={<FullPageLoader />}><UserProfilePage /></Suspense>
+          },
         ],
       },
     ],
@@ -115,15 +112,19 @@ const router = createHashRouter([
 ]);
 
 const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        {children}
-      </AuthProvider>
+  // Now using our custom AndroidThemeProvider
+  <AndroidThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          {children}
+        </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  </AndroidThemeProvider>
+  // </ThemeProvider>
 );
 
 const AppContent: React.FC = () => {
