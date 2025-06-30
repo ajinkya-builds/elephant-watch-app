@@ -1,1 +1,0 @@
-{"version":3,"file":"supabase-HmL3CfUB.js","sources":["../../src/lib/supabase.ts"],"sourcesContent":["import { getSupabaseClient } from './supabaseClient';\n\n// Export the singleton Supabase client instance\nexport const supabase = getSupabaseClient();"],"names":["supabase","getSupabaseClient"],"mappings":"wCAGO,MAAMA,EAAWC,EAAA"}
