@@ -25,6 +25,10 @@ const AdminStatistics = lazy(() => import('./pages/AdminStatistics'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const AdminNotifications = lazy(() => import('./pages/AdminNotifications'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
+const UserProfileEditPage = lazy(() => import('./pages/user-profile-edit'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const PrivacyPage = lazy(() => import('./pages/Privacy'));
+const HelpPage = lazy(() => import('./pages/Help'));
 
 class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode, fallback: ReactNode }) {
@@ -100,6 +104,22 @@ const router = createHashRouter([
           {
             path: 'user-profile',
             element: <Suspense fallback={<FullPageLoader />}><UserProfilePage /></Suspense>
+          },
+          {
+            path: 'user-profile/edit',
+            element: <Suspense fallback={<FullPageLoader />}><UserProfileEditPage /></Suspense>
+          },
+          {
+            path: 'settings',
+            element: <Suspense fallback={<FullPageLoader />}><SettingsPage /></Suspense>
+          },
+          {
+            path: 'privacy',
+            element: <Suspense fallback={<FullPageLoader />}><PrivacyPage /></Suspense>
+          },
+          {
+            path: 'help',
+            element: <Suspense fallback={<FullPageLoader />}><HelpPage /></Suspense>
           },
         ],
       },
