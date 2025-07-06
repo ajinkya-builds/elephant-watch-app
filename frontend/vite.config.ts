@@ -73,7 +73,7 @@ export default defineConfig(({ mode }) => {
   }
   console.log('All required environment variables are present');
 
-  const base = '/';
+  const base = '/elephant-watch-app/';
 
   return {
     base,
