@@ -92,7 +92,7 @@ export default defineConfig(({ mode }) => {
           scope: base,
           icons: [
             {
-              src: 'pwa-192x192.png',
+              src: '/elephant-watch-app/pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png'
             },
