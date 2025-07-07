@@ -1,0 +1,1 @@
+{"version":3,"file":"supabase-CegTfEW1.js","sources":["../../src/lib/supabase.ts"],"sourcesContent":["import { getSupabaseClient } from './supabaseClient';\n\n// Export the singleton Supabase client instance\nexport const supabase = getSupabaseClient();"],"names":["supabase","getSupabaseClient"],"mappings":"wCAGO,MAAMA,EAAWC,EAAA"}
