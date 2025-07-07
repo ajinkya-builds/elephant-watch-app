@@ -38,7 +38,7 @@ export default function Index() {
                 applyThemeClasses(theme, "bg-primary"))}></div>
               <div className="bg-white/80 rounded-full p-4 shadow-lg backdrop-blur-sm">
                 <img 
-                  src="/elephant_photo.png" 
+                  src={`${import.meta.env.BASE_URL}elephant_photo.png`} 
                   alt="Elephant Logo" 
                   className="w-20 h-20 sm:w-28 sm:h-28 relative z-10 drop-shadow-sm" 
                 />

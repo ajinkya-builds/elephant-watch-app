@@ -166,7 +166,7 @@ export default function Login() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            src="/elephant_photo.png"
+            src={`${import.meta.env.BASE_URL}elephant_photo.png`}
             alt="Elephant Watch Logo"
             className="h-24 w-auto drop-shadow-sm"
           />
